@@ -1,0 +1,23 @@
+# Example: Soundings context profile (minimal)
+#
+# This is the smallest valid /.well-known/soundings.yaml file. Every required
+# field is included; nothing else.
+#
+# Use this as a starting point if you want to publish a profile quickly. You
+# can add richer information later — Soundings will pick up changes the next
+# time it refetches.
+#
+# Spec: /soundings-spec/v2-context-layer.md
+
+soundings_version: "2.0"
+
+organisation:
+  name: "Hartlepool Community Food Project"
+  url: "https://example.org/"
+
+geography:
+  primary_places:
+    - "ltla24:E06000001"   # Hartlepool
+
+last_reviewed: "2025-11-30"
+licence: "CC-BY-4.0"

@@ -1,0 +1,187 @@
+# Example: Soundings context profile (rich, annotated)
+#
+# This is a worked example of a /.well-known/soundings.yaml file as defined in
+# the Soundings v2 spec. It is annotated extensively. A real profile would have
+# fewer comments; the annotations here are to help organisations and developers
+# understand what each field is for.
+#
+# This profile is for a fictional organisation. Any resemblance to real
+# organisations is illustrative.
+#
+# Spec: /soundings-spec/v2-context-layer.md
+# Validator: (when published) https://soundings.good-ship.co.uk/validate
+# Schema: https://soundings.good-ship.co.uk/schema/v2.0/profile.json
+
+# -----------------------------------------------------------------------------
+# Required: which version of the schema this profile is written against.
+# Soundings will index any v2.x profile. v3+ may introduce new required fields.
+# -----------------------------------------------------------------------------
+soundings_version: "2.0"
+
+# -----------------------------------------------------------------------------
+# Who you are.
+# -----------------------------------------------------------------------------
+organisation:
+  name: "Tees Valley Refugee Support"
+  legal_form: "registered_charity"            # see schema for full list
+
+  # Identifiers help Soundings cross-check against public registers. Provide
+  # whatever applies; none are individually required, but at least one is
+  # strongly recommended for verification.
+  identifiers:
+    charity_commission: "1187654"
+    companies_house: "11876543"
+
+  url: "https://teesvalleyrefugees.org.uk/"
+  description: >
+    We support people seeking asylum and refugees across the Tees Valley. Our
+    services include casework, English classes, a weekly drop-in, and
+    accompanying volunteers for appointments. We have been operating since
+    2014.
+
+  # Classification using ICNPO (International Classification of Non-Profit
+  # Organisations) codes. Multiple codes welcome where relevant.
+  classification:
+    - "icnpo:7100"   # Civic and Advocacy Organizations
+    - "icnpo:4500"   # Emergency and Refugee Aid
+
+# -----------------------------------------------------------------------------
+# Where you work.
+#
+# `primary_places` is the most important field in the profile after the
+# identifiers. It uses canonical Soundings geography IDs in the form
+# `<type>:<code>`. Valid types in v2.0: lsoa21, msoa21, ltla24, utla24, region,
+# country, westminster_constituency_24, ward24.
+#
+# Use the lowest level that genuinely reflects where you operate. If you serve
+# a whole local authority, use the LTLA. If you serve a tighter patch, use
+# MSOA-level codes.
+# -----------------------------------------------------------------------------
+geography:
+  primary_places:
+    - "ltla24:E06000004"   # Stockton-on-Tees
+    - "ltla24:E06000005"   # Darlington
+    - "ltla24:E06000002"   # Middlesbrough
+    - "ltla24:E06000001"   # Hartlepool
+
+  # Free text for human readers. Soundings uses primary_places for routing;
+  # this field is shown in the UI and to LLMs reading the profile.
+  reach_description: >
+    We work across the four Tees Valley local authorities. We accept referrals
+    from across the wider North East but cannot guarantee in-person support
+    outside our primary patch.
+
+# -----------------------------------------------------------------------------
+# What you observe.
+#
+# Each entry here is a theme of need or experience that you see in the course
+# of your work. This is *not* a list of services you provide — it is a list of
+# what you observe through providing those services.
+#
+# `theme` should be a short snake_case identifier. The Soundings editorial
+# board maintains a controlled list of themes; you can use one of those, or
+# propose a new one. Profiles using novel themes are still indexed but may
+# appear in fewer aggregations until the theme is recognised.
+#
+# `evidence_types` describes the kinds of evidence you have. This is informative
+# only in v2; in v3 it shapes how observations can be submitted.
+# -----------------------------------------------------------------------------
+what_we_observe:
+
+  - theme: "housing"
+    description: >
+      Patterns in barriers to securing safe and affordable housing for asylum
+      seekers and recently-recognised refugees, particularly around landlord
+      reluctance to accept tenants on benefits and time-limited move-on
+      windows after asylum decisions.
+    evidence_types: ["case_notes", "service_user_interviews"]
+    cadence: "ongoing"
+    recency: "current"
+
+  - theme: "mental_health"
+    description: >
+      Patterns in mental health support needs among service users, including
+      barriers to accessing primary care and the impact of asylum process
+      uncertainty on wellbeing.
+    evidence_types: ["case_notes", "outcome_measures"]
+    cadence: "quarterly"
+    recency: "Q4 2025"
+
+  - theme: "destitution"
+    description: >
+      Incidence of destitution risk among service users, particularly those
+      with no recourse to public funds or moving between asylum support and
+      mainstream benefits.
+    evidence_types: ["case_notes", "incident_log"]
+    cadence: "monthly"
+    recency: "current"
+
+  - theme: "service_access"
+    description: >
+      Patterns in accessing local services, particularly GP registration,
+      school admissions, and adult ESOL provision. We see who is being turned
+      away and on what grounds.
+    evidence_types: ["case_notes"]
+    cadence: "ongoing"
+    recency: "current"
+
+# -----------------------------------------------------------------------------
+# How you know what you observe.
+#
+# The methodology block is what gives a Soundings consumer (an LLM, a
+# researcher, a funder) the basis to weigh your contribution. Be honest about
+# scope and limits. You do not need to be a research institution. You do need
+# to be transparent.
+# -----------------------------------------------------------------------------
+methodology:
+  collection: >
+    Case notes are recorded by support workers at every contact with a service
+    user. A senior caseworker reviews case-note themes monthly. The head of
+    services reviews aggregated patterns quarterly and updates this profile.
+
+  sample: >
+    Every active service user is included in case-note analysis. We saw 487
+    distinct individuals in the year to September 2025. We do not see people
+    who have not approached us; this is not a representative sample of the
+    refugee or asylum-seeking population in the Tees Valley.
+
+  caveats:
+    - "We see only people who approach us. Our data reflects the experience of those who reach our services, not the wider population."
+    - "Case notes are not standardised across workers; we are working towards a more structured intake form for 2026."
+    - "Outcome measures are collected at intake and discharge only, not at intervals."
+
+# -----------------------------------------------------------------------------
+# How fresh your information is.
+#
+# `publishing_cadence` tells Soundings how often to expect updates to this
+# profile. Soundings will refetch on a cadence proportional to this, capped at
+# weekly minimum and quarterly maximum.
+#
+# `last_reviewed` is the date a human last looked at the file and confirmed it
+# is current. This is what Soundings displays to consumers as the freshness
+# signal.
+# -----------------------------------------------------------------------------
+publishing_cadence: "quarterly"
+last_reviewed: "2025-12-15"
+
+# -----------------------------------------------------------------------------
+# Contact (optional).
+#
+# Public profiles often omit personal contact details. The default Soundings
+# pattern is a role and a contact form on your own site. Email addresses are
+# allowed but not encouraged.
+# -----------------------------------------------------------------------------
+contact:
+  for_data_questions:
+    name: "Aisha Rahman"
+    role: "Head of Services"
+    contact_form_url: "https://teesvalleyrefugees.org.uk/data-enquiries"
+
+# -----------------------------------------------------------------------------
+# Licence.
+#
+# A licence applying to the profile content (not to your data — that's
+# separately handled when you submit observations in v3). CC-BY-4.0 is the
+# recommended default.
+# -----------------------------------------------------------------------------
+licence: "CC-BY-4.0"
