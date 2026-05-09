@@ -1,0 +1,54 @@
+[project]
+name = "soundings"
+version = "0.0.1"
+description = "Soundings server — MCP + FastAPI orchestration over UK open data"
+requires-python = ">=3.12"
+license = { file = "../LICENSE-AGPL-3.0" }
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "mcp>=1.2",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "asyncpg>=0.30",
+    "alembic>=1.14",
+    "pydantic>=2.10",
+    "pydantic-settings>=2.6",
+    "httpx>=0.28",
+    "aiolimiter>=1.2",
+    "geoalchemy2>=0.16",
+    "structlog>=24.4",
+    "pyyaml>=6.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-vcr>=1.0.2",
+    "vcrpy>=6.0",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "types-pyyaml",
+    "httpx>=0.28",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "ASYNC", "S", "RUF"]
+ignore = ["S101"]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "live: hits real upstream APIs; nightly only",
+    "integration: requires running Postgres",
+]

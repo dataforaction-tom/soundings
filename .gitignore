@@ -1,3 +1,16 @@
 CLAUDE.local.md
 HANDOFF.md
 .claude/settings.local.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# Environment
+.env
