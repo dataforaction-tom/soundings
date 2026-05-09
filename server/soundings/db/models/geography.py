@@ -1,7 +1,7 @@
 from datetime import date, datetime
 
 from geoalchemy2 import Geometry
-from sqlalchemy import Date, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import Date, DateTime, ForeignKey, Index, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from soundings.db.models import Base
@@ -11,6 +11,7 @@ class Place(Base):
     __tablename__ = "place"
     __table_args__ = (
         UniqueConstraint("type", "code", "valid_from", name="uq_place_type_code_validfrom"),
+        Index("ix_place_geom", "geom", postgresql_using="gist"),
         {"schema": "geography"},
     )
 

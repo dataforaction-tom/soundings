@@ -8,4 +8,4 @@ class Base(DeclarativeBase):
 
 metadata = Base.metadata
 
-from soundings.db.models import geography  # noqa: E402, F401
+from soundings.db.models import catalogue, geography  # noqa: E402, F401
