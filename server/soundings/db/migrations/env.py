@@ -19,6 +19,25 @@ if config.config_file_name is not None:
 target_metadata = metadata
 
 
+# Schemas Alembic should manage. Anything in `public` (postgis system tables,
+# pg_trgm, alembic_version) is left alone.
+MANAGED_SCHEMAS = {"geography", "catalogue", "data", "cache", "corpus"}
+
+
+def include_object(
+    obj: Any, name: str | None, type_: str, reflected: bool, compare_to: Any
+) -> bool:
+    if type_ == "table":
+        schema = getattr(obj, "schema", None)
+        if schema not in MANAGED_SCHEMAS:
+            return False
+    if type_ == "index":
+        schema = getattr(getattr(obj, "table", None), "schema", None)
+        if schema not in MANAGED_SCHEMAS:
+            return False
+    return True
+
+
 def run_migrations_offline() -> None:
     context.configure(
         url=config.get_main_option("sqlalchemy.url"),
@@ -26,6 +45,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         include_schemas=True,
+        include_object=include_object,
         version_table_schema="public",
     )
     with context.begin_transaction():
@@ -37,6 +57,7 @@ def do_run_migrations(connection: Connection) -> None:
         connection=connection,
         target_metadata=target_metadata,
         include_schemas=True,
+        include_object=include_object,
         version_table_schema="public",
     )
     with context.begin_transaction():
