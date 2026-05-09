@@ -2,7 +2,7 @@
 
 **Status:** Draft 0.2
 **Scope:** The MCP server, the indicator catalogue, the geography spine, and the questions corpus capture layer. Designed to run on a single machine.
-**Related:** [README](./README.md) · [v1.5](./v1.5-just-in-time-interfaces.md) · [v2](./v2-context-layer.md) · [v3](./v3-contribution-layer.md)
+**Related:** [README](../README.md) · [v1.5](./v1.5-just-in-time-interfaces.md) · [v2](./v2-context-layer.md) · [v3](./v3-contribution-layer.md)
 
 ---
 

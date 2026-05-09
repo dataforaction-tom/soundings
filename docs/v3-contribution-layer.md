@@ -3,7 +3,7 @@
 **Status:** Draft 0.1
 **Scope:** Organisations submit structured observations — claims about local need backed by evidence — that sit alongside official statistics in answers, clearly flagged and provenanced. The translatable observation standard from the original Local Needs Data Bank, evolved.
 **Builds on:** [v1](./v1-orchestration-and-capture.md), [v1.5](./v1.5-just-in-time-interfaces.md), [v2](./v2-context-layer.md)
-**Related:** [README](./README.md)
+**Related:** [README](../README.md)
 
 ---
 

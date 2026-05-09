@@ -3,7 +3,7 @@
 **Status:** Draft 0.1
 **Scope:** Organisations publish lightweight machine-readable profiles describing who they are, where they work, and what they observe. Soundings indexes these and treats them as first-class sources alongside ONS, DWP, etc.
 **Builds on:** [v1](./v1-orchestration-and-capture.md), [v1.5](./v1.5-just-in-time-interfaces.md)
-**Related:** [README](./README.md) · [v3](./v3-contribution-layer.md)
+**Related:** [README](../README.md) · [v3](./v3-contribution-layer.md)
 
 ---
 
