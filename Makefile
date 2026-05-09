@@ -22,22 +22,22 @@ test-live:  ## Run live-API tests (nightly cron only)
 	cd server && uv run pytest -m live
 
 up:  ## Bring up the docker compose stack
-	docker compose -f infra/docker-compose.yml up -d
+	docker compose -f infra/docker-compose.yml --project-directory . up -d
 
 down:  ## Tear down the stack
-	docker compose -f infra/docker-compose.yml down
+	docker compose -f infra/docker-compose.yml --project-directory . down
 
 logs:  ## Tail logs
-	docker compose -f infra/docker-compose.yml logs -f
+	docker compose -f infra/docker-compose.yml --project-directory . logs -f
 
 migrate:  ## Run alembic upgrade head against running stack
-	docker compose -f infra/docker-compose.yml exec server alembic upgrade head
+	docker compose -f infra/docker-compose.yml --project-directory . exec server alembic upgrade head
 
 seed:  ## Full geography + catalogue seed (~1 hour)
-	docker compose -f infra/docker-compose.yml exec server python -m soundings.seed.run --full
+	docker compose -f infra/docker-compose.yml --project-directory . exec server python -m soundings.seed.run --full
 
 seed-light:  ## Dev seed (single LTLA, ~5 min)
-	docker compose -f infra/docker-compose.yml exec server python -m soundings.seed.run --light
+	docker compose -f infra/docker-compose.yml --project-directory . exec server python -m soundings.seed.run --light
 
 decrypt-env:  ## Decrypt .env from soundings-ops (placeholder until soundings-ops exists)
 	@echo "TODO: implement once soundings-ops repo exists"
