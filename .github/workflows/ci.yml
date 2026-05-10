@@ -1,0 +1,53 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  lint-type:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "0.11.12"
+      - run: cd server && uv sync --frozen
+      - run: cd server && uv run ruff check .
+      - run: cd server && uv run ruff format --check .
+      - run: cd server && uv run mypy soundings
+
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_DB: soundings
+          POSTGRES_USER: soundings
+          POSTGRES_PASSWORD: changeme-locally
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U soundings"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "0.11.12"
+      - run: cd server && uv sync --frozen
+      - name: Bootstrap extensions and schemas
+        env:
+          PGPASSWORD: changeme-locally
+        run: |
+          psql -h localhost -U soundings -d soundings -f infra/initdb/00-extensions.sql
+          psql -h localhost -U soundings -d soundings -f infra/initdb/01-schemas.sql
+      - name: Run migrations
+        env:
+          DATABASE_URL: postgresql+asyncpg://soundings:changeme-locally@localhost:5432/soundings
+        run: cd server && uv run alembic upgrade head
+      - name: Tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://soundings:changeme-locally@localhost:5432/soundings
+        run: cd server && uv run pytest -m "not live"
