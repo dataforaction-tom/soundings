@@ -43,14 +43,24 @@ sources:
     ttl_hours: 24
     rate_limit: { rps: 2 }
 
-  - id: mhclg.imd2019
-    label: English Indices of Deprivation 2019
+  - id: mhclg.imd2025
+    label: English Indices of Deprivation 2025
     publisher: Ministry of Housing, Communities and Local Government
-    publisher_url: https://www.gov.uk/government/statistics/english-indices-of-deprivation-2019
-    dataset_url: https://www.gov.uk/government/statistics/english-indices-of-deprivation-2019
+    publisher_url: https://www.gov.uk/government/statistics/english-indices-of-deprivation-2025
+    dataset_url: https://www.gov.uk/government/statistics/english-indices-of-deprivation-2025
     licence: OGL-UK-3.0
     mode: loader
     refresh_cadence: "0 3 1 * *"
+
+  - id: ons.mid_year_estimates
+    label: ONS Mid-Year Population Estimates
+    publisher: Office for National Statistics
+    publisher_url: https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates
+    dataset_url: https://www.nomisweb.co.uk/
+    licence: OGL-UK-3.0
+    mode: loader
+    refresh_cadence: "0 2 1 7 *"
+    rate_limit: { rps: 2 }
 
   - id: mhclg.live_tables
     label: MHCLG Live Tables
@@ -110,7 +120,7 @@ sources:
     mode: loader
     refresh_cadence: "0 2 * * *"
 
-  - id: 360giving
+  - id: threesixtygiving
     label: 360Giving Datastore
     publisher: 360Giving
     publisher_url: https://www.threesixtygiving.org/
