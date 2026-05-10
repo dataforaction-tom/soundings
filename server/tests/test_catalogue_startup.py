@@ -10,10 +10,13 @@ pytestmark = pytest.mark.integration
 
 
 async def test_lifespan_loads_catalogue_into_postgres() -> None:
-    # Start with an empty catalogue. Dependent caches reference catalogue.source.
+    # Start with an empty catalogue. Dependent caches and loader_run rows
+    # reference catalogue.source via FK and need to clear first.
     engine = get_engine()
     async with engine.begin() as conn:
         await conn.execute(text("DELETE FROM cache.source_cache"))
+        await conn.execute(text("DELETE FROM data.indicator_value"))
+        await conn.execute(text("DELETE FROM data.loader_run"))
         await conn.execute(text("DELETE FROM catalogue.indicator"))
         await conn.execute(text("DELETE FROM catalogue.source"))
 
