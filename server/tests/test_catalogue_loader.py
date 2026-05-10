@@ -18,26 +18,18 @@ async def test_load_catalogue_is_idempotent_and_stamps_version() -> None:
     engine = get_engine()
 
     # Run twice; second run must not create duplicate rows.
-    await load_catalogue_into_db(
-        engine, sources_path=SOURCES_YAML, indicators_path=INDICATORS_YAML
-    )
+    await load_catalogue_into_db(engine, sources_path=SOURCES_YAML, indicators_path=INDICATORS_YAML)
     async with engine.connect() as conn:
         n_sources_first = (await conn.execute(select(func.count(Source.id)))).scalar_one()
-        n_indicators_first = (
-            await conn.execute(select(func.count(Indicator.key)))
-        ).scalar_one()
+        n_indicators_first = (await conn.execute(select(func.count(Indicator.key)))).scalar_one()
         version_first = (
             await conn.execute(select(Indicator.catalogue_version).distinct())
         ).scalar_one()
 
-    await load_catalogue_into_db(
-        engine, sources_path=SOURCES_YAML, indicators_path=INDICATORS_YAML
-    )
+    await load_catalogue_into_db(engine, sources_path=SOURCES_YAML, indicators_path=INDICATORS_YAML)
     async with engine.connect() as conn:
         n_sources_second = (await conn.execute(select(func.count(Source.id)))).scalar_one()
-        n_indicators_second = (
-            await conn.execute(select(func.count(Indicator.key)))
-        ).scalar_one()
+        n_indicators_second = (await conn.execute(select(func.count(Indicator.key)))).scalar_one()
         version_second = (
             await conn.execute(select(Indicator.catalogue_version).distinct())
         ).scalar_one()

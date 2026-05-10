@@ -6,7 +6,7 @@ adapter.
 """
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
@@ -28,15 +28,11 @@ def _normalise_postcode(postcode: str) -> str:
 
 
 class GeographyService:
-    def __init__(
-        self, engine: AsyncEngine, postcodes_io: PostcodesIoAdapter
-    ) -> None:
+    def __init__(self, engine: AsyncEngine, postcodes_io: PostcodesIoAdapter) -> None:
         self._engine = engine
         self._postcodes_io = postcodes_io
 
-    async def find_place_by_postcode(
-        self, postcode: str
-    ) -> dict[str, Place] | None:
+    async def find_place_by_postcode(self, postcode: str) -> dict[str, Place] | None:
         """Returns dict keyed by place type → Place, for all containing levels.
 
         Cache-first: hits geography.postcode if a fresh row exists, otherwise
@@ -68,9 +64,7 @@ class GeographyService:
             return {}
 
         async with AsyncSession(self._engine) as session:
-            places = (
-                await session.scalars(select(Place).where(Place.id.in_(place_ids)))
-            ).all()
+            places = (await session.scalars(select(Place).where(Place.id.in_(place_ids)))).all()
         return {p.type: p for p in places}
 
     async def find_place_by_name(
@@ -114,11 +108,8 @@ class GeographyService:
         if types:
             placeholders = ", ".join(f":t{i}" for i, _ in enumerate(types))
             clauses += f" AND type IN ({placeholders})"
-        sql = (
-            "SELECT id, type, code, name, valid_from, valid_to "
-            "FROM geography.place "
-            f"{clauses}"
-        )
+        # `clauses` is built only from a fixed set of `:tN` placeholders, not user input.
+        sql = f"SELECT id, type, code, name, valid_from, valid_to FROM geography.place {clauses}"  # noqa: S608
         params: dict[str, object] = {"lat": lat, "lng": lng}
         if types:
             for i, t in enumerate(types):
@@ -138,7 +129,7 @@ class GeographyService:
         ]
 
     async def _read_cached_postcode(self, normalised: str) -> Postcode | None:
-        cutoff = datetime.now(tz=timezone.utc) - POSTCODE_FRESHNESS
+        cutoff = datetime.now(tz=UTC) - POSTCODE_FRESHNESS
         async with AsyncSession(self._engine) as session:
             return (
                 await session.scalars(

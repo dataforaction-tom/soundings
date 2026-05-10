@@ -13,9 +13,7 @@ class QuestionRecord(Base):
     __tablename__ = "question_record"
     __table_args__ = ({"schema": "corpus"},)
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     session_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
     consent_version: Mapped[str] = mapped_column(String(32))

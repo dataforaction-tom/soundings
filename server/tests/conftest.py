@@ -19,7 +19,7 @@ async def _reset_engine_per_test() -> AsyncIterator[None]:
     yield
     from soundings.db.engine import get_engine
 
-    engine = get_engine.cache_info().currsize and get_engine() or None
+    engine = (get_engine.cache_info().currsize and get_engine()) or None
     if engine is not None:
         await engine.dispose()
     get_engine.cache_clear()

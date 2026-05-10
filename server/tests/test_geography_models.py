@@ -10,7 +10,5 @@ pytestmark = pytest.mark.integration
 async def test_place_table_exists_with_required_columns() -> None:
     engine = get_engine()
     async with engine.connect() as conn:
-        result = await conn.execute(
-            select(Place.id, Place.type, Place.code, Place.name).limit(0)
-        )
+        result = await conn.execute(select(Place.id, Place.type, Place.code, Place.name).limit(0))
         assert tuple(result.keys()) == ("id", "type", "code", "name")

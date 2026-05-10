@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import text
@@ -12,7 +12,9 @@ pytestmark = pytest.mark.integration
 async def _ensure_source(source_id: str) -> None:
     engine = get_engine()
     async with engine.begin() as conn:
-        await conn.execute(text("DELETE FROM cache.source_cache WHERE source_id = :s"), {"s": source_id})
+        await conn.execute(
+            text("DELETE FROM cache.source_cache WHERE source_id = :s"), {"s": source_id}
+        )
         await conn.execute(
             text(
                 "INSERT INTO catalogue.source (id, label, publisher, licence, mode, rate_limit) "
@@ -27,9 +29,7 @@ async def test_put_then_get_within_ttl_returns_payload() -> None:
     engine = get_engine()
     await _ensure_source("test.cache.fresh")
     store = SourceCacheStore(engine)
-    await store.put(
-        "test.cache.fresh", "TS18 1AB", {"hello": "world"}, ttl=timedelta(hours=1)
-    )
+    await store.put("test.cache.fresh", "TS18 1AB", {"hello": "world"}, ttl=timedelta(hours=1))
     got = await store.get("test.cache.fresh", "TS18 1AB")
     assert got == {"hello": "world"}
 
@@ -39,7 +39,7 @@ async def test_put_then_get_after_ttl_returns_none() -> None:
     await _ensure_source("test.cache.expired")
     store = SourceCacheStore(engine)
     # Synthesise an already-expired row.
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     async with engine.begin() as conn:
         await conn.execute(
             text(
@@ -61,9 +61,11 @@ async def test_delete_expired_removes_stale_rows() -> None:
     engine = get_engine()
     await _ensure_source("test.cache.cleanup")
     store = SourceCacheStore(engine)
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     async with engine.begin() as conn:
-        await conn.execute(text("DELETE FROM cache.source_cache WHERE source_id = 'test.cache.cleanup'"))
+        await conn.execute(
+            text("DELETE FROM cache.source_cache WHERE source_id = 'test.cache.cleanup'")
+        )
         await conn.execute(
             text(
                 "INSERT INTO cache.source_cache "

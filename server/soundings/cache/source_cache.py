@@ -4,7 +4,7 @@ Keyed by `(source_id, cache_key)` and stamped with retrieved_at + expires_at.
 Reads expired rows as `None` so callers can re-fetch upstream.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select, text
@@ -19,7 +19,7 @@ class SourceCacheStore:
         self._engine = engine
 
     async def get(self, source_id: str, cache_key: str) -> Any | None:
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now(tz=UTC)
         async with self._engine.connect() as conn:
             result = await conn.execute(
                 select(SourceCache.payload, SourceCache.expires_at).where(
@@ -40,7 +40,7 @@ class SourceCacheStore:
         *,
         ttl: timedelta,
     ) -> None:
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now(tz=UTC)
         expires = now + ttl
         async with self._engine.begin() as conn:
             stmt = insert(SourceCache).values(

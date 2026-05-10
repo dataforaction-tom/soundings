@@ -19,9 +19,7 @@ def test_sources_yaml_loads_and_validates() -> None:
                 f"{s.id} is passthrough but has no ttl_hours"
             )
         if s.mode == "loader":
-            assert s.refresh_cadence is not None, (
-                f"{s.id} is loader but has no refresh_cadence"
-            )
+            assert s.refresh_cadence is not None, f"{s.id} is loader but has no refresh_cadence"
 
 
 def test_indicators_yaml_loads_and_references_known_sources() -> None:

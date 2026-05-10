@@ -83,9 +83,7 @@ async def _seed_full_spine() -> None:
         await conn.execute(text("DELETE FROM geography.place"))
         for place_id, place_type, code, name in PLACE_FIXTURES:
             await conn.execute(
-                Place.__table__.insert().values(
-                    id=place_id, type=place_type, code=code, name=name
-                )
+                Place.__table__.insert().values(id=place_id, type=place_type, code=code, name=name)
             )
         for child, parent in HIERARCHY_EDGES:
             await conn.execute(

@@ -74,9 +74,7 @@ class OnsGeographyPlacesLoader(LoaderAdapter):
         body = response.json()
         return [f.get("attributes", {}) for f in body.get("features", [])]
 
-    async def _upsert_features(
-        self, layer: OgpLayer, features: list[dict[str, Any]]
-    ) -> None:
+    async def _upsert_features(self, layer: OgpLayer, features: list[dict[str, Any]]) -> None:
         rows = []
         for f in features:
             code = f.get(layer.code_field)

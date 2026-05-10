@@ -30,12 +30,8 @@ class PlaceHierarchy(Base):
     __tablename__ = "place_hierarchy"
     __table_args__ = ({"schema": "geography"},)
 
-    child_id: Mapped[str] = mapped_column(
-        ForeignKey("geography.place.id"), primary_key=True
-    )
-    parent_id: Mapped[str] = mapped_column(
-        ForeignKey("geography.place.id"), primary_key=True
-    )
+    child_id: Mapped[str] = mapped_column(ForeignKey("geography.place.id"), primary_key=True)
+    parent_id: Mapped[str] = mapped_column(ForeignKey("geography.place.id"), primary_key=True)
 
 
 class Postcode(Base):
@@ -43,30 +39,16 @@ class Postcode(Base):
     __table_args__ = ({"schema": "geography"},)
 
     postcode: Mapped[str] = mapped_column(String(8), primary_key=True)
-    lsoa21: Mapped[str | None] = mapped_column(
-        ForeignKey("geography.place.id"), nullable=True
-    )
-    msoa21: Mapped[str | None] = mapped_column(
-        ForeignKey("geography.place.id"), nullable=True
-    )
-    ltla24: Mapped[str | None] = mapped_column(
-        ForeignKey("geography.place.id"), nullable=True
-    )
-    utla24: Mapped[str | None] = mapped_column(
-        ForeignKey("geography.place.id"), nullable=True
-    )
-    ward24: Mapped[str | None] = mapped_column(
-        ForeignKey("geography.place.id"), nullable=True
-    )
+    lsoa21: Mapped[str | None] = mapped_column(ForeignKey("geography.place.id"), nullable=True)
+    msoa21: Mapped[str | None] = mapped_column(ForeignKey("geography.place.id"), nullable=True)
+    ltla24: Mapped[str | None] = mapped_column(ForeignKey("geography.place.id"), nullable=True)
+    utla24: Mapped[str | None] = mapped_column(ForeignKey("geography.place.id"), nullable=True)
+    ward24: Mapped[str | None] = mapped_column(ForeignKey("geography.place.id"), nullable=True)
     westminster_constituency_24: Mapped[str | None] = mapped_column(
         ForeignKey("geography.place.id"), nullable=True
     )
-    region: Mapped[str | None] = mapped_column(
-        ForeignKey("geography.place.id"), nullable=True
-    )
-    country: Mapped[str | None] = mapped_column(
-        ForeignKey("geography.place.id"), nullable=True
-    )
+    region: Mapped[str | None] = mapped_column(ForeignKey("geography.place.id"), nullable=True)
+    country: Mapped[str | None] = mapped_column(ForeignKey("geography.place.id"), nullable=True)
     retrieved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 

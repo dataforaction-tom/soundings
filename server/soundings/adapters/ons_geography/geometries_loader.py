@@ -49,9 +49,7 @@ class OnsGeographyGeometriesLoader(LoaderAdapter):
             if owns_client:
                 await client.aclose()
 
-    async def _load_layer(
-        self, client: httpx.AsyncClient, layer: OgpLayer
-    ) -> tuple[int, int]:
+    async def _load_layer(self, client: httpx.AsyncClient, layer: OgpLayer) -> tuple[int, int]:
         offset = 0
         written = 0
         skipped = 0
@@ -81,7 +79,8 @@ class OnsGeographyGeometriesLoader(LoaderAdapter):
         }
         response = await client.get(f"{layer.feature_url}/query", params=params)
         response.raise_for_status()
-        return response.json().get("features", [])
+        features: list[dict[str, Any]] = response.json().get("features", [])
+        return features
 
     async def _update_geometries(
         self, layer: OgpLayer, features: list[dict[str, Any]]

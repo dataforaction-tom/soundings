@@ -7,6 +7,7 @@ LSOA→MSOA, LSOA→LTLA, MSOA→LTLA. Multiple chains can be loaded in one pass
 →country chain).
 """
 
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from itertools import combinations
 from typing import Any
@@ -60,7 +61,9 @@ class OnsGeographyHierarchyLoader(LoaderAdapter):
             if owns_client:
                 await client.aclose()
 
-    async def _iter_rows(self, client: httpx.AsyncClient, chain: LookupChain):
+    async def _iter_rows(
+        self, client: httpx.AsyncClient, chain: LookupChain
+    ) -> AsyncIterator[dict[str, Any]]:
         offset = 0
         out_fields = ",".join(field for _, field in chain.levels)
         while True:
@@ -84,9 +87,7 @@ class OnsGeographyHierarchyLoader(LoaderAdapter):
             offset += PAGE_SIZE
 
     @staticmethod
-    def _row_to_edges(
-        row: dict[str, Any], chain: LookupChain
-    ) -> set[tuple[str, str]]:
+    def _row_to_edges(row: dict[str, Any], chain: LookupChain) -> set[tuple[str, str]]:
         present: list[tuple[str, str]] = []
         for place_type, field in chain.levels:
             code = row.get(field)
@@ -109,7 +110,11 @@ class OnsGeographyHierarchyLoader(LoaderAdapter):
             return
         rows = [{"child_id": c, "parent_id": p} for c, p in edges]
         async with self._engine.begin() as conn:
-            stmt = insert(PlaceHierarchy).values(rows).on_conflict_do_nothing(
-                index_elements=[PlaceHierarchy.child_id, PlaceHierarchy.parent_id]
+            stmt = (
+                insert(PlaceHierarchy)
+                .values(rows)
+                .on_conflict_do_nothing(
+                    index_elements=[PlaceHierarchy.child_id, PlaceHierarchy.parent_id]
+                )
             )
             await conn.execute(stmt)

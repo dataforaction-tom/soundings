@@ -18,7 +18,7 @@ async def healthz() -> dict[str, Any]:
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
         checks["postgres"] = "ok"
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         checks["postgres"] = f"fail: {exc.__class__.__name__}"
 
     try:
@@ -26,7 +26,7 @@ async def healthz() -> dict[str, Any]:
         async with engine.connect() as conn:
             n_sources = (await conn.execute(select(func.count(Source.id)))).scalar_one()
         checks["catalogue"] = "ok" if n_sources > 0 else "empty"
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         checks["catalogue"] = f"fail: {exc.__class__.__name__}"
 
     overall = "ok" if all(v == "ok" for v in checks.values()) else "degraded"

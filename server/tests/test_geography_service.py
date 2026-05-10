@@ -55,9 +55,7 @@ async def _seed_places() -> None:
         await conn.execute(text("DELETE FROM geography.place"))
         for place_id, place_type, code, name in PLACE_FIXTURES:
             await conn.execute(
-                Place.__table__.insert().values(
-                    id=place_id, type=place_type, code=code, name=name
-                )
+                Place.__table__.insert().values(id=place_id, type=place_type, code=code, name=name)
             )
 
 
@@ -70,9 +68,7 @@ async def test_find_place_by_postcode_returns_all_levels() -> None:
 
     transport = httpx.MockTransport(handler)
     async with httpx.AsyncClient(transport=transport) as client:
-        adapter = PostcodesIoAdapter(
-            engine, ttl=timedelta(hours=720), http_client=client
-        )
+        adapter = PostcodesIoAdapter(engine, ttl=timedelta(hours=720), http_client=client)
         svc = GeographyService(engine, adapter)
         result = await svc.find_place_by_postcode("TS18 1AB")
 
@@ -100,9 +96,7 @@ async def test_find_place_by_name_returns_top_match() -> None:
 
     transport = httpx.MockTransport(handler)
     async with httpx.AsyncClient(transport=transport) as client:
-        adapter = PostcodesIoAdapter(
-            engine, ttl=timedelta(hours=720), http_client=client
-        )
+        adapter = PostcodesIoAdapter(engine, ttl=timedelta(hours=720), http_client=client)
         svc = GeographyService(engine, adapter)
         matches = await svc.find_place_by_name("stockton", geography_types=["ltla24"])
     assert len(matches) >= 1
@@ -141,9 +135,7 @@ async def test_find_containing_places_via_hierarchy() -> None:
 
     transport = httpx.MockTransport(handler)
     async with httpx.AsyncClient(transport=transport) as client:
-        adapter = PostcodesIoAdapter(
-            engine, ttl=timedelta(hours=720), http_client=client
-        )
+        adapter = PostcodesIoAdapter(engine, ttl=timedelta(hours=720), http_client=client)
         svc = GeographyService(engine, adapter)
         ancestors = await svc.find_containing_places("lsoa21:E01012018")
 
@@ -177,9 +169,7 @@ async def test_find_containing_places_by_point_returns_polygon_match() -> None:
 
     transport = httpx.MockTransport(handler)
     async with httpx.AsyncClient(transport=transport) as client:
-        adapter = PostcodesIoAdapter(
-            engine, ttl=timedelta(hours=720), http_client=client
-        )
+        adapter = PostcodesIoAdapter(engine, ttl=timedelta(hours=720), http_client=client)
         svc = GeographyService(engine, adapter)
         hits = await svc.find_containing_places_by_point(54.57, -1.31, types=["ltla24"])
 

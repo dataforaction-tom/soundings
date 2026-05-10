@@ -35,7 +35,7 @@ NOTES_FIELDS = ("NOTES", "NOTE")
 
 def _pick(row: dict[str, str], candidates: tuple[str, ...]) -> str | None:
     for c in candidates:
-        if c in row and row[c]:
+        if row.get(c):
             return row[c]
     return None
 

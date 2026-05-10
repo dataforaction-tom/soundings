@@ -18,5 +18,5 @@ class Settings(BaseSettings):
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     if "DATABASE_URL" in os.environ:
-        return Settings(database_url=os.environ["DATABASE_URL"])  # type: ignore[arg-type]
+        return Settings(database_url=os.environ["DATABASE_URL"])
     return Settings()

@@ -61,9 +61,7 @@ async def _seed_places() -> None:
                 continue
             seen.add(place_id)
             await conn.execute(
-                Place.__table__.insert().values(
-                    id=place_id, type=place_type, code=code, name=name
-                )
+                Place.__table__.insert().values(id=place_id, type=place_type, code=code, name=name)
             )
 
 
@@ -76,9 +74,7 @@ async def test_upsert_postcode_writes_canonical_row() -> None:
 
     transport = httpx.MockTransport(handler)
     async with httpx.AsyncClient(transport=transport) as client:
-        adapter = PostcodesIoAdapter(
-            engine, ttl=timedelta(hours=720), http_client=client
-        )
+        adapter = PostcodesIoAdapter(engine, ttl=timedelta(hours=720), http_client=client)
         row = await adapter.upsert_postcode("TS18 1AB")
 
     assert row is not None
@@ -102,14 +98,10 @@ async def test_upsert_postcode_idempotent() -> None:
 
     transport = httpx.MockTransport(handler)
     async with httpx.AsyncClient(transport=transport) as client:
-        adapter = PostcodesIoAdapter(
-            engine, ttl=timedelta(hours=720), http_client=client
-        )
+        adapter = PostcodesIoAdapter(engine, ttl=timedelta(hours=720), http_client=client)
         await adapter.upsert_postcode("TS18 1AB")
         await adapter.upsert_postcode("TS18 1AB")
 
     async with engine.connect() as conn:
-        n = (
-            await conn.execute(text("SELECT count(*) FROM geography.postcode"))
-        ).scalar_one()
+        n = (await conn.execute(text("SELECT count(*) FROM geography.postcode"))).scalar_one()
     assert n == 1

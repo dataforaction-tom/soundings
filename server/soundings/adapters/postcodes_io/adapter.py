@@ -6,7 +6,7 @@ with the source's TTL (default 30 days for postcodes.io).
 """
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -49,9 +49,7 @@ class PostcodesIoAdapter(PassthroughAdapter):
             return None
         return self._map_to_lookup(postcode, payload)
 
-    async def _call_upstream(
-        self, client: httpx.AsyncClient, cache_key: str
-    ) -> Any | None:
+    async def _call_upstream(self, client: httpx.AsyncClient, cache_key: str) -> Any | None:
         response = await client.get(f"{API_HOST}/postcodes/{cache_key}")
         if response.status_code == 404:
             return None
@@ -64,7 +62,7 @@ class PostcodesIoAdapter(PassthroughAdapter):
         if result is None:
             return None
         normalised = _normalise_postcode(postcode)
-        async with self._cache._engine.begin() as conn:  # noqa: SLF001
+        async with self._cache._engine.begin() as conn:
             stmt = insert(Postcode).values(
                 postcode=normalised,
                 lsoa21=result.lsoa21,
@@ -75,7 +73,7 @@ class PostcodesIoAdapter(PassthroughAdapter):
                 westminster_constituency_24=result.westminster_constituency_24,
                 region=result.region,
                 country=result.country,
-                retrieved_at=datetime.now(tz=timezone.utc),
+                retrieved_at=datetime.now(tz=UTC),
             )
             stmt = stmt.on_conflict_do_update(
                 index_elements=[Postcode.postcode],
@@ -104,9 +102,7 @@ class PostcodesIoAdapter(PassthroughAdapter):
             lsoa21=_qualified("lsoa21", codes.get("lsoa")),
             msoa21=_qualified("msoa21", codes.get("msoa")),
             ltla24=_qualified("ltla24", codes.get("admin_district")),
-            utla24=_qualified(
-                "utla24", codes.get("admin_county") or codes.get("admin_district")
-            ),
+            utla24=_qualified("utla24", codes.get("admin_county") or codes.get("admin_district")),
             ward24=_qualified("ward24", codes.get("admin_ward")),
             westminster_constituency_24=_qualified(
                 "westminster_constituency_24",

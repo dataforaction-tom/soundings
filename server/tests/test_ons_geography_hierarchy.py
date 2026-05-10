@@ -21,9 +21,7 @@ async def _seed_places(ids: dict[str, str]) -> None:
         for place_id, name in ids.items():
             type_, code = place_id.split(":", 1)
             await conn.execute(
-                Place.__table__.insert().values(
-                    id=place_id, type=type_, code=code, name=name
-                )
+                Place.__table__.insert().values(id=place_id, type=type_, code=code, name=name)
             )
 
 
@@ -69,13 +67,15 @@ async def test_hierarchy_loader_expands_transitive_edges() -> None:
         loader = OnsGeographyHierarchyLoader(engine, http_client=client, chains=[chain])
         result = await loader.load()
 
-    # 2 LSOAs × (MSOA + LTLA edges) + 2 MSOAs × LTLA edge = 6 distinct edges
+    # 2 LSOAs * (MSOA + LTLA edges) + 2 MSOAs * LTLA edge = 6 distinct edges
     assert result.rows_written == 6
 
     async with engine.connect() as conn:
         edges = {
             (r.child_id, r.parent_id)
-            for r in (await conn.execute(select(PlaceHierarchy.child_id, PlaceHierarchy.parent_id))).all()
+            for r in (
+                await conn.execute(select(PlaceHierarchy.child_id, PlaceHierarchy.parent_id))
+            ).all()
         }
     assert ("lsoa21:E01000001", "msoa21:E02000001") in edges
     assert ("lsoa21:E01000001", "ltla24:E09000001") in edges

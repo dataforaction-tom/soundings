@@ -20,6 +20,8 @@ async def test_indicator_table_exists() -> None:
     engine = get_engine()
     async with engine.connect() as conn:
         result = await conn.execute(
-            select(Indicator.key, Indicator.unit, Indicator.source_id, Indicator.available_at).limit(0)
+            select(
+                Indicator.key, Indicator.unit, Indicator.source_id, Indicator.available_at
+            ).limit(0)
         )
         assert tuple(result.keys()) == ("key", "unit", "source_id", "available_at")

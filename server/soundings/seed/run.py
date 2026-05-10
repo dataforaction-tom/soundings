@@ -12,7 +12,9 @@ import argparse
 import asyncio
 import sys
 import uuid
-from datetime import datetime, timezone
+from collections.abc import Coroutine
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -36,10 +38,13 @@ LIGHT_LAYERS = {"ltla24", "utla24", "region", "country", "westminster_constituen
 
 
 async def _run_loader(
-    engine: AsyncEngine, source_id: str, name: str, coro
+    engine: AsyncEngine,
+    source_id: str,
+    name: str,
+    coro: Coroutine[Any, Any, LoaderResult],
 ) -> LoaderResult:
     run_id = uuid.uuid4()
-    started = datetime.now(tz=timezone.utc)
+    started = datetime.now(tz=UTC)
     async with engine.begin() as conn:
         await conn.execute(
             text(
@@ -49,8 +54,8 @@ async def _run_loader(
             {"id": run_id, "sid": source_id, "st": started},
         )
     try:
-        result = await coro
-        finished = datetime.now(tz=timezone.utc)
+        result: LoaderResult = await coro
+        finished = datetime.now(tz=UTC)
         async with engine.begin() as conn:
             await conn.execute(
                 text(
@@ -75,7 +80,7 @@ async def _run_loader(
                     "SET status='failed', finished_at=:f, notes=:n WHERE id=:id"
                 ),
                 {
-                    "f": datetime.now(tz=timezone.utc),
+                    "f": datetime.now(tz=UTC),
                     "n": f"{exc.__class__.__name__}: {exc}",
                     "id": run_id,
                 },
@@ -87,9 +92,7 @@ async def _seed(*, full: bool) -> None:
     engine = get_engine()
 
     layers = (
-        BOUNDARY_LAYERS
-        if full
-        else {k: v for k, v in BOUNDARY_LAYERS.items() if k in LIGHT_LAYERS}
+        BOUNDARY_LAYERS if full else {k: v for k, v in BOUNDARY_LAYERS.items() if k in LIGHT_LAYERS}
     )
 
     places = OnsGeographyPlacesLoader(engine, layers=layers)

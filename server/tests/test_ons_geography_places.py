@@ -42,18 +42,14 @@ async def test_places_loader_upserts_place_rows() -> None:
 
     transport = httpx.MockTransport(handler)
     async with httpx.AsyncClient(transport=transport) as client:
-        loader = OnsGeographyPlacesLoader(
-            engine, http_client=client, layers={"lsoa21": layer}
-        )
+        loader = OnsGeographyPlacesLoader(engine, http_client=client, layers={"lsoa21": layer})
         result = await loader.load()
 
     assert result.rows_written == 3
 
     async with engine.connect() as conn:
         rows = (
-            await conn.execute(
-                select(Place.id, Place.name).where(Place.type == "lsoa21")
-            )
+            await conn.execute(select(Place.id, Place.name).where(Place.type == "lsoa21"))
         ).all()
     by_id = {row.id: row.name for row in rows}
     assert by_id["lsoa21:E01000001"] == "City of London 001A"
@@ -76,17 +72,13 @@ async def test_places_loader_is_idempotent() -> None:
 
     transport = httpx.MockTransport(handler)
     async with httpx.AsyncClient(transport=transport) as client:
-        loader = OnsGeographyPlacesLoader(
-            engine, http_client=client, layers={"lsoa21": layer}
-        )
+        loader = OnsGeographyPlacesLoader(engine, http_client=client, layers={"lsoa21": layer})
         await loader.load()
         await loader.load()  # second call must not fail or duplicate.
 
     async with engine.connect() as conn:
         rows = (
-            await conn.execute(
-                select(Place.id, Place.name).where(Place.type == "lsoa21")
-            )
+            await conn.execute(select(Place.id, Place.name).where(Place.type == "lsoa21"))
         ).all()
     assert len(rows) == 1
     assert rows[0].name == "Renamed area"

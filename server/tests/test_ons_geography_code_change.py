@@ -1,5 +1,3 @@
-import io
-
 import pytest
 from sqlalchemy import select, text
 
@@ -50,7 +48,5 @@ async def test_code_change_loader_is_idempotent() -> None:
     await loader.load_from_bytes(SAMPLE_CSV)
     await loader.load_from_bytes(SAMPLE_CSV)
     async with engine.connect() as conn:
-        n = (
-            await conn.execute(text("SELECT count(*) FROM geography.code_change"))
-        ).scalar_one()
+        n = (await conn.execute(text("SELECT count(*) FROM geography.code_change"))).scalar_one()
     assert n == 3

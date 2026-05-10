@@ -33,9 +33,7 @@ async def _seed_place(place_id: str, place_type: str, code: str, name: str) -> N
         await conn.execute(text("DELETE FROM geography.postcode"))
         await conn.execute(text("DELETE FROM geography.place"))
         await conn.execute(
-            Place.__table__.insert().values(
-                id=place_id, type=place_type, code=code, name=name
-            )
+            Place.__table__.insert().values(id=place_id, type=place_type, code=code, name=name)
         )
 
 
@@ -69,9 +67,7 @@ async def test_geometries_loader_updates_place_geom() -> None:
 
     transport = httpx.MockTransport(handler)
     async with httpx.AsyncClient(transport=transport) as client:
-        loader = OnsGeographyGeometriesLoader(
-            engine, http_client=client, layers={"ltla24": layer}
-        )
+        loader = OnsGeographyGeometriesLoader(engine, http_client=client, layers={"ltla24": layer})
         result = await loader.load()
 
     assert result.rows_written == 1
@@ -92,9 +88,7 @@ async def test_geometries_loader_updates_place_geom() -> None:
 
 async def test_geometries_loader_skips_unknown_places() -> None:
     engine = get_engine()
-    await _seed_place(
-        "ltla24:E07000223", "ltla24", "E07000223", "Stockton-on-Tees"
-    )
+    await _seed_place("ltla24:E07000223", "ltla24", "E07000223", "Stockton-on-Tees")
 
     layer = OgpLayer("ltla24", "LAD24CD", "LAD24NM", "test_ltla_layer")
     body = {
@@ -113,16 +107,12 @@ async def test_geometries_loader_skips_unknown_places() -> None:
 
     transport = httpx.MockTransport(handler)
     async with httpx.AsyncClient(transport=transport) as client:
-        loader = OnsGeographyGeometriesLoader(
-            engine, http_client=client, layers={"ltla24": layer}
-        )
+        loader = OnsGeographyGeometriesLoader(engine, http_client=client, layers={"ltla24": layer})
         result = await loader.load()
 
     assert result.rows_written == 0
     async with engine.connect() as conn:
         existing = (
-            await conn.execute(
-                select(Place.id).where(Place.id == "ltla24:E07000999")
-            )
+            await conn.execute(select(Place.id).where(Place.id == "ltla24:E07000999"))
         ).scalar_one_or_none()
     assert existing is None

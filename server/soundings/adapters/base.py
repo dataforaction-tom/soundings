@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 
 
 @dataclass
@@ -27,6 +27,5 @@ class LoaderAdapter(ABC):
 
     @staticmethod
     def now_utc() -> datetime:
-        from datetime import timezone
 
-        return datetime.now(tz=timezone.utc)
+        return datetime.now(tz=UTC)

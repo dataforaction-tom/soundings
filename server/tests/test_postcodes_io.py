@@ -37,9 +37,7 @@ async def test_postcodes_io_lookup_returns_canonical_ids() -> None:
 
     transport = httpx.MockTransport(handler)
     async with httpx.AsyncClient(transport=transport) as client:
-        adapter = PostcodesIoAdapter(
-            engine, ttl=timedelta(hours=720), http_client=client
-        )
+        adapter = PostcodesIoAdapter(engine, ttl=timedelta(hours=720), http_client=client)
         result = await adapter.lookup("TS18 1AB")
 
     assert result is not None
@@ -63,8 +61,6 @@ async def test_postcodes_io_returns_none_on_404() -> None:
 
     transport = httpx.MockTransport(handler)
     async with httpx.AsyncClient(transport=transport) as client:
-        adapter = PostcodesIoAdapter(
-            engine, ttl=timedelta(hours=720), http_client=client
-        )
+        adapter = PostcodesIoAdapter(engine, ttl=timedelta(hours=720), http_client=client)
         result = await adapter.lookup("ZZ99 9ZZ")
     assert result is None

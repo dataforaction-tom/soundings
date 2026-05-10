@@ -52,9 +52,7 @@ class PassthroughAdapter(ABC):
         return payload
 
     @abstractmethod
-    async def _call_upstream(
-        self, client: httpx.AsyncClient, cache_key: str
-    ) -> Any | None:
+    async def _call_upstream(self, client: httpx.AsyncClient, cache_key: str) -> Any | None:
         """Hit the upstream API. Return the JSON payload to cache, or None
         if the response is a known-empty result (404)."""
         ...
