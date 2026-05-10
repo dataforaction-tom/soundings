@@ -114,12 +114,18 @@ class IndicatorOrchestrator:
 
     @staticmethod
     def _dedup_sources(refs: list[SourceRef]) -> list[SourceRef]:
-        # Stub for Task 25: full dedup logic is added there.
-        seen: set[str] = set()
+        """Dedup by (source_id, retrieved_at minute).
+
+        Lets the UI cite a single source once per source even when many
+        indicators share that source within the same orchestration call.
+        """
+        seen: set[tuple[str, str]] = set()
         out: list[SourceRef] = []
         for r in refs:
-            if r.source_id in seen:
+            minute = r.retrieved_at.replace(second=0, microsecond=0).isoformat()
+            key = (r.source_id, minute)
+            if key in seen:
                 continue
-            seen.add(r.source_id)
+            seen.add(key)
             out.append(r)
         return out
