@@ -31,8 +31,10 @@ from soundings.adapters.ons_geography.geometries_loader import (
 from soundings.adapters.ons_geography.hierarchy_loader import (
     OnsGeographyHierarchyLoader,
 )
-from soundings.adapters.ons_geography.places_loader import OnsGeographyPlacesLoader
+from soundings.adapters.mhclg_imd2025.aggregation import aggregate_imd_to_ltla
+from soundings.adapters.mhclg_imd2025.loader import MhclgImd2025Loader
 from soundings.adapters.ons_census2021.loader import OnsCensus2021Loader
+from soundings.adapters.ons_geography.places_loader import OnsGeographyPlacesLoader
 from soundings.adapters.ons_mid_year_estimates.loader import OnsMidYearEstimatesLoader
 from soundings.db.engine import get_engine
 
@@ -117,6 +119,13 @@ async def _seed(*, full: bool) -> None:
 
     census = OnsCensus2021Loader(engine, place_filter=light_filter)
     await _run_loader(engine, "ons.census2021", "census", census.load())
+
+    # IMD must run after MYE: the LSOA→LTLA aggregation is population-weighted
+    # using mid-year estimate values.
+    imd = MhclgImd2025Loader(engine)
+    await _run_loader(engine, "mhclg.imd2025", "imd", imd.load())
+    aggregated = await aggregate_imd_to_ltla(engine)
+    print(f"[seed] imd_aggregation: {aggregated} LTLA rows")
 
 
 def main(argv: list[str] | None = None) -> int:
