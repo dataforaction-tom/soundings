@@ -89,3 +89,22 @@ async def test_find_place_by_postcode_returns_all_levels() -> None:
     } <= set(result.keys())
     assert result["ltla24"].name == "Stockton-on-Tees"
     assert result["country"].name == "England"
+
+
+async def test_find_place_by_name_returns_top_match() -> None:
+    engine = get_engine()
+    await _seed_places()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=SAMPLE_RESPONSE)
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        adapter = PostcodesIoAdapter(
+            engine, ttl=timedelta(hours=720), http_client=client
+        )
+        svc = GeographyService(engine, adapter)
+        matches = await svc.find_place_by_name("stockton", geography_types=["ltla24"])
+    assert len(matches) >= 1
+    assert matches[0].place.id == "ltla24:E06000004"
+    assert 0 < matches[0].confidence <= 1.0

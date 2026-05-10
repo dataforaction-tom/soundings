@@ -8,7 +8,7 @@ adapter.
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from soundings.adapters.postcodes_io.adapter import PostcodesIoAdapter
@@ -72,6 +72,26 @@ class GeographyService:
                 await session.scalars(select(Place).where(Place.id.in_(place_ids)))
             ).all()
         return {p.type: p for p in places}
+
+    async def find_place_by_name(
+        self,
+        query: str,
+        geography_types: list[str] | None = None,
+        limit: int = 5,
+    ) -> list[PlaceMatch]:
+        """Fuzzy place-name search via pg_trgm similarity."""
+        similarity = func.similarity(Place.name, query).label("score")
+        stmt = (
+            select(Place, similarity)
+            .where(similarity > 0.1)
+            .order_by(similarity.desc())
+            .limit(limit)
+        )
+        if geography_types:
+            stmt = stmt.where(Place.type.in_(geography_types))
+        async with AsyncSession(self._engine) as session:
+            rows = (await session.execute(stmt)).all()
+        return [PlaceMatch(place=r.Place, confidence=float(r.score)) for r in rows]
 
     async def _read_cached_postcode(self, normalised: str) -> Postcode | None:
         cutoff = datetime.now(tz=timezone.utc) - POSTCODE_FRESHNESS
