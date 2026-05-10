@@ -74,3 +74,28 @@ async def test_get_indicators_returns_tall_results_with_sources() -> None:
     assert all(r.source.source_id for r in result.results)
     # Two distinct sources → two distinct source refs.
     assert len({s.source_id for s in result.sources}) == 2
+
+
+async def test_get_indicators_wide_format_groups_by_place() -> None:
+    engine = get_engine()
+    await _seed_two_indicators()
+
+    registry = AdapterRegistry(engine)
+    registry.register("ons.mid_year_estimates", OnsMidYearEstimatesAdapter)
+    registry.register("mhclg.imd2025", MhclgImd2025Adapter)
+    orchestrator = IndicatorOrchestrator(engine, registry)
+
+    result = await get_indicators(
+        GetIndicatorsInput(
+            place_id="ltla24:E06000004",
+            indicators=["population.total", "deprivation.imd.score"],
+            format="wide",
+        ),
+        orchestrator,
+    )
+    assert result.wide is not None
+    assert result.wide.place_id == "ltla24:E06000004"
+    assert result.wide.indicators["population.total"] == 200000
+    assert result.wide.indicators["deprivation.imd.score"] == 24.0
+    # Tall is still populated alongside wide so consumers can pick.
+    assert len(result.results) == 2

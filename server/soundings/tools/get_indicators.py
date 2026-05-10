@@ -20,8 +20,14 @@ class GetIndicatorsInput(BaseModel):
     format: Literal["wide", "tall"] = "tall"
 
 
+class WideRow(BaseModel):
+    place_id: str
+    indicators: dict[str, float | None]
+
+
 class GetIndicatorsOutput(BaseModel):
     results: list[IndicatorValue] = Field(default_factory=list)
+    wide: WideRow | None = None
     sources: list[SourceRef] = Field(default_factory=list)
     caveats: list[str] = Field(default_factory=list)
     partial: bool = False
@@ -35,8 +41,15 @@ async def get_indicators(
         place_id=input.place_id,
         period=input.period,
     )
+    wide: WideRow | None = None
+    if input.format == "wide":
+        wide = WideRow(
+            place_id=input.place_id,
+            indicators={v.indicator: v.value for v in result.values},
+        )
     return GetIndicatorsOutput(
         results=result.values,
+        wide=wide,
         sources=result.sources,
         caveats=result.caveats,
         partial=result.partial,
