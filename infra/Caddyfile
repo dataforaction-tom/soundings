@@ -1,0 +1,11 @@
+:80 {
+    handle /v1/* {
+        reverse_proxy server:8000
+    }
+    handle /healthz {
+        reverse_proxy server:8000
+    }
+    handle {
+        respond "soundings phase 0 — UI not yet wired" 200
+    }
+}

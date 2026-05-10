@@ -38,5 +38,16 @@ services:
       timeout: 3s
       retries: 5
 
+  caddy:
+    image: caddy:2
+    depends_on:
+      - server
+    volumes:
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    ports:
+      - "127.0.0.1:8088:80"
+
 volumes:
   pgdata:
+  caddy_data:
