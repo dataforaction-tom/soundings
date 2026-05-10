@@ -6,11 +6,14 @@ with the source's TTL (default 30 days for postcodes.io).
 """
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 
 import httpx
+from sqlalchemy.dialects.postgresql import insert
 
 from soundings.adapters.passthrough_base import PassthroughAdapter
+from soundings.db.models.geography import Postcode
 
 API_HOST = "https://api.postcodes.io"
 
@@ -54,6 +57,43 @@ class PostcodesIoAdapter(PassthroughAdapter):
             return None
         response.raise_for_status()
         return response.json()
+
+    async def upsert_postcode(self, postcode: str) -> PostcodeLookup | None:
+        """Look up the postcode and upsert the result into geography.postcode."""
+        result = await self.lookup(postcode)
+        if result is None:
+            return None
+        normalised = _normalise_postcode(postcode)
+        async with self._cache._engine.begin() as conn:  # noqa: SLF001
+            stmt = insert(Postcode).values(
+                postcode=normalised,
+                lsoa21=result.lsoa21,
+                msoa21=result.msoa21,
+                ltla24=result.ltla24,
+                utla24=result.utla24,
+                ward24=result.ward24,
+                westminster_constituency_24=result.westminster_constituency_24,
+                region=result.region,
+                country=result.country,
+                retrieved_at=datetime.now(tz=timezone.utc),
+            )
+            stmt = stmt.on_conflict_do_update(
+                index_elements=[Postcode.postcode],
+                set_={
+                    "lsoa21": stmt.excluded.lsoa21,
+                    "msoa21": stmt.excluded.msoa21,
+                    "ltla24": stmt.excluded.ltla24,
+                    "utla24": stmt.excluded.utla24,
+                    "ward24": stmt.excluded.ward24,
+                    "westminster_constituency_24": stmt.excluded.westminster_constituency_24,
+                    "region": stmt.excluded.region,
+                    "country": stmt.excluded.country,
+                    "retrieved_at": stmt.excluded.retrieved_at,
+                },
+            )
+            await conn.execute(stmt)
+        result.postcode = normalised
+        return result
 
     @staticmethod
     def _map_to_lookup(postcode: str, payload: dict[str, Any]) -> PostcodeLookup:
