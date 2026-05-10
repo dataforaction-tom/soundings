@@ -32,6 +32,8 @@ from soundings.adapters.ons_geography.hierarchy_loader import (
     OnsGeographyHierarchyLoader,
 )
 from soundings.adapters.ons_geography.places_loader import OnsGeographyPlacesLoader
+from soundings.adapters.ons_census2021.loader import OnsCensus2021Loader
+from soundings.adapters.ons_mid_year_estimates.loader import OnsMidYearEstimatesLoader
 from soundings.db.engine import get_engine
 
 LIGHT_LAYERS = {"ltla24", "utla24", "region", "country", "westminster_constituency_24", "ward24"}
@@ -106,6 +108,15 @@ async def _seed(*, full: bool) -> None:
 
     chd = OnsGeographyCodeChangeLoader(engine)
     await _run_loader(engine, "ons.geography", "code_change", chd.load())
+
+    # Indicator data — Phase 1 sources. `--light` filters to the dev LTLA
+    # so a fresh box doesn't burn through Nomis rate limits.
+    light_filter = ["ltla24:E06000004"] if not full else None
+    mye = OnsMidYearEstimatesLoader(engine, place_filter=light_filter)
+    await _run_loader(engine, "ons.mid_year_estimates", "mye", mye.load())
+
+    census = OnsCensus2021Loader(engine, place_filter=light_filter)
+    await _run_loader(engine, "ons.census2021", "census", census.load())
 
 
 def main(argv: list[str] | None = None) -> int:
