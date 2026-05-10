@@ -121,7 +121,7 @@ class OnsCensus2021Loader(LoaderAdapter):
                     "source_id": self.source_id,
                     "retrieved_at": retrieved,
                     "loader_run_id": None,
-                    "caveats": [],
+                    "caveats": ["Census 2021 covers England and Wales only."],
                 }
             )
         if not rows:
