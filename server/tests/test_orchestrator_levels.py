@@ -74,6 +74,5 @@ async def test_orchestrator_refuses_indicator_at_unsupported_level() -> None:
     assert result.values == []
     assert result.partial is True
     assert any(
-        "INDICATOR_NOT_AVAILABLE_AT_LEVEL" in c or "not published at" in c
-        for c in result.caveats
+        "INDICATOR_NOT_AVAILABLE_AT_LEVEL" in c or "not published at" in c for c in result.caveats
     )

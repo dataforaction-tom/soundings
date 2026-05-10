@@ -41,10 +41,7 @@ async def _seed_environment() -> None:
             ("region:E12000001", "region", "E12000001", "North East"),
         ]:
             await conn.execute(
-                text(
-                    "INSERT INTO geography.place (id, type, code, name) "
-                    "VALUES (:id, :t, :c, :n)"
-                ),
+                text("INSERT INTO geography.place (id, type, code, name) VALUES (:id, :t, :c, :n)"),
                 {"id": place_id, "t": place_type, "c": code, "n": name},
             )
 

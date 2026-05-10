@@ -20,9 +20,7 @@ from soundings.db.models.data import IndicatorValue
 
 SOURCE_ID = "ons.mid_year_estimates"
 DEFAULT_MAPPING_PATH = (
-    Path(__file__).resolve().parent.parent.parent.parent.parent
-    / "catalogue"
-    / "nomis-mapping.yaml"
+    Path(__file__).resolve().parent.parent.parent.parent.parent / "catalogue" / "nomis-mapping.yaml"
 )
 
 
@@ -56,11 +54,7 @@ class OnsMidYearEstimatesLoader(LoaderAdapter):
         return LoaderResult(rows_written=rows_written)
 
     def _mappings_for_this_source(self) -> list[NomisMapping]:
-        return [
-            m
-            for m in load_nomis_mapping(self._mapping_path)
-            if m.source_id == self.source_id
-        ]
+        return [m for m in load_nomis_mapping(self._mapping_path) if m.source_id == self.source_id]
 
     async def _load_one(self, mapping: NomisMapping) -> int:
         rows_written = 0
@@ -68,9 +62,7 @@ class OnsMidYearEstimatesLoader(LoaderAdapter):
             place_codes = await self._place_codes_for_type(place_type)
             for place_code in place_codes:
                 obs = await self._fetch_observations(mapping, place_code)
-                rows_written += await self._upsert_obs(
-                    mapping.indicator_key, place_type, obs
-                )
+                rows_written += await self._upsert_obs(mapping.indicator_key, place_type, obs)
         return rows_written
 
     async def _place_codes_for_type(self, place_type: str) -> list[str]:
@@ -92,7 +84,8 @@ class OnsMidYearEstimatesLoader(LoaderAdapter):
             measures=mapping.measures,
             time=mapping.period or "latest",
         )
-        return payload.get("obs", [])
+        obs: list[dict[str, Any]] = payload.get("obs", [])
+        return obs
 
     async def _upsert_obs(
         self, indicator_key: str, place_type: str, obs: list[dict[str, Any]]

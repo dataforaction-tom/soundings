@@ -121,7 +121,4 @@ async def test_census_loader_skips_scottish_geographies() -> None:
                 )
             )
         ).all()
-    assert all(
-        any("England and Wales only" in c for c in (row.caveats or []))
-        for row in rows
-    )
+    assert all(any("England and Wales only" in c for c in (row.caveats or [])) for row in rows)

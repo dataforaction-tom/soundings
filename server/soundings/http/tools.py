@@ -46,9 +46,7 @@ async def http_find_place(input: FindPlaceInput, request: Request) -> FindPlaceO
 
 
 @router.post("/get_indicators", response_model=GetIndicatorsOutput)
-async def http_get_indicators(
-    input: GetIndicatorsInput, request: Request
-) -> GetIndicatorsOutput:
+async def http_get_indicators(input: GetIndicatorsInput, request: Request) -> GetIndicatorsOutput:
     return await get_indicators(input, request.app.state.orchestrator)
 
 

@@ -23,10 +23,7 @@ async def _seed_two_lsoas_in_one_ltla() -> None:
             ("ltla24:E06000004", "ltla24", "E06000004", "Stockton-on-Tees"),
         ]:
             await conn.execute(
-                text(
-                    "INSERT INTO geography.place (id, type, code, name) "
-                    "VALUES (:id, :t, :c, :n)"
-                ),
+                text("INSERT INTO geography.place (id, type, code, name) VALUES (:id, :t, :c, :n)"),
                 {"id": place_id, "t": place_type, "c": code, "n": name},
             )
         for child, parent in [
@@ -34,10 +31,7 @@ async def _seed_two_lsoas_in_one_ltla() -> None:
             ("lsoa21:E01012019", "ltla24:E06000004"),
         ]:
             await conn.execute(
-                text(
-                    "INSERT INTO geography.place_hierarchy (child_id, parent_id) "
-                    "VALUES (:c, :p)"
-                ),
+                text("INSERT INTO geography.place_hierarchy (child_id, parent_id) VALUES (:c, :p)"),
                 {"c": child, "p": parent},
             )
         # MYE populations: 2000 and 1000.

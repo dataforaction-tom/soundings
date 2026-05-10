@@ -58,7 +58,5 @@ AGGREGATE_SQL = text(
 async def aggregate_imd_to_ltla(engine: AsyncEngine) -> int:
     """Returns the number of LTLA rows inserted/updated."""
     async with engine.begin() as conn:
-        result = await conn.execute(
-            AGGREGATE_SQL, {"indicator_keys": list(IMD_INDICATOR_KEYS)}
-        )
+        result = await conn.execute(AGGREGATE_SQL, {"indicator_keys": list(IMD_INDICATOR_KEYS)})
     return result.rowcount or 0

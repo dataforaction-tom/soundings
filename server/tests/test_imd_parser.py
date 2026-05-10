@@ -7,9 +7,7 @@ FIXTURE = Path(__file__).parent / "fixtures" / "imd" / "imd2025_sample.xlsx"
 
 def test_parse_imd_xlsx_returns_indicator_rows() -> None:
     rows = parse_imd_xlsx(FIXTURE.read_bytes())
-    by_key: dict[tuple[str, str], float] = {
-        (r.lsoa_code, r.indicator_key): r.value for r in rows
-    }
+    by_key: dict[tuple[str, str], float] = {(r.lsoa_code, r.indicator_key): r.value for r in rows}
     assert by_key[("E01012018", "deprivation.imd.score")] == 35.5
     assert by_key[("E01012018", "deprivation.imd.decile")] == 3
     assert by_key[("E01012019", "deprivation.imd.income_score")] == 0.10

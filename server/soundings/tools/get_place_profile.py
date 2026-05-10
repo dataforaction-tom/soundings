@@ -59,9 +59,7 @@ async def _resolve_place_header(engine: AsyncEngine, place_id: str) -> PlaceHead
     async with engine.connect() as conn:
         row = (
             await conn.execute(
-                text(
-                    "SELECT id, name, type FROM geography.place WHERE id = :id"
-                ),
+                text("SELECT id, name, type FROM geography.place WHERE id = :id"),
                 {"id": place_id},
             )
         ).first()
@@ -74,9 +72,7 @@ async def _resolve_indicators(engine: AsyncEngine, domains: list[str]) -> list[s
     if not domains:
         # Default: all top-level domains in the catalogue.
         async with engine.connect() as conn:
-            rows = (
-                await conn.execute(text("SELECT key FROM catalogue.indicator"))
-            ).all()
+            rows = (await conn.execute(text("SELECT key FROM catalogue.indicator"))).all()
         return [r.key for r in rows]
 
     like_patterns = [f"{d}.%" for d in domains]

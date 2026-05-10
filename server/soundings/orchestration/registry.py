@@ -43,9 +43,7 @@ class AdapterRegistry:
         async with self._engine.connect() as conn:
             row = (
                 await conn.execute(
-                    text(
-                        "SELECT source_id FROM catalogue.indicator WHERE key = :k"
-                    ),
+                    text("SELECT source_id FROM catalogue.indicator WHERE key = :k"),
                     {"k": indicator_key},
                 )
             ).first()

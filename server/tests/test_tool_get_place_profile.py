@@ -67,6 +67,8 @@ async def test_get_place_profile_resolves_population_domain() -> None:
     by_key = {v.indicator: v.value for v in result.indicators}
     assert by_key.get("population.total") == 200000
     # Every indicator value carries an explicit confidence label.
-    assert all(iv.confidence in ("official", "modelled", "experimental") for iv in result.indicators)
+    assert all(
+        iv.confidence in ("official", "modelled", "experimental") for iv in result.indicators
+    )
     # MYE is a loader-mode source publishing official statistics.
     assert result.indicators[0].confidence == "official"

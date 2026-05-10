@@ -65,15 +65,10 @@ async def _seed_source_indicator_and_value(
         )
         await conn.execute(text("DELETE FROM geography.postcode"))
         await conn.execute(text("DELETE FROM geography.place_hierarchy"))
-        await conn.execute(
-            text("DELETE FROM geography.place WHERE id = :id"), {"id": place_id}
-        )
+        await conn.execute(text("DELETE FROM geography.place WHERE id = :id"), {"id": place_id})
         type_, code = place_id.split(":", 1)
         await conn.execute(
-            text(
-                "INSERT INTO geography.place (id, type, code, name) "
-                "VALUES (:id, :t, :c, :n)"
-            ),
+            text("INSERT INTO geography.place (id, type, code, name) VALUES (:id, :t, :c, :n)"),
             {"id": place_id, "t": type_, "c": code, "n": "Test place"},
         )
         run_id = uuid.uuid4()

@@ -1,10 +1,8 @@
 import pytest
 from fastapi import APIRouter
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import text
 
 from soundings.app import app
-from soundings.db.engine import get_engine
 from soundings.orchestration.errors import (
     GeographyNotFoundError,
     IndicatorNotAvailableAtLevelError,
@@ -42,7 +40,9 @@ app.include_router(_debug)
 
 async def test_geography_not_found_returns_404_envelope() -> None:
     async with app.router.lifespan_context(app):
-        async with AsyncClient(transport=ASGITransport(app=app, raise_app_exceptions=False), base_url="http://test") as ac:
+        async with AsyncClient(
+            transport=ASGITransport(app=app, raise_app_exceptions=False), base_url="http://test"
+        ) as ac:
             response = await ac.post("/v1/_debug/raise/geography_not_found")
     assert response.status_code == 404
     body = response.json()
@@ -52,7 +52,9 @@ async def test_geography_not_found_returns_404_envelope() -> None:
 
 async def test_indicator_not_available_at_level_returns_422_envelope() -> None:
     async with app.router.lifespan_context(app):
-        async with AsyncClient(transport=ASGITransport(app=app, raise_app_exceptions=False), base_url="http://test") as ac:
+        async with AsyncClient(
+            transport=ASGITransport(app=app, raise_app_exceptions=False), base_url="http://test"
+        ) as ac:
             response = await ac.post("/v1/_debug/raise/indicator_not_available_at_level")
     assert response.status_code == 422
     body = response.json()
@@ -62,7 +64,9 @@ async def test_indicator_not_available_at_level_returns_422_envelope() -> None:
 
 async def test_internal_errors_return_500_envelope() -> None:
     async with app.router.lifespan_context(app):
-        async with AsyncClient(transport=ASGITransport(app=app, raise_app_exceptions=False), base_url="http://test") as ac:
+        async with AsyncClient(
+            transport=ASGITransport(app=app, raise_app_exceptions=False), base_url="http://test"
+        ) as ac:
             response = await ac.post("/v1/_debug/raise/internal")
     assert response.status_code == 500
     body = response.json()

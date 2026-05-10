@@ -45,9 +45,7 @@ async def get_indicators(
 
     # Merge static caveats from the indicator catalogue with the orchestrator's
     # dynamic caveats (rate limits, partial failures, level violations).
-    catalogue_caveats = await _catalogue_caveats(
-        orchestrator._engine, input.indicators  # noqa: SLF001
-    )
+    catalogue_caveats = await _catalogue_caveats(orchestrator._engine, input.indicators)
     merged_caveats = list(dict.fromkeys([*result.caveats, *catalogue_caveats]))
 
     wide: WideRow | None = None
@@ -70,10 +68,7 @@ async def _catalogue_caveats(engine: object, indicator_keys: list[str]) -> list[
     async with engine.connect() as conn:  # type: ignore[attr-defined]
         rows = (
             await conn.execute(
-                text(
-                    "SELECT key, caveats FROM catalogue.indicator "
-                    "WHERE key = ANY(:keys)"
-                ),
+                text("SELECT key, caveats FROM catalogue.indicator WHERE key = ANY(:keys)"),
                 {"keys": indicator_keys},
             )
         ).all()

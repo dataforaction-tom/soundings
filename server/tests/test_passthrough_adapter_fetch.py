@@ -17,9 +17,7 @@ class _StubAdapter(PassthroughAdapter):
     source_id = "test.passthrough.stub"
     upstream_calls = 0
 
-    async def _call_upstream(
-        self, client: httpx.AsyncClient, cache_key: str
-    ) -> Any | None:
+    async def _call_upstream(self, client: httpx.AsyncClient, cache_key: str) -> Any | None:
         type(self).upstream_calls += 1
         return {"value": 42, "cache_key": cache_key}
 
@@ -45,7 +43,9 @@ class _StubAdapter(PassthroughAdapter):
 async def _ensure_source() -> None:
     engine = get_engine()
     async with engine.begin() as conn:
-        await conn.execute(text("DELETE FROM cache.source_cache WHERE source_id = 'test.passthrough.stub'"))
+        await conn.execute(
+            text("DELETE FROM cache.source_cache WHERE source_id = 'test.passthrough.stub'")
+        )
         await conn.execute(
             text(
                 "INSERT INTO catalogue.source "

@@ -21,9 +21,7 @@ from soundings.db.models.data import IndicatorValue
 
 SOURCE_ID = "ons.census2021"
 DEFAULT_MAPPING_PATH = (
-    Path(__file__).resolve().parent.parent.parent.parent.parent
-    / "catalogue"
-    / "nomis-mapping.yaml"
+    Path(__file__).resolve().parent.parent.parent.parent.parent / "catalogue" / "nomis-mapping.yaml"
 )
 
 
@@ -47,9 +45,7 @@ class OnsCensus2021Loader(LoaderAdapter):
 
     async def load(self, run_id: str | None = None) -> LoaderResult:
         mappings = [
-            m
-            for m in load_nomis_mapping(self._mapping_path)
-            if m.source_id == self.source_id
+            m for m in load_nomis_mapping(self._mapping_path) if m.source_id == self.source_id
         ]
         if self._indicator_keys is not None:
             keys = set(self._indicator_keys)
@@ -93,7 +89,8 @@ class OnsCensus2021Loader(LoaderAdapter):
             measures=mapping.measures,
             time=mapping.period or "2021",
         )
-        return payload.get("obs", [])
+        obs: list[dict[str, Any]] = payload.get("obs", [])
+        return obs
 
     async def _upsert_obs(
         self,

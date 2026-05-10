@@ -20,6 +20,9 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from soundings.adapters.base import LoaderResult
+from soundings.adapters.mhclg_imd2025.aggregation import aggregate_imd_to_ltla
+from soundings.adapters.mhclg_imd2025.loader import MhclgImd2025Loader
+from soundings.adapters.ons_census2021.loader import OnsCensus2021Loader
 from soundings.adapters.ons_geography.chains import ALL_CHAINS
 from soundings.adapters.ons_geography.code_change_loader import (
     OnsGeographyCodeChangeLoader,
@@ -31,9 +34,6 @@ from soundings.adapters.ons_geography.geometries_loader import (
 from soundings.adapters.ons_geography.hierarchy_loader import (
     OnsGeographyHierarchyLoader,
 )
-from soundings.adapters.mhclg_imd2025.aggregation import aggregate_imd_to_ltla
-from soundings.adapters.mhclg_imd2025.loader import MhclgImd2025Loader
-from soundings.adapters.ons_census2021.loader import OnsCensus2021Loader
 from soundings.adapters.ons_geography.places_loader import OnsGeographyPlacesLoader
 from soundings.adapters.ons_mid_year_estimates.loader import OnsMidYearEstimatesLoader
 from soundings.db.engine import get_engine

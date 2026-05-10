@@ -9,16 +9,16 @@ import argparse
 import asyncio
 import sys
 from collections.abc import Awaitable, Callable
-from typing import cast
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.cron import CronTrigger
+from apscheduler.schedulers.asyncio import AsyncIOScheduler  # type: ignore[import-untyped]
+from apscheduler.triggers.cron import CronTrigger  # type: ignore[import-untyped]
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from soundings.adapters.mhclg_imd2025.aggregation import aggregate_imd_to_ltla
 from soundings.adapters.mhclg_imd2025.loader import MhclgImd2025Loader
 from soundings.adapters.ons_census2021.loader import OnsCensus2021Loader
+from soundings.adapters.ons_geography.chains import ALL_CHAINS
 from soundings.adapters.ons_geography.code_change_loader import (
     OnsGeographyCodeChangeLoader,
 )
@@ -29,7 +29,6 @@ from soundings.adapters.ons_geography.hierarchy_loader import (
     OnsGeographyHierarchyLoader,
 )
 from soundings.adapters.ons_geography.places_loader import OnsGeographyPlacesLoader
-from soundings.adapters.ons_geography.chains import ALL_CHAINS
 from soundings.adapters.ons_mid_year_estimates.loader import OnsMidYearEstimatesLoader
 from soundings.db.engine import get_engine
 
@@ -70,10 +69,7 @@ async def build_scheduler(
     async with engine.connect() as conn:
         rows = (
             await conn.execute(
-                text(
-                    "SELECT id, refresh_cadence FROM catalogue.source "
-                    "WHERE mode = 'loader'"
-                )
+                text("SELECT id, refresh_cadence FROM catalogue.source WHERE mode = 'loader'")
             )
         ).all()
     for row in rows:
@@ -115,7 +111,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--once", metavar="SOURCE_ID")
     args = parser.parse_args(argv)
     if args.once:
-        return cast(int, asyncio.run(_run_once(args.once)))
+        return asyncio.run(_run_once(args.once))
     asyncio.run(_run_forever())
     return 0
 

@@ -19,9 +19,7 @@ async def _seed_recent_loader_runs() -> None:
     now = datetime.now(tz=UTC)
     async with engine.begin() as conn:
         sources = (
-            await conn.execute(
-                text("SELECT id FROM catalogue.source WHERE mode = 'loader'")
-            )
+            await conn.execute(text("SELECT id FROM catalogue.source WHERE mode = 'loader'"))
         ).all()
         for row in sources:
             await conn.execute(

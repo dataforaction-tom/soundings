@@ -53,7 +53,7 @@ class NomisClient:
                     f"{NOMIS_HOST}/dataset/{dataset_id}.data.json", params=params
                 )
                 response.raise_for_status()
-                payload = response.json()
+                payload: dict[str, Any] = response.json()
             finally:
                 if self._owns_client:
                     await client.aclose()

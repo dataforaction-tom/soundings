@@ -56,16 +56,14 @@ def build_mcp_server(state: Any | None = None) -> FastMCP:
                 place_id=place_id,
                 indicators=indicators,
                 period=period,
-                format=format,  # type: ignore[arg-type]
+                format=format,
             ),
             state.orchestrator,
         )
         return result.model_dump(mode="json")
 
     @mcp.tool(name="get_place_profile")
-    async def _get_place_profile(
-        place_id: str, include: list[str] | None = None
-    ) -> dict[str, Any]:
+    async def _get_place_profile(place_id: str, include: list[str] | None = None) -> dict[str, Any]:
         if state is None:
             raise RuntimeError("MCP get_place_profile invoked without app state")
         result = await get_place_profile(

@@ -36,9 +36,7 @@ async def test_source_ref_factory_builds_from_catalogue_row() -> None:
 
     factory = SourceRefFactory(engine)
     now = datetime.now(tz=UTC)
-    ref = await factory.build(
-        "test.factory.source", retrieved_at=now, cache_status="cached"
-    )
+    ref = await factory.build("test.factory.source", retrieved_at=now, cache_status="cached")
     assert ref.source_id == "test.factory.source"
     assert ref.source_label == "Test Label"
     assert ref.publisher == "Test Publisher"

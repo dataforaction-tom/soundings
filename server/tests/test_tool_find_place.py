@@ -55,10 +55,7 @@ async def _seed_places() -> None:
         await conn.execute(text("DELETE FROM geography.place"))
         for pid, ptype, code, name in PLACE_FIXTURES:
             await conn.execute(
-                text(
-                    "INSERT INTO geography.place (id, type, code, name) "
-                    "VALUES (:id, :t, :c, :n)"
-                ),
+                text("INSERT INTO geography.place (id, type, code, name) VALUES (:id, :t, :c, :n)"),
                 {"id": pid, "t": ptype, "c": code, "n": name},
             )
 
@@ -113,10 +110,7 @@ async def test_find_place_name_ranks_ltla_above_region_for_same_name() -> None:
             ("ltla24:E08000021", "ltla24", "E08000021", "Newcastle upon Tyne"),
         ]:
             await conn.execute(
-                text(
-                    "INSERT INTO geography.place (id, type, code, name) "
-                    "VALUES (:id, :t, :c, :n)"
-                ),
+                text("INSERT INTO geography.place (id, type, code, name) VALUES (:id, :t, :c, :n)"),
                 {"id": pid, "t": ptype, "c": code, "n": name},
             )
     svc = _build_service(engine)

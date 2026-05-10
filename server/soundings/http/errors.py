@@ -34,9 +34,7 @@ def _envelope(code: str, message: str, details: dict[str, Any]) -> JSONResponse:
     )
 
 
-async def _orchestration_handler(
-    request: Request, exc: OrchestrationError
-) -> JSONResponse:
+async def _orchestration_handler(request: Request, exc: OrchestrationError) -> JSONResponse:
     details: dict[str, Any] = {}
     if isinstance(exc, GeographyNotFoundError):
         details = {"place_id": exc.place_id}
@@ -60,5 +58,5 @@ async def _fallback_handler(request: Request, exc: Exception) -> JSONResponse:
 
 
 def install_error_envelope(app: FastAPI) -> None:
-    app.add_exception_handler(OrchestrationError, _orchestration_handler)
+    app.add_exception_handler(OrchestrationError, _orchestration_handler)  # type: ignore[arg-type]
     app.add_exception_handler(Exception, _fallback_handler)

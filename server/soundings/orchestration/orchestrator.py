@@ -45,9 +45,7 @@ class IndicatorOrchestrator:
         *,
         timeout: float = DEFAULT_TIMEOUT,
     ) -> OrchestrationResult:
-        tasks = [
-            self._fetch_one(key, place_id, period) for key in indicator_keys
-        ]
+        tasks = [self._fetch_one(key, place_id, period) for key in indicator_keys]
         try:
             outcomes = await asyncio.wait_for(
                 asyncio.gather(*tasks, return_exceptions=True),
@@ -83,24 +81,23 @@ class IndicatorOrchestrator:
     ) -> IndicatorValue | None:
         await self._enforce_level(indicator_key, place_id)
         adapter = await self._registry.adapter_for_indicator(indicator_key)
-        return await adapter.fetch_indicator(indicator_key, place_id, period)
+        result: IndicatorValue | None = await adapter.fetch_indicator(
+            indicator_key, place_id, period
+        )
+        return result
 
     async def _enforce_level(self, indicator_key: str, place_id: str) -> None:
         place_type, _, _ = place_id.partition(":")
         async with self._engine.connect() as conn:
             row = (
                 await conn.execute(
-                    text(
-                        "SELECT available_at FROM catalogue.indicator WHERE key = :k"
-                    ),
+                    text("SELECT available_at FROM catalogue.indicator WHERE key = :k"),
                     {"k": indicator_key},
                 )
             ).first()
         available_at = list(row.available_at) if row else []
         if available_at and place_type not in available_at:
-            raise IndicatorNotAvailableAtLevelError(
-                indicator_key, place_id, available_at
-            )
+            raise IndicatorNotAvailableAtLevelError(indicator_key, place_id, available_at)
 
     @staticmethod
     def _caveat_for_failure(indicator_key: str, exc: BaseException) -> str:

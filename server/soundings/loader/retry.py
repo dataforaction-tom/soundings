@@ -6,11 +6,8 @@ errors and 5xx HTTPStatusError. 4xx never retries.
 
 import asyncio
 from collections.abc import Awaitable, Callable
-from typing import TypeVar
 
 import httpx
-
-T = TypeVar("T")
 
 
 def _should_retry(exc: BaseException) -> bool:
@@ -21,7 +18,7 @@ def _should_retry(exc: BaseException) -> bool:
     return False
 
 
-async def retry_with_backoff(
+async def retry_with_backoff[T](
     fn: Callable[[], Awaitable[T]],
     *,
     max_attempts: int = 3,

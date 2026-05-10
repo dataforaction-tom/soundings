@@ -27,9 +27,7 @@ async def test_imd_loader_downloads_and_parses_real_workbook() -> None:
     result = await adapter.load()
     assert result.rows_written > 0, "real IMD download produced no rows"
 
-    iv = await adapter.fetch_indicator(
-        "deprivation.imd.score", "lsoa21:E01012018", None
-    )
+    iv = await adapter.fetch_indicator("deprivation.imd.score", "lsoa21:E01012018", None)
     assert iv is not None
     # IMD scores in England range roughly 0–80; allow generous bounds.
     assert 0 <= (iv.value or -1) <= 100

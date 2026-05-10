@@ -41,9 +41,7 @@ class PassthroughAdapter(ABC):
         self._client = http_client
 
     @abstractmethod
-    async def _call_upstream(
-        self, client: httpx.AsyncClient, cache_key: str
-    ) -> Any | None:
+    async def _call_upstream(self, client: httpx.AsyncClient, cache_key: str) -> Any | None:
         """Hit the upstream API. Return the JSON payload to cache, or None
         if the response is a known-empty result (404)."""
         ...
@@ -61,9 +59,7 @@ class PassthroughAdapter(ABC):
         adapters that only feed the geography spine (e.g. postcodes.io) can
         leave the default which refuses to participate in `fetch_indicator`.
         """
-        raise NotImplementedError(
-            f"{type(self).__name__} does not publish indicator values"
-        )
+        raise NotImplementedError(f"{type(self).__name__} does not publish indicator values")
 
     @staticmethod
     def _cache_key(indicator_key: str, place_id: str, period: str | None) -> str:
@@ -79,7 +75,9 @@ class PassthroughAdapter(ABC):
         payload, status = await self._fetch_with_status(cache_key)
         if payload is None:
             return None
-        source_ref = await self._build_source_ref(retrieved_at=datetime.now(tz=UTC), cache_status=status)
+        source_ref = await self._build_source_ref(
+            retrieved_at=datetime.now(tz=UTC), cache_status=status
+        )
         return self._materialise(payload, indicator_key, place_id, period, source_ref)
 
     async def list_available_indicators(self) -> list[str]:
@@ -97,9 +95,7 @@ class PassthroughAdapter(ABC):
         payload, _status = await self._fetch_with_status(cache_key)
         return payload
 
-    async def _fetch_with_status(
-        self, cache_key: str
-    ) -> tuple[Any | None, CacheStatus]:
+    async def _fetch_with_status(self, cache_key: str) -> tuple[Any | None, CacheStatus]:
         cached = await self._cache.get(self.source_id, cache_key)
         if cached is not None:
             return cached, "cached"

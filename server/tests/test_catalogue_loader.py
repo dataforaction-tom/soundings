@@ -28,9 +28,7 @@ async def test_load_catalogue_is_idempotent_and_stamps_version() -> None:
             await conn.execute(select(func.count(Source.id)).where(real_source_filter))
         ).scalar_one()
         n_indicators_first = (
-            await conn.execute(
-                select(func.count(Indicator.key)).where(real_indicator_filter)
-            )
+            await conn.execute(select(func.count(Indicator.key)).where(real_indicator_filter))
         ).scalar_one()
         version_first = (
             await conn.execute(
@@ -44,9 +42,7 @@ async def test_load_catalogue_is_idempotent_and_stamps_version() -> None:
             await conn.execute(select(func.count(Source.id)).where(real_source_filter))
         ).scalar_one()
         n_indicators_second = (
-            await conn.execute(
-                select(func.count(Indicator.key)).where(real_indicator_filter)
-            )
+            await conn.execute(select(func.count(Indicator.key)).where(real_indicator_filter))
         ).scalar_one()
         version_second = (
             await conn.execute(

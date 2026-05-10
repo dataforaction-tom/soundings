@@ -14,10 +14,7 @@ async def _ensure_loader_sources() -> None:
     async with engine.connect() as conn:
         rows = (
             await conn.execute(
-                text(
-                    "SELECT id, refresh_cadence FROM catalogue.source "
-                    "WHERE mode = 'loader'"
-                )
+                text("SELECT id, refresh_cadence FROM catalogue.source WHERE mode = 'loader'")
             )
         ).all()
     assert len(rows) > 0

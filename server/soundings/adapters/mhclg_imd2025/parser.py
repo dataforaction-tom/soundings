@@ -41,9 +41,7 @@ def parse_imd_xlsx(blob: bytes) -> list[ImdRow]:
     if headers is None:
         return []
     header_index: dict[int, str] = {
-        idx: str(h).strip().lower()
-        for idx, h in enumerate(headers)
-        if h is not None
+        idx: str(h).strip().lower() for idx, h in enumerate(headers) if h is not None
     }
 
     # Find the LSOA code column.

@@ -12,9 +12,7 @@ from pydantic import BaseModel, Field
 
 from soundings.geography.service import GeographyService
 
-UK_POSTCODE_RE = re.compile(
-    r"^\s*[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\s*$", re.IGNORECASE
-)
+UK_POSTCODE_RE = re.compile(r"^\s*[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\s*$", re.IGNORECASE)
 
 # Used to break similarity-score ties: deepest level wins so a name match for
 # "Newcastle" prefers the LTLA over the region.
@@ -64,17 +62,13 @@ def tool_spec() -> dict[str, object]:
     }
 
 
-async def find_place(
-    input: FindPlaceInput, service: GeographyService
-) -> FindPlaceOutput:
+async def find_place(input: FindPlaceInput, service: GeographyService) -> FindPlaceOutput:
     if UK_POSTCODE_RE.match(input.query):
         return await _find_by_postcode(input, service)
     return await _find_by_name(input, service)
 
 
-async def _find_by_postcode(
-    input: FindPlaceInput, service: GeographyService
-) -> FindPlaceOutput:
+async def _find_by_postcode(input: FindPlaceInput, service: GeographyService) -> FindPlaceOutput:
     result = await service.find_place_by_postcode(input.query)
     if result is None:
         return FindPlaceOutput()
@@ -94,9 +88,7 @@ async def _find_by_postcode(
     return FindPlaceOutput(matches=matches[: input.limit])
 
 
-async def _find_by_name(
-    input: FindPlaceInput, service: GeographyService
-) -> FindPlaceOutput:
+async def _find_by_name(input: FindPlaceInput, service: GeographyService) -> FindPlaceOutput:
     raw = await service.find_place_by_name(
         input.query,
         geography_types=input.geography_types,

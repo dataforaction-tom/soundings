@@ -81,9 +81,7 @@ class LoaderAdapter(ABC):
         async with self._engine.connect() as conn:
             rows = (
                 await conn.execute(
-                    text(
-                        "SELECT key FROM catalogue.indicator WHERE source_id = :sid"
-                    ),
+                    text("SELECT key FROM catalogue.indicator WHERE source_id = :sid"),
                     {"sid": self.source_id},
                 )
             ).all()

@@ -20,10 +20,7 @@ async def _seed_one_row(value: float = 200000) -> None:
         await conn.execute(text("DELETE FROM geography.place_hierarchy"))
         await conn.execute(text("DELETE FROM geography.place"))
         await conn.execute(
-            text(
-                "INSERT INTO geography.place (id, type, code, name) "
-                "VALUES (:id, :t, :c, :n)"
-            ),
+            text("INSERT INTO geography.place (id, type, code, name) VALUES (:id, :t, :c, :n)"),
             {
                 "id": "ltla24:E06000004",
                 "t": "ltla24",
