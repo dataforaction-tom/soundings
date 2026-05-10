@@ -99,6 +99,32 @@ async def test_find_place_with_name_input_returns_ranked_matches() -> None:
     assert 0.0 < result.matches[0].confidence <= 1.0
 
 
+async def test_find_place_name_ranks_ltla_above_region_for_same_name() -> None:
+    """When several places share a similar name, the deepest level wins."""
+    engine = get_engine()
+    async with engine.begin() as conn:
+        await conn.execute(text("DELETE FROM data.indicator_value"))
+        await conn.execute(text("DELETE FROM geography.postcode"))
+        await conn.execute(text("DELETE FROM geography.place_hierarchy"))
+        await conn.execute(text("DELETE FROM geography.place"))
+        for pid, ptype, code, name in [
+            ("region:E12000001", "region", "E12000001", "Newcastle Region"),
+            ("utla24:E08000021", "utla24", "E08000021", "Newcastle upon Tyne"),
+            ("ltla24:E08000021", "ltla24", "E08000021", "Newcastle upon Tyne"),
+        ]:
+            await conn.execute(
+                text(
+                    "INSERT INTO geography.place (id, type, code, name) "
+                    "VALUES (:id, :t, :c, :n)"
+                ),
+                {"id": pid, "t": ptype, "c": code, "n": name},
+            )
+    svc = _build_service(engine)
+    result = await find_place(FindPlaceInput(query="Newcastle upon Tyne"), svc)
+    assert result.matches[0].type == "ltla24"
+    assert result.matches[0].confidence > 0.8
+
+
 async def test_find_place_handles_unknown_postcode_gracefully() -> None:
     engine = get_engine()
     await _seed_places()
