@@ -48,6 +48,22 @@ class FindPlaceOutput(BaseModel):
     matches: list[PlaceMatch] = Field(default_factory=list)
 
 
+TOOL_NAME = "find_place"
+TOOL_DESCRIPTION = (
+    "Resolve a place reference (UK postcode or natural-language name) to "
+    "one or more canonical Soundings geography IDs with confidence scores."
+)
+
+
+def tool_spec() -> dict[str, object]:
+    return {
+        "name": TOOL_NAME,
+        "description": TOOL_DESCRIPTION,
+        "input_schema": FindPlaceInput.model_json_schema(),
+        "output_schema": FindPlaceOutput.model_json_schema(),
+    }
+
+
 async def find_place(
     input: FindPlaceInput, service: GeographyService
 ) -> FindPlaceOutput:
