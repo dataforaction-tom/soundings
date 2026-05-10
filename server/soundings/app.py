@@ -4,12 +4,14 @@ from datetime import timedelta
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from soundings.adapters.mhclg_imd2025.adapter import MhclgImd2025Adapter
 from soundings.adapters.ons_census2021.adapter import OnsCensus2021Adapter
 from soundings.adapters.ons_mid_year_estimates.adapter import OnsMidYearEstimatesAdapter
 from soundings.adapters.postcodes_io.adapter import PostcodesIoAdapter
 from soundings.catalogue.loader import load_catalogue_into_db
+from soundings.core.config import get_settings
 from soundings.db.engine import get_engine
 from soundings.geography.service import GeographyService
 from soundings.http.catalogue import router as catalogue_router
@@ -54,6 +56,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Soundings", version="0.0.1", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[get_settings().ui_origin],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
 app.include_router(health_router)
 app.include_router(tools_router)
 app.include_router(sources_router)

@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     )
     log_level: str = "info"
     env: str = "dev"
+    ui_origin: str = "http://localhost:8088"
 
 
 @lru_cache(maxsize=1)
