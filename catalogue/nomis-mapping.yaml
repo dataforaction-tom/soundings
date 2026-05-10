@@ -1,0 +1,140 @@
+# catalogue/nomis-mapping.yaml — Nomis dataset/measure pinning per indicator.
+#
+# `dataset_id` is Nomis's internal identifier (e.g. NM_2010_1 for Mid-Year
+# Estimates). Field codes (measures, cell) are Nomis-specific and live here so
+# code doesn't have to know them. Treat all entries as `(unverified)` until
+# the live test in nightly CI confirms them.
+#
+# `geography_type_codes` maps a Soundings place type to Nomis's geography
+# type code (e.g. lsoa21 → "TYPE298"). The actual `geography=...` query is
+# the Soundings code looked up against this type code.
+
+mappings:
+
+  # --- ONS Mid-Year Estimates ----------------------------------------------
+
+  - indicator_key: population.total
+    source_id: ons.mid_year_estimates
+    dataset_id: NM_2010_1
+    measures: "20100"             # all-persons (unverified)
+    geography_type_codes:
+      lsoa21: TYPE298
+      msoa21: TYPE297
+      ltla24: TYPE154
+      utla24: TYPE499
+      region: TYPE480
+      country: TYPE499
+    period: latest
+
+  - indicator_key: population.density
+    source_id: ons.mid_year_estimates
+    dataset_id: NM_2010_1
+    measures: "20100"
+    geography_type_codes:
+      lsoa21: TYPE298
+      msoa21: TYPE297
+      ltla24: TYPE154
+      utla24: TYPE499
+      region: TYPE480
+      country: TYPE499
+    period: latest
+    extra_params:
+      derived: "value_per_sq_km"  # post-process: value / area_sq_km
+
+  - indicator_key: population.age_structure.under_18
+    source_id: ons.mid_year_estimates
+    dataset_id: NM_2010_1
+    measures: "20100"
+    cell: "0_17"                  # age band 0–17 (unverified)
+    geography_type_codes:
+      lsoa21: TYPE298
+      msoa21: TYPE297
+      ltla24: TYPE154
+
+  - indicator_key: population.age_structure.over_65
+    source_id: ons.mid_year_estimates
+    dataset_id: NM_2010_1
+    measures: "20100"
+    cell: "65_plus"               # age band 65+ (unverified)
+    geography_type_codes:
+      lsoa21: TYPE298
+      msoa21: TYPE297
+      ltla24: TYPE154
+
+  # --- ONS Census 2021 -----------------------------------------------------
+
+  - indicator_key: population.ethnicity.non_white_british_share
+    source_id: ons.census2021
+    dataset_id: NM_2021CT_001     # placeholder; pick real dataset at first run
+    measures: "20100"
+    cell: "ethnicity_non_white_british"
+    geography_type_codes:
+      lsoa21: TYPE151
+      msoa21: TYPE152
+      ltla24: TYPE154
+    period: "2021"
+
+  - indicator_key: population.households.total
+    source_id: ons.census2021
+    dataset_id: NM_2021CT_002
+    measures: "20100"
+    geography_type_codes:
+      lsoa21: TYPE151
+      msoa21: TYPE152
+      ltla24: TYPE154
+    period: "2021"
+
+  - indicator_key: population.households.lone_parent_share
+    source_id: ons.census2021
+    dataset_id: NM_2021CT_003
+    measures: "20100"
+    cell: "lone_parent"
+    geography_type_codes:
+      lsoa21: TYPE151
+      msoa21: TYPE152
+      ltla24: TYPE154
+    period: "2021"
+
+  - indicator_key: health.long_term_conditions_share
+    source_id: ons.census2021
+    dataset_id: NM_2021CT_004
+    measures: "20100"
+    cell: "long_term_health_problem"
+    geography_type_codes:
+      lsoa21: TYPE151
+      msoa21: TYPE152
+      ltla24: TYPE154
+    period: "2021"
+
+  - indicator_key: education.no_qualifications_share
+    source_id: ons.census2021
+    dataset_id: NM_2021CT_005
+    measures: "20100"
+    cell: "no_qualifications"
+    geography_type_codes:
+      lsoa21: TYPE151
+      msoa21: TYPE152
+      ltla24: TYPE154
+    period: "2021"
+
+  - indicator_key: housing.social_rented_share
+    source_id: ons.census2021
+    dataset_id: NM_2021CT_006
+    measures: "20100"
+    cell: "social_rented"
+    geography_type_codes:
+      lsoa21: TYPE151
+      msoa21: TYPE152
+      ltla24: TYPE154
+    period: "2021"
+
+  - indicator_key: housing.overcrowding_share
+    source_id: ons.census2021
+    dataset_id: NM_2021CT_007
+    measures: "20100"
+    cell: "overcrowding"
+    geography_type_codes:
+      lsoa21: TYPE151
+      msoa21: TYPE152
+      ltla24: TYPE154
+    period: "2021"
