@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from soundings.adapters.source_ref_factory import SourceRefFactory
 from soundings.contracts.indicator_value import Confidence, IndicatorValue
 from soundings.contracts.source_ref import CacheStatus, SourceRef
 
@@ -65,6 +66,7 @@ class LoaderAdapter(ABC):
 
     def __init__(self, engine: AsyncEngine) -> None:
         self._engine = engine
+        self._source_ref_factory = SourceRefFactory(engine)
 
     @abstractmethod
     async def load(self, run_id: str | None = None) -> LoaderResult:
@@ -121,36 +123,25 @@ class LoaderAdapter(ABC):
                 )
             ).first()
 
-            source_row = (
+            cadence_row = (
                 await conn.execute(
-                    text(
-                        "SELECT id, label, publisher, publisher_url, dataset_url, "
-                        "       licence, refresh_cadence "
-                        "FROM catalogue.source WHERE id = :sid"
-                    ),
+                    text("SELECT refresh_cadence FROM catalogue.source WHERE id = :sid"),
                     {"sid": self.source_id},
                 )
             ).first()
-        if source_row is None:
+        if cadence_row is None:
             return None
 
-        retrieved_at = (
-            run_row.finished_at if run_row else self.now_utc()
-        )
+        retrieved_at = run_row.finished_at if run_row else self.now_utc()
         cache_status = self._compute_cache_status(
             run_row.finished_at if run_row else None,
-            source_row.refresh_cadence,
+            cadence_row.refresh_cadence,
         )
-        source_ref = SourceRef(
-            source_id=source_row.id,
-            source_label=source_row.label,
-            publisher=source_row.publisher,
-            publisher_url=source_row.publisher_url,
-            dataset_url=source_row.dataset_url,
-            retrieved_at=retrieved_at,
-            cache_status=cache_status,
-            licence=source_row.licence,
+        source_ref = await self._source_ref_factory.build(
+            self.source_id, retrieved_at=retrieved_at, cache_status=cache_status
         )
+        if source_ref is None:
+            return None
         return IndicatorValue(
             place_id=place_id,
             indicator=indicator_key,

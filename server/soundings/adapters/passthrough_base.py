@@ -15,6 +15,7 @@ from aiolimiter import AsyncLimiter
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from soundings.adapters.source_ref_factory import SourceRefFactory
 from soundings.cache.source_cache import SourceCacheStore
 from soundings.contracts.indicator_value import IndicatorValue
 from soundings.contracts.source_ref import CacheStatus, SourceRef
@@ -34,6 +35,7 @@ class PassthroughAdapter(ABC):
     ) -> None:
         self._engine = engine
         self._cache = SourceCacheStore(engine)
+        self._source_ref_factory = SourceRefFactory(engine)
         self._ttl = ttl
         self._limiter = AsyncLimiter(max_rate=rate_per_second, time_period=1)
         self._client = http_client
@@ -118,17 +120,10 @@ class PassthroughAdapter(ABC):
     async def _build_source_ref(
         self, *, retrieved_at: datetime, cache_status: CacheStatus
     ) -> SourceRef:
-        async with self._engine.connect() as conn:
-            row = (
-                await conn.execute(
-                    text(
-                        "SELECT id, label, publisher, publisher_url, dataset_url, licence "
-                        "FROM catalogue.source WHERE id = :sid"
-                    ),
-                    {"sid": self.source_id},
-                )
-            ).first()
-        if row is None:
+        ref = await self._source_ref_factory.build(
+            self.source_id, retrieved_at=retrieved_at, cache_status=cache_status
+        )
+        if ref is None:
             return SourceRef(
                 source_id=self.source_id,
                 source_label=self.source_id,
@@ -137,16 +132,7 @@ class PassthroughAdapter(ABC):
                 retrieved_at=retrieved_at,
                 cache_status=cache_status,
             )
-        return SourceRef(
-            source_id=row.id,
-            source_label=row.label,
-            publisher=row.publisher,
-            publisher_url=row.publisher_url,
-            dataset_url=row.dataset_url,
-            retrieved_at=retrieved_at,
-            cache_status=cache_status,
-            licence=row.licence,
-        )
+        return ref
 
     def get_source_ref(
         self,
