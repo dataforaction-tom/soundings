@@ -49,6 +49,7 @@ PLACE_FIXTURES = [
 async def _seed_places() -> None:
     engine = get_engine()
     async with engine.begin() as conn:
+        await conn.execute(text("DELETE FROM geography.place_hierarchy"))
         await conn.execute(text("DELETE FROM geography.postcode"))
         await conn.execute(text("DELETE FROM geography.place"))
         # ltla24 and utla24 share the same code in unitary authorities;
