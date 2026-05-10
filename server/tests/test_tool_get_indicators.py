@@ -99,3 +99,30 @@ async def test_get_indicators_wide_format_groups_by_place() -> None:
     assert result.wide.indicators["deprivation.imd.score"] == 24.0
     # Tall is still populated alongside wide so consumers can pick.
     assert len(result.results) == 2
+
+
+async def test_get_indicators_surfaces_catalogue_caveats() -> None:
+    engine = get_engine()
+    await _seed_two_indicators()
+    # Stamp a catalogue-level caveat onto one of the indicators.
+    async with engine.begin() as conn:
+        await conn.execute(
+            text(
+                "UPDATE catalogue.indicator SET caveats = '[\"Mid-year estimates are revised after each Census.\"]'::jsonb "
+                "WHERE key = 'population.total'"
+            )
+        )
+
+    registry = AdapterRegistry(engine)
+    registry.register("ons.mid_year_estimates", OnsMidYearEstimatesAdapter)
+    registry.register("mhclg.imd2025", MhclgImd2025Adapter)
+    orchestrator = IndicatorOrchestrator(engine, registry)
+
+    result = await get_indicators(
+        GetIndicatorsInput(
+            place_id="ltla24:E06000004",
+            indicators=["population.total"],
+        ),
+        orchestrator,
+    )
+    assert any("Mid-year estimates are revised" in c for c in result.caveats)

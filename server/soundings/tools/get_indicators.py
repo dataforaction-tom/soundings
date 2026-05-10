@@ -7,6 +7,7 @@ on the way out; both formats share the deduplicated SourceRef[].
 from typing import Literal
 
 from pydantic import BaseModel, Field
+from sqlalchemy import text
 
 from soundings.contracts.indicator_value import IndicatorValue
 from soundings.contracts.source_ref import SourceRef
@@ -41,19 +42,46 @@ async def get_indicators(
         place_id=input.place_id,
         period=input.period,
     )
+
+    # Merge static caveats from the indicator catalogue with the orchestrator's
+    # dynamic caveats (rate limits, partial failures, level violations).
+    catalogue_caveats = await _catalogue_caveats(
+        orchestrator._engine, input.indicators  # noqa: SLF001
+    )
+    merged_caveats = list(dict.fromkeys([*result.caveats, *catalogue_caveats]))
+
     wide: WideRow | None = None
     if input.format == "wide":
         wide = WideRow(
             place_id=input.place_id,
             indicators={v.indicator: v.value for v in result.values},
         )
+
     return GetIndicatorsOutput(
         results=result.values,
         wide=wide,
         sources=result.sources,
-        caveats=result.caveats,
+        caveats=merged_caveats,
         partial=result.partial,
     )
+
+
+async def _catalogue_caveats(engine: object, indicator_keys: list[str]) -> list[str]:
+    async with engine.connect() as conn:  # type: ignore[attr-defined]
+        rows = (
+            await conn.execute(
+                text(
+                    "SELECT key, caveats FROM catalogue.indicator "
+                    "WHERE key = ANY(:keys)"
+                ),
+                {"keys": indicator_keys},
+            )
+        ).all()
+    caveats: list[str] = []
+    for row in rows:
+        for c in row.caveats or []:
+            caveats.append(f"{row.key}: {c}")
+    return caveats
 
 
 TOOL_NAME = "get_indicators"
