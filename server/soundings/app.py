@@ -17,6 +17,7 @@ from soundings.http.errors import install_error_envelope
 from soundings.http.health import router as health_router
 from soundings.http.sources import router as sources_router
 from soundings.http.tools import router as tools_router
+from soundings.mcp.server import build_mcp_server
 from soundings.orchestration.orchestrator import IndicatorOrchestrator
 from soundings.orchestration.registry import AdapterRegistry
 
@@ -44,6 +45,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.adapter_registry = registry
     app.state.orchestrator = IndicatorOrchestrator(engine, registry)
     app.state.geography_service = GeographyService(engine, postcodes_io)
+
+    # MCP server uses the same tool handlers + app.state.
+    mcp_server = build_mcp_server(state=app.state)
+    app.mount("/mcp", mcp_server.sse_app())
 
     yield
 
