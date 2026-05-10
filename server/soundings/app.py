@@ -12,8 +12,10 @@ from soundings.adapters.postcodes_io.adapter import PostcodesIoAdapter
 from soundings.catalogue.loader import load_catalogue_into_db
 from soundings.db.engine import get_engine
 from soundings.geography.service import GeographyService
+from soundings.http.catalogue import router as catalogue_router
 from soundings.http.errors import install_error_envelope
 from soundings.http.health import router as health_router
+from soundings.http.sources import router as sources_router
 from soundings.http.tools import router as tools_router
 from soundings.orchestration.orchestrator import IndicatorOrchestrator
 from soundings.orchestration.registry import AdapterRegistry
@@ -49,4 +51,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="Soundings", version="0.0.1", lifespan=lifespan)
 app.include_router(health_router)
 app.include_router(tools_router)
+app.include_router(sources_router)
+app.include_router(catalogue_router)
 install_error_envelope(app)
