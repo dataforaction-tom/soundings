@@ -15,6 +15,7 @@ pytestmark = pytest.mark.integration
 async def _seed_places(ids: dict[str, str]) -> None:
     engine = get_engine()
     async with engine.begin() as conn:
+        await conn.execute(text("DELETE FROM data.indicator_value"))
         await conn.execute(text("DELETE FROM geography.place_hierarchy"))
         await conn.execute(text("DELETE FROM geography.postcode"))
         await conn.execute(text("DELETE FROM geography.place"))
