@@ -94,6 +94,16 @@ async def test_post_find_place_returns_200_for_name_query() -> None:
     assert any(m["id"] == "ltla24:E06000004" for m in body["matches"])
 
 
+async def test_get_v1_tools_lists_specs() -> None:
+    async with app.router.lifespan_context(app):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            response = await ac.get("/v1/tools")
+    assert response.status_code == 200
+    body = response.json()
+    names = {t["name"] for t in body["tools"]}
+    assert names == {"find_place", "get_indicators", "get_place_profile"}
+
+
 async def test_post_tool_validates_input() -> None:
     async with app.router.lifespan_context(app):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:

@@ -7,19 +7,37 @@ implementations are also registered with the MCP server at `/mcp`.
 
 from fastapi import APIRouter, Request
 
-from soundings.tools.find_place import FindPlaceInput, FindPlaceOutput, find_place
+from soundings.tools.find_place import (
+    FindPlaceInput,
+    FindPlaceOutput,
+    find_place,
+)
+from soundings.tools.find_place import tool_spec as find_place_spec
 from soundings.tools.get_indicators import (
     GetIndicatorsInput,
     GetIndicatorsOutput,
     get_indicators,
 )
+from soundings.tools.get_indicators import tool_spec as get_indicators_spec
 from soundings.tools.get_place_profile import (
     GetPlaceProfileInput,
     GetPlaceProfileOutput,
     get_place_profile,
 )
+from soundings.tools.get_place_profile import tool_spec as get_place_profile_spec
 
 router = APIRouter(prefix="/v1/tools")
+
+
+@router.get("")
+async def list_tools() -> dict[str, list[dict[str, object]]]:
+    return {
+        "tools": [
+            find_place_spec(),
+            get_indicators_spec(),
+            get_place_profile_spec(),
+        ]
+    }
 
 
 @router.post("/find_place", response_model=FindPlaceOutput)
