@@ -9,11 +9,13 @@ don't see redundant citations.
 import asyncio
 from dataclasses import dataclass, field
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from soundings.contracts.indicator_value import IndicatorValue
 from soundings.contracts.source_ref import SourceRef
 from soundings.orchestration.errors import (
+    IndicatorNotAvailableAtLevelError,
     IndicatorNotRegisteredError,
     OrchestrationError,
 )
@@ -79,11 +81,31 @@ class IndicatorOrchestrator:
     async def _fetch_one(
         self, indicator_key: str, place_id: str, period: str | None
     ) -> IndicatorValue | None:
+        await self._enforce_level(indicator_key, place_id)
         adapter = await self._registry.adapter_for_indicator(indicator_key)
         return await adapter.fetch_indicator(indicator_key, place_id, period)
 
+    async def _enforce_level(self, indicator_key: str, place_id: str) -> None:
+        place_type, _, _ = place_id.partition(":")
+        async with self._engine.connect() as conn:
+            row = (
+                await conn.execute(
+                    text(
+                        "SELECT available_at FROM catalogue.indicator WHERE key = :k"
+                    ),
+                    {"k": indicator_key},
+                )
+            ).first()
+        available_at = list(row.available_at) if row else []
+        if available_at and place_type not in available_at:
+            raise IndicatorNotAvailableAtLevelError(
+                indicator_key, place_id, available_at
+            )
+
     @staticmethod
     def _caveat_for_failure(indicator_key: str, exc: BaseException) -> str:
+        if isinstance(exc, IndicatorNotAvailableAtLevelError):
+            return f"INDICATOR_NOT_AVAILABLE_AT_LEVEL: {exc}"
         if isinstance(exc, OrchestrationError):
             return f"{indicator_key}: {exc}"
         if isinstance(exc, IndicatorNotRegisteredError):
