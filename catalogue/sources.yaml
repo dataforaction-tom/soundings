@@ -1,0 +1,130 @@
+# catalogue/sources.yaml — v1 sources, pinned per design 2026-05-05 §3.
+# Each entry includes: mode (loader|passthrough), refresh policy, licence,
+# publisher metadata for SourceRef construction.
+
+sources:
+  - id: ons.geography
+    label: ONS Open Geography Portal
+    publisher: Office for National Statistics
+    publisher_url: https://geoportal.statistics.gov.uk/
+    dataset_url: https://geoportal.statistics.gov.uk/
+    licence: OGL-UK-3.0
+    mode: loader
+    refresh_cadence: "0 2 1 */3 *"
+    rate_limit: { rps: 4 }
+
+  - id: postcodes.io
+    label: postcodes.io
+    publisher: postcodes.io
+    publisher_url: https://postcodes.io/
+    dataset_url: https://api.postcodes.io/
+    licence: MIT
+    mode: passthrough
+    ttl_hours: 720
+    rate_limit: { rps: 10 }
+
+  - id: ons.census2021
+    label: ONS Census 2021
+    publisher: Office for National Statistics
+    publisher_url: https://www.ons.gov.uk/census
+    dataset_url: https://www.nomisweb.co.uk/
+    licence: OGL-UK-3.0
+    mode: loader
+    refresh_cadence: "0 2 1 1 *"
+    rate_limit: { rps: 2 }
+
+  - id: ons.aps
+    label: ONS Annual Population Survey
+    publisher: Office for National Statistics
+    publisher_url: https://www.ons.gov.uk/
+    dataset_url: https://www.nomisweb.co.uk/
+    licence: OGL-UK-3.0
+    mode: passthrough
+    ttl_hours: 24
+    rate_limit: { rps: 2 }
+
+  - id: mhclg.imd2019
+    label: English Indices of Deprivation 2019
+    publisher: Ministry of Housing, Communities and Local Government
+    publisher_url: https://www.gov.uk/government/statistics/english-indices-of-deprivation-2019
+    dataset_url: https://www.gov.uk/government/statistics/english-indices-of-deprivation-2019
+    licence: OGL-UK-3.0
+    mode: loader
+    refresh_cadence: "0 3 1 * *"
+
+  - id: mhclg.live_tables
+    label: MHCLG Live Tables
+    publisher: Ministry of Housing, Communities and Local Government
+    publisher_url: https://www.gov.uk/government/statistical-data-sets
+    dataset_url: https://www.gov.uk/government/statistical-data-sets
+    licence: OGL-UK-3.0
+    mode: loader
+    refresh_cadence: "0 4 * * 1"
+
+  - id: dwp.statxplore
+    label: DWP Stat-Xplore
+    publisher: Department for Work and Pensions
+    publisher_url: https://stat-xplore.dwp.gov.uk/
+    dataset_url: https://stat-xplore.dwp.gov.uk/webapi/online-help/
+    licence: OGL-UK-3.0
+    mode: passthrough
+    ttl_hours: 24
+    rate_limit: { rps: 2 }
+
+  - id: ohid.fingertips
+    label: OHID Fingertips
+    publisher: Office for Health Improvement and Disparities
+    publisher_url: https://fingertips.phe.org.uk/
+    dataset_url: https://fingertips.phe.org.uk/api
+    licence: OGL-UK-3.0
+    mode: passthrough
+    ttl_hours: 24
+    rate_limit: { rps: 4 }
+
+  - id: dfe.explore
+    label: Explore Education Statistics
+    publisher: Department for Education
+    publisher_url: https://explore-education-statistics.service.gov.uk/
+    dataset_url: https://content.explore-education-statistics.service.gov.uk/api/
+    licence: OGL-UK-3.0
+    mode: passthrough
+    ttl_hours: 24
+    rate_limit: { rps: 2 }
+
+  - id: police_uk
+    label: data.police.uk
+    publisher: Home Office
+    publisher_url: https://data.police.uk/
+    dataset_url: https://data.police.uk/docs/
+    licence: OGL-UK-3.0
+    mode: passthrough
+    ttl_hours: 24
+    rate_limit: { rps: 10 }
+
+  - id: charity_commission
+    label: Charity Commission Register
+    publisher: Charity Commission for England and Wales
+    publisher_url: https://register-of-charities.charitycommission.gov.uk/
+    dataset_url: https://register-of-charities.charitycommission.gov.uk/register/api
+    licence: OGL-UK-3.0
+    mode: loader
+    refresh_cadence: "0 2 * * *"
+
+  - id: 360giving
+    label: 360Giving Datastore
+    publisher: 360Giving
+    publisher_url: https://www.threesixtygiving.org/
+    dataset_url: https://grantnav.threesixtygiving.org/
+    licence: CC-BY-4.0
+    mode: loader
+    refresh_cadence: "0 5 * * 0"
+
+  - id: find_that_charity
+    label: Find That Charity
+    publisher: Find That Charity
+    publisher_url: https://findthatcharity.uk/
+    dataset_url: https://findthatcharity.uk/about
+    licence: CC-BY-SA-4.0
+    mode: passthrough
+    ttl_hours: 168
+    rate_limit: { rps: 4 }
