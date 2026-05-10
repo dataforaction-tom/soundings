@@ -108,3 +108,79 @@ async def test_find_place_by_name_returns_top_match() -> None:
     assert len(matches) >= 1
     assert matches[0].place.id == "ltla24:E06000004"
     assert 0 < matches[0].confidence <= 1.0
+
+
+async def test_find_containing_places_via_hierarchy() -> None:
+    engine = get_engine()
+    await _seed_places()
+    # Seed hierarchy: lsoa -> msoa -> ltla -> region -> country
+    async with engine.begin() as conn:
+        edges = [
+            ("lsoa21:E01012018", "msoa21:E02002565"),
+            ("lsoa21:E01012018", "ltla24:E06000004"),
+            ("lsoa21:E01012018", "region:E12000001"),
+            ("lsoa21:E01012018", "country:E92000001"),
+            ("msoa21:E02002565", "ltla24:E06000004"),
+            ("msoa21:E02002565", "region:E12000001"),
+            ("msoa21:E02002565", "country:E92000001"),
+            ("ltla24:E06000004", "region:E12000001"),
+            ("ltla24:E06000004", "country:E92000001"),
+            ("region:E12000001", "country:E92000001"),
+        ]
+        for child, parent in edges:
+            await conn.execute(
+                text(
+                    "INSERT INTO geography.place_hierarchy (child_id, parent_id) "
+                    "VALUES (:c, :p) ON CONFLICT DO NOTHING"
+                ),
+                {"c": child, "p": parent},
+            )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=SAMPLE_RESPONSE)
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        adapter = PostcodesIoAdapter(
+            engine, ttl=timedelta(hours=720), http_client=client
+        )
+        svc = GeographyService(engine, adapter)
+        ancestors = await svc.find_containing_places("lsoa21:E01012018")
+
+    types = {p.type for p in ancestors}
+    assert "msoa21" in types
+    assert "ltla24" in types
+    assert "region" in types
+    assert "country" in types
+
+
+async def test_find_containing_places_by_point_returns_polygon_match() -> None:
+    engine = get_engine()
+    await _seed_places()
+    # Plant a polygon that covers (54.57, -1.31) on the LTLA row.
+    async with engine.begin() as conn:
+        await conn.execute(
+            text(
+                "UPDATE geography.place SET geom = ST_Multi(ST_GeomFromGeoJSON(:gj)) "
+                "WHERE id = 'ltla24:E06000004'"
+            ),
+            {
+                "gj": (
+                    '{"type":"Polygon","coordinates":[[[-1.32,54.56],[-1.30,54.56],'
+                    "[-1.30,54.58],[-1.32,54.58],[-1.32,54.56]]]}"
+                )
+            },
+        )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=SAMPLE_RESPONSE)
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        adapter = PostcodesIoAdapter(
+            engine, ttl=timedelta(hours=720), http_client=client
+        )
+        svc = GeographyService(engine, adapter)
+        hits = await svc.find_containing_places_by_point(54.57, -1.31, types=["ltla24"])
+
+    assert any(p.id == "ltla24:E06000004" for p in hits)

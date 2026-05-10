@@ -12,7 +12,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from soundings.adapters.postcodes_io.adapter import PostcodesIoAdapter
-from soundings.db.models.geography import Place, Postcode
+from soundings.db.models.geography import Place, PlaceHierarchy, Postcode
 
 POSTCODE_FRESHNESS = timedelta(days=30)
 
@@ -92,6 +92,50 @@ class GeographyService:
         async with AsyncSession(self._engine) as session:
             rows = (await session.execute(stmt)).all()
         return [PlaceMatch(place=r.Place, confidence=float(r.score)) for r in rows]
+
+    async def find_containing_places(self, place_id: str) -> list[Place]:
+        """All ancestor Places of a given place_id, via the hierarchy table."""
+        stmt = (
+            select(Place)
+            .join(PlaceHierarchy, Place.id == PlaceHierarchy.parent_id)
+            .where(PlaceHierarchy.child_id == place_id)
+        )
+        async with AsyncSession(self._engine) as session:
+            return list((await session.scalars(stmt)).all())
+
+    async def find_containing_places_by_point(
+        self,
+        lat: float,
+        lng: float,
+        types: list[str] | None = None,
+    ) -> list[Place]:
+        """Point-in-polygon containing-place lookup via PostGIS ST_Within."""
+        clauses = "WHERE ST_Within(ST_SetSRID(ST_Point(:lng, :lat), 4326), geom)"
+        if types:
+            placeholders = ", ".join(f":t{i}" for i, _ in enumerate(types))
+            clauses += f" AND type IN ({placeholders})"
+        sql = (
+            "SELECT id, type, code, name, valid_from, valid_to "
+            "FROM geography.place "
+            f"{clauses}"
+        )
+        params: dict[str, object] = {"lat": lat, "lng": lng}
+        if types:
+            for i, t in enumerate(types):
+                params[f"t{i}"] = t
+        async with AsyncSession(self._engine) as session:
+            rows = (await session.execute(text(sql), params)).all()
+        return [
+            Place(
+                id=r.id,
+                type=r.type,
+                code=r.code,
+                name=r.name,
+                valid_from=r.valid_from,
+                valid_to=r.valid_to,
+            )
+            for r in rows
+        ]
 
     async def _read_cached_postcode(self, normalised: str) -> Postcode | None:
         cutoff = datetime.now(tz=timezone.utc) - POSTCODE_FRESHNESS
