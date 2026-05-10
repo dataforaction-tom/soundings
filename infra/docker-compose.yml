@@ -38,6 +38,21 @@ services:
       timeout: 3s
       retries: 5
 
+  loader:
+    image: soundings-server
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.server
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: "postgresql+asyncpg://soundings:${POSTGRES_PASSWORD}@postgres:5432/soundings"
+    command: ["python", "-m", "soundings.loader.run"]
+    restart: unless-stopped
+
   caddy:
     image: caddy:2
     depends_on:
