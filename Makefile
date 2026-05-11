@@ -1,10 +1,13 @@
-.PHONY: help install lint type test test-integration test-live migrate seed seed-light up down logs decrypt-env
+.PHONY: help install install-spacy lint type test test-integration test-live migrate seed seed-light up down logs decrypt-env
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## ' Makefile | awk 'BEGIN{FS=":.*?## "} {printf "  %-18s %s\n", $$1, $$2}'
 
 install:  ## Sync dev deps with uv (run inside server/)
 	cd server && uv sync
+
+install-spacy:  ## Download the spaCy NER model used by the sanitisation pipeline
+	cd server && uv run python -m spacy download en_core_web_sm
 
 lint:  ## Run ruff
 	cd server && uv run ruff check . && uv run ruff format --check .

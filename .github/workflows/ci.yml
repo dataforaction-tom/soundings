@@ -37,6 +37,8 @@ jobs:
         with:
           version: "0.11.12"
       - run: cd server && uv sync --frozen
+      - name: Install spaCy NER model
+        run: cd server && uv run python -m spacy download en_core_web_sm
       - name: Bootstrap extensions and schemas
         env:
           PGPASSWORD: changeme-locally
