@@ -1,4 +1,4 @@
-.PHONY: help install install-spacy lint type test test-integration test-live migrate seed seed-light up down logs decrypt-env
+.PHONY: help install install-spacy lint type test test-integration test-live migrate seed seed-light up down logs decrypt-env publish-corpus
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## ' Makefile | awk 'BEGIN{FS=":.*?## "} {printf "  %-18s %s\n", $$1, $$2}'
@@ -44,3 +44,11 @@ seed-light:  ## Dev seed (single LTLA, ~5 min)
 
 decrypt-env:  ## Decrypt .env from soundings-ops (placeholder until soundings-ops exists)
 	@echo "TODO: implement once soundings-ops repo exists"
+
+# PERIOD defaults to last month if not provided. OUT defaults to ./corpus/.
+PERIOD ?=
+OUT    ?= corpus
+publish-corpus:  ## Materialise the monthly corpus into $(OUT)/ and create a local git tag
+	cd server && uv run python -m soundings.publication.cli \
+	  $(if $(PERIOD),--period $(PERIOD)) \
+	  --out ../$(OUT)

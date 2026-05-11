@@ -88,7 +88,7 @@ def test_resolve_git_sha_returns_current_head(tmp_path: Path) -> None:
     if sha is not None:
         assert len(sha) == 40
         # Sanity: matches `git rev-parse HEAD`.
-        expected = subprocess.check_output(  # noqa: S603
+        expected = subprocess.check_output(
             ["git", "rev-parse", "HEAD"],  # noqa: S607
             text=True,
         ).strip()

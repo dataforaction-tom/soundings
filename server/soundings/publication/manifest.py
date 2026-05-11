@@ -49,7 +49,7 @@ def resolve_git_sha() -> str | None:
     """`git rev-parse HEAD` — returns None outside a git repo."""
     try:
         # Trusted argv (literal list); PATH lookup is fine for portability.
-        result = subprocess.run(  # noqa: S603
+        result = subprocess.run(
             ["git", "rev-parse", "HEAD"],  # noqa: S607
             check=True,
             capture_output=True,

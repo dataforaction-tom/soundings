@@ -49,6 +49,9 @@ ignore = [
     "S101",      # assert in tests is fine
     "ASYNC109",  # we want the explicit timeout param on IndicatorOrchestrator.fetch
     "ASYNC110",  # `while True: await asyncio.sleep(N)` is fine in long-running daemons
+    "ASYNC221",  # subprocess in publication CLI is one-shot; blocking is fine
+    "ASYNC230",  # open() in async — same reasoning, batch jobs not request hot path
+    "ASYNC240",  # pathlib in async — same reasoning
     "RUF002",    # docstring "×" / "–" symbols are intentional in tables / specs
     "RUF003",    # comment "×" / "–" symbols are intentional in tables / specs
 ]
