@@ -1,8 +1,8 @@
 # Plan
 
 > Last updated: 2026-05-11
-> Status: **Phase 1 complete.** Tag `v0.2.0-phase-1`. Phase 1 live URLs all
-> verified end-to-end against real upstreams 2026-05-11.
+> Status: **Phase 2 complete.** Tag `v0.3.0-phase-2`. Capture pipeline,
+> sanitisation rules, monthly publication, and minimal Astro UI all live.
 
 ## Objective
 
@@ -18,6 +18,7 @@ Per-phase plans live in `docs/plans/`:
 - `docs/plans/2026-05-05-soundings-v1-design.md` — implementation design.
 - `docs/plans/2026-05-05-soundings-v1-phase-0-plan.md` — Phase 0 plan (40 tasks).
 - `docs/plans/2026-05-10-soundings-v1-phase-1-plan.md` — Phase 1 plan (52 tasks).
+- `docs/plans/2026-05-11-soundings-v1-phase-2-plan.md` — Phase 2 plan (45 tasks).
 
 Each phase plan is TDD task-by-task: failing test → minimum implementation →
 green → conventional-commit. Block-level commit boundaries.
@@ -29,8 +30,9 @@ green → conventional-commit. Block-level commit boundaries.
 - [x] Phase 1 — Three indicator adapters (MYE, Census, IMD); three tools
       (`find_place`, `get_indicators`, `get_place_profile`); HTTP + MCP
       transports; loader daemon. Tag `v0.2.0-phase-1`.
-- [ ] Phase 2 — Capture pipeline + sanitisation + minimal `/` and
-      `/place/{id}` UI.
+- [x] Phase 2 — Capture pipeline (raw + sanitised, two-step write), six
+      sanitisation rules, monthly publication, minimal Astro UI (`/`,
+      `/place/[id]`, `/about`), Resend alerts. Tag `v0.3.0-phase-2`.
 - [ ] Phase 3 — Adapters for Fingertips, DWP Stat-Xplore, DfE, police.uk;
       `compare_places` and `get_trend`.
 - [ ] Phase 4 — Adapters for Charity Commission, 360Giving, Find That Charity;

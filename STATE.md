@@ -1,8 +1,7 @@
 # State
 
 > Last updated: 2026-05-11
-> Phase: **1 — indicator pipeline + three tools** (complete, tag `v0.2.0-phase-1`,
-> live URLs verified end-to-end 2026-05-11).
+> Phase: **2 — capture + sanitisation + UI** (complete, tag `v0.3.0-phase-2`).
 
 ## System State Diagram
 
@@ -14,9 +13,11 @@ stateDiagram-v2
     Phase0Done --> Phase1Build: phase 1 plan accepted
     Phase1Build --> Phase1Done: e2e (HTTP + MCP) green, tag pushed
     Phase1Done --> Phase2Build: planning underway
-    Phase2Build --> [*]: not started
+    Phase2Build --> Phase2Done: capture + UI live, e2e green, tag pushed
+    Phase2Done --> Phase3Build: planning underway
+    Phase3Build --> [*]: not started
 
-    note right of Phase1Done: ← WE ARE HERE
+    note right of Phase2Done: ← WE ARE HERE
 ```
 
 ## Component Status
@@ -48,6 +49,17 @@ stateDiagram-v2
 | Seed CLI (`make seed`, `make seed-light`) | ✅ Phase 0 + 1 | Now seeds MYE + Census + IMD after the geography spine. |
 | GitHub Actions CI + nightly live workflow | ✅ Phase 0 | Live tests run nightly; MYE + Census + IMD live tests added. |
 | Smoke deploy config (Caddy + cloudflared runbook) | ✅ Phase 0 | |
+| **Capture middleware + RawRecordWriter (stub + raw in one txn)** | ✅ Phase 2 | Raw ASGI middleware; tracks sanitiser tasks via app.state.background_tasks. |
+| **Sanitisation pipeline (6 rules + pipeline runner)** | ✅ Phase 2 | direct identifiers, fine geography, spaCy NER, small orgs, normalise, validate. Pipeline runner flags review_status=flagged at total_fires ≥ 2. |
+| **Migration 0005 — review_status + sanitisation_rules_version** | ✅ Phase 2 | |
+| **SanitiserWorker + startup replay** | ✅ Phase 2 | Replay capped at 4 concurrent spaCy invocations. |
+| **POST /v1/capture/consent + /v1/capture/feedback** | ✅ Phase 2 | Issues session/consent/sector cookies; feedback enforces same-session ownership. |
+| **FullConsentRateLimiter (60/hour silent downgrade)** | ✅ Phase 2 | |
+| **Resend alerts + 30-day raw_record retention cron** | ✅ Phase 2 | Daily 04:00 UTC; failure paths route through send_alert. |
+| **Publication CLI (`make publish-corpus`)** | ✅ Phase 2 | CSV + JSONL + SHA-256 manifest + local git tag; deterministic byte output. |
+| **Astro 5 UI (`/`, `/place/[id]`, `/about`)** | ✅ Phase 2 | SSR everywhere. Typed `lib/api.ts` mirrors Pydantic shapes; ADR-0005. |
+| **Caddyfile path routing for /v1, /mcp, ui** | ✅ Phase 2 | Replaces the Phase 0 placeholder. |
+| **`/healthz` capture-pipeline freshness** | ✅ Phase 2 | Pending backlog + stuck >1h checks. |
 
 Status markers: ⏳ Not started · 🔧 In progress · ✅ Done · 🚫 Blocked · ⚠️ Needs attention.
 
@@ -85,13 +97,26 @@ flowchart LR
 | postcodes.io | Working | |
 | GitHub Actions | Configured | |
 
-## Known follow-ups for Phase 2
+## Known follow-ups (Phase 3 and beyond)
 
-- IMD 2025 deciles/ranks: only Scores (File 5) loaded; Decile/Rank (File 2)
-  not yet wired up for the 2025 edition. Decide whether to add a second
-  download or switch indicator contracts.
-- Census TS-table IDs for indicators beyond `lone_parent_share` are pinned
-  with plausible IDs and not yet exercised — verify when each is used.
-- Capture pipeline (raw_record + sanitised question_record) — Phase 2 plan.
-- Minimal `/` and `/place/{id}` UI — Phase 2 plan.
-- `compare_places` and `get_trend` tools — Phase 3 plan.
+- **Production sanitisation pipeline missing rules**: app.py lifespan
+  composes only StripDirectIdentifiers + NormaliseAskerPurpose +
+  ValidateConsentLevel. StripFineGeographyInFreeText,
+  StripPersonalNamesViaNER, and StripSmallOrgNames exist + are tested
+  but not wired into the runtime pipeline. Bundling that wire-up with
+  loading the DB-backed name lists from `geography.place` and
+  `data.organisation` is the next sanitiser improvement.
+- **No Vitest in CI**: GitHub Actions runs the Python suite only.
+  `cd ui && npm test` runs locally. CI extension is a small workflow
+  patch.
+- **No Playwright UI e2e**: deferred per the Phase 2 plan
+  "best-effort" provision.
+- **IMD 2025 deciles/ranks**: only Scores (File 5) loaded for 2025;
+  Decile/Rank in File 2 not yet wired.
+- **Census TS-table IDs**: indicators beyond `lone_parent_share` are
+  pinned with plausible IDs, not yet exercised.
+- **Backblaze B2 publication push**: deferred per ADR-0004.
+- **Permanent-orphan pending stubs**: edge case from ADR-0003; cron
+  hard-deleting pending stubs older than 60 days is a Phase 3 task.
+- **`compare_places` and `get_trend` tools** — Phase 3 plan.
+- **Observable Plot charts** — deferred to Phase 3 per ADR-0007.
