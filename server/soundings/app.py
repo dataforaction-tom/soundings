@@ -12,6 +12,7 @@ from soundings.adapters.ons_census2021.adapter import OnsCensus2021Adapter
 from soundings.adapters.ons_mid_year_estimates.adapter import OnsMidYearEstimatesAdapter
 from soundings.adapters.postcodes_io.adapter import PostcodesIoAdapter
 from soundings.capture.middleware import CaptureMiddleware
+from soundings.capture.rate_limit import FullConsentRateLimiter
 from soundings.capture.raw_writer import RawRecordWriter
 from soundings.capture.replay import replay_pending
 from soundings.capture.sanitisation.config import load_sanitisation_config
@@ -58,11 +59,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     postcodes_io = PostcodesIoAdapter(engine, ttl=POSTCODES_IO_TTL)
 
+    sanitisation_config = load_sanitisation_config()
+
     app.state.engine = engine
     app.state.adapter_registry = registry
     app.state.orchestrator = IndicatorOrchestrator(engine, registry)
     app.state.geography_service = GeographyService(engine, postcodes_io)
     app.state.raw_writer = RawRecordWriter(engine)
+    app.state.rate_limiter = FullConsentRateLimiter(
+        engine,
+        threshold=sanitisation_config.asker_purpose.rate_limit.full_consent_per_session_per_hour,
+    )
 
     # Sanitiser pipeline. Block C wires the minimal rules that don't
     # need DB lookups or the spaCy NER model — the latter two get added
@@ -70,7 +77,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # and instantiates `StripPersonalNamesViaNER`. Phase 4 brings the
     # Charity Commission seed that populates `data.organisation` so
     # `StripSmallOrgNames` becomes useful.
-    sanitisation_config = load_sanitisation_config()
     pipeline = SanitisationPipeline(
         rules=[
             StripDirectIdentifiers(),

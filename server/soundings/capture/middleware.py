@@ -51,6 +51,10 @@ class SanitiserScheduler(Protocol):
     async def sanitise(self, record_id: UUID) -> None: ...
 
 
+class _RateLimiter(Protocol):
+    async def should_downgrade(self, session_id: UUID) -> bool: ...
+
+
 def _extract_tool_name(path: str) -> str:
     # /v1/tools/find_place → "find_place"
     return path[len(TOOLS_PATH_PREFIX) :].split("/", 1)[0]
@@ -159,6 +163,17 @@ class CaptureMiddleware:
             await self.app(scope, receive, send)
             return
 
+        # Rate-limit silent downgrade: if this session has exceeded the
+        # full-consent per-hour cap (spec §8.3), demote this record to
+        # `minimal` before anything else runs. The asker sees no error.
+        effective_consent = session.consent_level
+        if effective_consent == "full" and session.session_id is not None:
+            limiter: _RateLimiter | None = (
+                getattr(app_obj.state, "rate_limiter", None) if app_obj is not None else None
+            )
+            if limiter is not None and await limiter.should_downgrade(session.session_id):
+                effective_consent = "minimal"
+
         # Drain the request body so we can inspect and possibly rewrite it.
         body_chunks: list[bytes] = []
         more_body = True
@@ -172,7 +187,7 @@ class CaptureMiddleware:
         tool_inputs: dict[str, Any] = body_json if isinstance(body_json, dict) else {}
 
         nl_question: str | None = None
-        if session.consent_level == "full" and isinstance(tool_inputs.get("nl_question"), str):
+        if effective_consent == "full" and isinstance(tool_inputs.get("nl_question"), str):
             nl_question = tool_inputs["nl_question"]
         tool_inputs.pop("nl_question", None)
 
@@ -213,7 +228,7 @@ class CaptureMiddleware:
         extras = _extract_capture_fields(response_payload)
         ctx = CaptureContext(
             session_id=session.session_id,
-            consent_level=session.consent_level,
+            consent_level=effective_consent,
             consent_version=session.consent_version,
             tool_called=_extract_tool_name(scope["path"]),
             tool_inputs=tool_inputs,

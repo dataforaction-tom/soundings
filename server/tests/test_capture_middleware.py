@@ -262,6 +262,48 @@ async def test_background_tasks_set_is_populated_then_drained() -> None:
     assert len(sanitiser.calls) == 1
 
 
+class AlwaysDowngradeLimiter:
+    async def should_downgrade(self, session_id: UUID) -> bool:
+        del session_id
+        return True
+
+
+async def test_rate_limit_downgrades_full_consent_silently() -> None:
+    """A session over the per-hour cap should land its record at minimal."""
+    app = FastAPI()
+    writer = FakeRawWriter()
+    app.state.raw_writer = writer
+    app.state.rate_limiter = AlwaysDowngradeLimiter()
+    app.add_middleware(CaptureMiddleware)
+    app.add_middleware(SessionMiddleware)
+
+    @app.post("/v1/tools/find_place")
+    async def find_place(body: dict[str, Any]) -> dict[str, Any]:
+        del body
+        return {"matches": [], "sources": []}
+
+    transport = httpx.ASGITransport(app=app)
+    cookies = {
+        "soundings_session": str(uuid4()),
+        "soundings_consent": "full",
+    }
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", cookies=cookies
+    ) as client:
+        response = await client.post(
+            "/v1/tools/find_place",
+            json={"query": "Stockton", "nl_question": "should be dropped"},
+        )
+
+    # Tool call still 200 — no error visible to the asker.
+    assert response.status_code == 200
+    assert len(writer.calls) == 1
+    ctx = writer.calls[0]
+    # capture_level downgraded, nl_question discarded.
+    assert ctx.consent_level == "minimal"
+    assert ctx.natural_language_question is None
+
+
 async def test_middleware_short_circuits_when_no_writer_configured() -> None:
     """Without a writer the middleware must not touch body or response.
 
