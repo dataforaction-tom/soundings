@@ -1,0 +1,154 @@
+"""Tests for CaptureMiddleware.
+
+These tests build a minimal FastAPI app with a fake tool route so we
+exercise the middleware in isolation — without spinning up the real
+adapter registry / geography service from soundings.app.
+"""
+
+from typing import Any
+from uuid import uuid4
+
+import httpx
+import pytest
+from fastapi import FastAPI
+
+from soundings.capture.context import CaptureContext
+from soundings.capture.middleware import CaptureMiddleware
+from soundings.http.session import SessionMiddleware
+
+
+class FakeRawWriter:
+    """Records the CaptureContexts it receives without writing to a DB."""
+
+    def __init__(self) -> None:
+        self.calls: list[CaptureContext] = []
+
+    async def write(self, ctx: CaptureContext) -> None:
+        self.calls.append(ctx)
+
+
+@pytest.fixture
+def app_with_fake_tool() -> tuple[FastAPI, FakeRawWriter]:
+    app = FastAPI()
+    writer = FakeRawWriter()
+    app.state.raw_writer = writer
+
+    # Outer-most middleware runs last on request, first on response, so
+    # CaptureMiddleware (added second) wraps SessionMiddleware (added first).
+    app.add_middleware(CaptureMiddleware)
+    app.add_middleware(SessionMiddleware)
+
+    @app.post("/v1/tools/find_place")
+    async def find_place(body: dict[str, Any]) -> dict[str, Any]:
+        # Mimic the shape `find_place` returns; nl_question must NOT be in
+        # body by the time the handler sees it (middleware pops it).
+        assert "nl_question" not in body, "middleware should have stripped nl_question"
+        return {
+            "matches": [
+                {
+                    "id": "ltla24:E06000004",
+                    "name": "Stockton-on-Tees",
+                    "type": "ltla24",
+                    "parent_ids": ["region:E12000001"],
+                    "confidence": 1.0,
+                }
+            ],
+            "sources": [],
+        }
+
+    return app, writer
+
+
+async def test_middleware_extracts_nl_question_and_invokes_writer(
+    app_with_fake_tool: tuple[FastAPI, FakeRawWriter],
+) -> None:
+    app, writer = app_with_fake_tool
+    session_id = uuid4()
+    transport = httpx.ASGITransport(app=app)
+    cookies = {
+        "soundings_session": str(session_id),
+        "soundings_consent": "full",
+        "soundings_sector": "researcher",
+    }
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", cookies=cookies
+    ) as client:
+        response = await client.post(
+            "/v1/tools/find_place",
+            json={
+                "query": "Stockton-on-Tees",
+                "nl_question": "What's the population of Stockton?",
+            },
+        )
+
+    assert response.status_code == 200
+    assert len(writer.calls) == 1
+    ctx = writer.calls[0]
+    assert ctx.tool_called == "find_place"
+    assert ctx.session_id == session_id
+    assert ctx.consent_level == "full"
+    assert ctx.asker_sector == "researcher"
+    assert ctx.natural_language_question == "What's the population of Stockton?"
+    assert "nl_question" not in ctx.tool_inputs
+
+
+async def test_middleware_discards_nl_question_under_non_full_consent(
+    app_with_fake_tool: tuple[FastAPI, FakeRawWriter],
+) -> None:
+    app, writer = app_with_fake_tool
+    transport = httpx.ASGITransport(app=app)
+    cookies = {
+        "soundings_session": str(uuid4()),
+        "soundings_consent": "minimal",
+    }
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", cookies=cookies
+    ) as client:
+        await client.post(
+            "/v1/tools/find_place",
+            json={"query": "Stockton", "nl_question": "Should be discarded"},
+        )
+
+    ctx = writer.calls[0]
+    assert ctx.consent_level == "minimal"
+    assert ctx.natural_language_question is None
+
+
+async def test_middleware_skips_capture_when_consent_is_none(
+    app_with_fake_tool: tuple[FastAPI, FakeRawWriter],
+) -> None:
+    app, writer = app_with_fake_tool
+    transport = httpx.ASGITransport(app=app)
+    cookies = {
+        "soundings_session": str(uuid4()),
+        "soundings_consent": "none",
+    }
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", cookies=cookies
+    ) as client:
+        response = await client.post("/v1/tools/find_place", json={"query": "Stockton"})
+
+    assert response.status_code == 200
+    assert writer.calls == []
+
+
+async def test_middleware_skips_non_tool_routes(
+    app_with_fake_tool: tuple[FastAPI, FakeRawWriter],
+) -> None:
+    app, writer = app_with_fake_tool
+
+    @app.get("/healthz")
+    async def healthz() -> dict[str, str]:
+        return {"status": "ok"}
+
+    transport = httpx.ASGITransport(app=app)
+    cookies = {
+        "soundings_session": str(uuid4()),
+        "soundings_consent": "full",
+    }
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", cookies=cookies
+    ) as client:
+        await client.get("/healthz")
+
+    assert writer.calls == []

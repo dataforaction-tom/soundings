@@ -10,6 +10,7 @@ from soundings.adapters.mhclg_imd2025.adapter import MhclgImd2019Adapter, MhclgI
 from soundings.adapters.ons_census2021.adapter import OnsCensus2021Adapter
 from soundings.adapters.ons_mid_year_estimates.adapter import OnsMidYearEstimatesAdapter
 from soundings.adapters.postcodes_io.adapter import PostcodesIoAdapter
+from soundings.capture.middleware import CaptureMiddleware
 from soundings.catalogue.loader import load_catalogue_into_db
 from soundings.core.config import get_settings
 from soundings.db.engine import get_engine
@@ -59,6 +60,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Soundings", version="0.0.1", lifespan=lifespan)
+# Order matters: CaptureMiddleware wraps the inner stack and reads
+# `request.state.session` set by SessionMiddleware, so SessionMiddleware
+# must run first on the way in. add_middleware prepends, so the LAST
+# add_middleware call runs FIRST on requests.
+app.add_middleware(CaptureMiddleware)
 app.add_middleware(SessionMiddleware)
 app.add_middleware(
     CORSMiddleware,
