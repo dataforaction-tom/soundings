@@ -12,129 +12,136 @@
 mappings:
 
   # --- ONS Mid-Year Estimates ----------------------------------------------
+  # NM_2002_1 = "Population estimates - local authority based by single year
+  # of age" — covers LA-equivalent levels and above. For LSOA21 use NM_2014_1
+  # ("Population estimates - small area (2021 based)…"); that requires a
+  # separate mapping entry (deferred until needed by an LSOA-level indicator).
 
   - indicator_key: population.total
     source_id: ons.mid_year_estimates
-    dataset_id: NM_2010_1
-    measures: "20100"             # all-persons (unverified)
+    dataset_id: NM_2002_1
+    measures: "20100"             # value (count of persons)
     geography_type_codes:
-      lsoa21: TYPE298
-      msoa21: TYPE297
-      ltla24: TYPE154
-      utla24: TYPE499
+      ltla24: TYPE424             # LA: district/unitary (April 2023)
+      utla24: TYPE423             # LA: county/unitary  (April 2023)
       region: TYPE480
       country: TYPE499
+    extra_params:
+      c_age: "0"                  # All Ages
+      gender: "0"                 # Total (both sexes)
     period: latest
 
   - indicator_key: population.density
     source_id: ons.mid_year_estimates
-    dataset_id: NM_2010_1
+    dataset_id: NM_2002_1
     measures: "20100"
     geography_type_codes:
-      lsoa21: TYPE298
-      msoa21: TYPE297
-      ltla24: TYPE154
-      utla24: TYPE499
+      ltla24: TYPE424
+      utla24: TYPE423
       region: TYPE480
       country: TYPE499
-    period: latest
     extra_params:
-      derived: "value_per_sq_km"  # post-process: value / area_sq_km
+      c_age: "0"
+      gender: "0"
+    period: latest
 
   - indicator_key: population.age_structure.under_18
     source_id: ons.mid_year_estimates
-    dataset_id: NM_2010_1
+    dataset_id: NM_2002_1
     measures: "20100"
-    cell: "0_17"                  # age band 0–17 (unverified)
     geography_type_codes:
-      lsoa21: TYPE298
-      msoa21: TYPE297
-      ltla24: TYPE154
+      ltla24: TYPE424
+      utla24: TYPE423
+    extra_params:
+      c_age: "201"                # Aged 0 to 15 (closest single c_age band;
+                                  #   NM_2002_1 has no 0–17 — under_18 share
+                                  #   needs a post-process step. Tracked in
+                                  #   PLAN.md open questions.)
+      gender: "0"
+    period: latest
 
   - indicator_key: population.age_structure.over_65
     source_id: ons.mid_year_estimates
-    dataset_id: NM_2010_1
+    dataset_id: NM_2002_1
     measures: "20100"
-    cell: "65_plus"               # age band 65+ (unverified)
     geography_type_codes:
-      lsoa21: TYPE298
-      msoa21: TYPE297
-      ltla24: TYPE154
+      ltla24: TYPE424
+      utla24: TYPE423
+    extra_params:
+      c_age: "209"                # Aged 65+
+      gender: "0"
+    period: latest
 
   # --- ONS Census 2021 -----------------------------------------------------
+  # Each TS table maps to a Nomis dataset id; only one is currently exercised
+  # by the live test (TS003 → lone_parent_share). The others are pinned as
+  # plausible-but-unverified — when added to an integration test or used by
+  # a tool, confirm the cell code against the dataset's hhcomp / qualif /
+  # tenure / ethnicgroup codelists. value_scale=0.01 turns measures=20301
+  # (percent, 0–100) into a fraction in [0,1] to match indicator contracts.
 
   - indicator_key: population.ethnicity.non_white_british_share
     source_id: ons.census2021
-    dataset_id: NM_2021CT_001     # placeholder; pick real dataset at first run
-    measures: "20100"
-    cell: "ethnicity_non_white_british"
+    dataset_id: NM_2041_1         # TS021 - Ethnic group (unverified)
+    measures: "20301"
     geography_type_codes:
-      lsoa21: TYPE151
-      msoa21: TYPE152
-      ltla24: TYPE154
+      ltla24: TYPE424
     period: "2021"
+    value_scale: 0.01
 
   - indicator_key: population.households.total
     source_id: ons.census2021
-    dataset_id: NM_2021CT_002
+    dataset_id: NM_2023_1         # TS003 - Household composition (total)
     measures: "20100"
     geography_type_codes:
-      lsoa21: TYPE151
-      msoa21: TYPE152
-      ltla24: TYPE154
+      ltla24: TYPE424
+    extra_params:
+      c2021_hhcomp_15: "0"        # Total: All households
     period: "2021"
 
   - indicator_key: population.households.lone_parent_share
     source_id: ons.census2021
-    dataset_id: NM_2021CT_003
-    measures: "20100"
-    cell: "lone_parent"
+    dataset_id: NM_2023_1         # TS003 - Household composition
+    measures: "20301"             # percent
     geography_type_codes:
-      lsoa21: TYPE151
-      msoa21: TYPE152
-      ltla24: TYPE154
+      ltla24: TYPE424
+    extra_params:
+      c2021_hhcomp_15: "1005"     # Single family household: Lone parent family
     period: "2021"
+    value_scale: 0.01
 
   - indicator_key: health.long_term_conditions_share
     source_id: ons.census2021
-    dataset_id: NM_2021CT_004
-    measures: "20100"
-    cell: "long_term_health_problem"
+    dataset_id: NM_2055_1         # TS038 - Disability (unverified)
+    measures: "20301"
     geography_type_codes:
-      lsoa21: TYPE151
-      msoa21: TYPE152
-      ltla24: TYPE154
+      ltla24: TYPE424
     period: "2021"
+    value_scale: 0.01
 
   - indicator_key: education.no_qualifications_share
     source_id: ons.census2021
-    dataset_id: NM_2021CT_005
-    measures: "20100"
-    cell: "no_qualifications"
+    dataset_id: NM_2062_1         # TS067 - Highest level of qualification (unverified)
+    measures: "20301"
     geography_type_codes:
-      lsoa21: TYPE151
-      msoa21: TYPE152
-      ltla24: TYPE154
+      ltla24: TYPE424
     period: "2021"
+    value_scale: 0.01
 
   - indicator_key: housing.social_rented_share
     source_id: ons.census2021
-    dataset_id: NM_2021CT_006
-    measures: "20100"
-    cell: "social_rented"
+    dataset_id: NM_2072_1         # TS054 - Tenure (unverified)
+    measures: "20301"
     geography_type_codes:
-      lsoa21: TYPE151
-      msoa21: TYPE152
-      ltla24: TYPE154
+      ltla24: TYPE424
     period: "2021"
+    value_scale: 0.01
 
   - indicator_key: housing.overcrowding_share
     source_id: ons.census2021
-    dataset_id: NM_2021CT_007
-    measures: "20100"
-    cell: "overcrowding"
+    dataset_id: NM_2075_1         # TS052 - Occupancy rating for bedrooms (unverified)
+    measures: "20301"
     geography_type_codes:
-      lsoa21: TYPE151
-      msoa21: TYPE152
-      ltla24: TYPE154
+      ltla24: TYPE424
     period: "2021"
+    value_scale: 0.01

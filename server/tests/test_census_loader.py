@@ -35,7 +35,7 @@ async def test_census_loader_writes_indicator_value_rows() -> None:
             json={
                 "obs": [
                     {
-                        "obs_value": {"value": 0.18},
+                        "obs_value": {"value": 18.0},
                         "geography": {"geogcode": "E06000004"},
                         "time": {"description": "2021"},
                     }
@@ -91,7 +91,7 @@ async def test_census_loader_skips_scottish_geographies() -> None:
             json={
                 "obs": [
                     {
-                        "obs_value": {"value": 0.10},
+                        "obs_value": {"value": 10.0},
                         "geography": {"geogcode": "E06000004"},
                         "time": {"description": "2021"},
                     }
