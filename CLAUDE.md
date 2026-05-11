@@ -58,7 +58,7 @@ Things Claude has got wrong on this project — don't repeat these:
 
 - [Add mistakes as they happen — this is the highest-leverage section]
 
-<!-- 
+<!--
 Keep this file concise. ~150 instructions max before Claude starts ignoring things.
 If Claude already does something correctly without being told, don't add it here.
 Focus on: things Claude gets wrong, patterns it can't infer, commands it needs.
