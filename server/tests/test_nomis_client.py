@@ -15,7 +15,7 @@ async def test_nomis_client_builds_correct_url() -> None:
                 "obs": [
                     {
                         "obs_value": {"value": 100},
-                        "geography": {"geographycode": "E01000001"},
+                        "geography": {"geogcode": "E01000001"},
                         "time": {"description": "2021"},
                     }
                 ]

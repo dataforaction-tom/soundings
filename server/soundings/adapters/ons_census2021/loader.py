@@ -65,9 +65,7 @@ class OnsCensus2021Loader(LoaderAdapter):
                     # Census 2021 covers England + Wales only.
                     continue
                 obs = await self._fetch_observations(mapping, place_code)
-                rows_written += await self._upsert_obs(
-                    mapping.indicator_key, place_type, mapping.period, obs
-                )
+                rows_written += await self._upsert_obs(mapping, place_type, obs)
         return rows_written
 
     async def _place_codes_for_type(self, place_type: str) -> list[str]:
@@ -88,15 +86,15 @@ class OnsCensus2021Loader(LoaderAdapter):
             geography=place_code,
             measures=mapping.measures,
             time=mapping.period or "2021",
+            **mapping.extra_params,
         )
         obs: list[dict[str, Any]] = payload.get("obs", [])
         return obs
 
     async def _upsert_obs(
         self,
-        indicator_key: str,
+        mapping: NomisMapping,
         place_type: str,
-        default_period: str | None,
         obs: list[dict[str, Any]],
     ) -> int:
         if not obs:
@@ -104,15 +102,17 @@ class OnsCensus2021Loader(LoaderAdapter):
         rows = []
         retrieved = datetime.now(tz=UTC)
         for o in obs:
-            geo_code = o.get("geography", {}).get("geographycode")
+            geo_code = o.get("geography", {}).get("geogcode")
             if not geo_code:
                 continue
             value = o.get("obs_value", {}).get("value")
-            period = o.get("time", {}).get("description") or default_period or "2021"
+            if value is not None and mapping.value_scale is not None:
+                value = value * mapping.value_scale
+            period = o.get("time", {}).get("description") or mapping.period or "2021"
             rows.append(
                 {
                     "place_id": f"{place_type}:{geo_code}",
-                    "indicator_key": indicator_key,
+                    "indicator_key": mapping.indicator_key,
                     "period": str(period),
                     "value": value,
                     "source_id": self.source_id,

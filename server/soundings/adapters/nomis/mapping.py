@@ -7,7 +7,6 @@ first run, same pattern as ADR-0001 endpoint URLs.
 """
 
 from pathlib import Path
-from typing import Any
 
 import yaml
 from pydantic import BaseModel, Field
@@ -20,8 +19,15 @@ class NomisMapping(BaseModel):
     measures: str | None = None
     cell: str | None = None
     geography_type_codes: dict[str, str] = Field(default_factory=dict)
-    extra_params: dict[str, Any] = Field(default_factory=dict)
+    # Free-form Nomis dimension filters (e.g. c_age, gender, c2021_*). Loaders
+    # splat these into NomisClient.get_observations as query params. Values are
+    # stringly-typed because Nomis is a URL query API.
+    extra_params: dict[str, str] = Field(default_factory=dict)
     period: str | None = None  # e.g. "2021" for Census, "latest" for MYE
+    # Post-fetch multiplier on obs_value. Used when Nomis returns a percent
+    # (measures=20301, range 0–100) but the indicator contract is a fraction
+    # (0–1); set value_scale: 0.01.
+    value_scale: float | None = None
 
 
 def load_nomis_mapping(path: Path) -> list[NomisMapping]:

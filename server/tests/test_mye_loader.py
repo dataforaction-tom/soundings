@@ -14,14 +14,14 @@ NOMIS_RESPONSE_BY_GEO = {
     "E06000004": [
         {
             "obs_value": {"value": 200000},
-            "geography": {"geographycode": "E06000004"},
+            "geography": {"geogcode": "E06000004"},
             "time": {"description": "2024"},
         },
     ],
     "E12000001": [
         {
             "obs_value": {"value": 2700000},
-            "geography": {"geographycode": "E12000001"},
+            "geography": {"geogcode": "E12000001"},
             "time": {"description": "2024"},
         },
     ],

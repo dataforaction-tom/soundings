@@ -83,6 +83,7 @@ class OnsMidYearEstimatesLoader(LoaderAdapter):
             geography=place_code,
             measures=mapping.measures,
             time=mapping.period or "latest",
+            **mapping.extra_params,
         )
         obs: list[dict[str, Any]] = payload.get("obs", [])
         return obs
@@ -95,7 +96,7 @@ class OnsMidYearEstimatesLoader(LoaderAdapter):
         rows = []
         retrieved = datetime.now(tz=UTC)
         for o in obs:
-            geo_code = o.get("geography", {}).get("geographycode")
+            geo_code = o.get("geography", {}).get("geogcode")
             if not geo_code:
                 continue
             value = o.get("obs_value", {}).get("value")
