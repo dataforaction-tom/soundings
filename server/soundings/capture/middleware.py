@@ -172,6 +172,8 @@ class CaptureMiddleware:
         )
 
         if writer is not None and session is not None and session.consent_level != "none":
+            response_payload = _safe_json_loads(response_bytes)
+            extras = _extract_capture_fields(response_payload)
             ctx = CaptureContext(
                 session_id=session.session_id,
                 consent_level=session.consent_level,
@@ -181,6 +183,11 @@ class CaptureMiddleware:
                 natural_language_question=nl_question,
                 asker_sector=session.asker_sector,
                 asker_purpose=None,
+                result_status=extras["result_status"],
+                error_class=extras["error_class"],
+                indicators_returned=extras["indicators_returned"],
+                sources_used=extras["sources_used"],
+                geography_referenced=extras["geography_referenced"],
             )
             await writer.write(ctx)
 

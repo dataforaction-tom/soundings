@@ -11,6 +11,7 @@ from soundings.adapters.ons_census2021.adapter import OnsCensus2021Adapter
 from soundings.adapters.ons_mid_year_estimates.adapter import OnsMidYearEstimatesAdapter
 from soundings.adapters.postcodes_io.adapter import PostcodesIoAdapter
 from soundings.capture.middleware import CaptureMiddleware
+from soundings.capture.raw_writer import RawRecordWriter
 from soundings.catalogue.loader import load_catalogue_into_db
 from soundings.core.config import get_settings
 from soundings.db.engine import get_engine
@@ -51,6 +52,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.adapter_registry = registry
     app.state.orchestrator = IndicatorOrchestrator(engine, registry)
     app.state.geography_service = GeographyService(engine, postcodes_io)
+    app.state.raw_writer = RawRecordWriter(engine)
 
     # MCP server uses the same tool handlers + app.state.
     mcp_server = build_mcp_server(state=app.state)
