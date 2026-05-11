@@ -1,7 +1,8 @@
 # State
 
-> Last updated: 2026-05-10
-> Phase: **1 — indicator pipeline + three tools** (complete, tag `v0.2.0-phase-1`).
+> Last updated: 2026-05-11
+> Phase: **1 — indicator pipeline + three tools** (complete, tag `v0.2.0-phase-1`,
+> live URLs verified end-to-end 2026-05-11).
 
 ## System State Diagram
 
@@ -33,8 +34,8 @@ stateDiagram-v2
 | **`IndicatorValue` + `SourceRef` contracts + `SourceAdapter` Protocol** | ✅ Phase 1 | |
 | **`LoaderAdapter.fetch_indicator` default reading `data.indicator_value`** | ✅ Phase 1 | cache_status derived from `loader_run` age vs cron. |
 | **`PassthroughAdapter.fetch_indicator` + `SourceRefFactory`** | ✅ Phase 1 | |
-| **`NomisClient` + ons.mid_year_estimates + ons.census2021 adapters** | ✅ Phase 1 | mappings unverified; nightly live tests confirm against real Nomis. |
-| **`mhclg.imd2025` adapter (xlsx parse + LSOA→LTLA aggregation)** | ✅ Phase 1 | URL pinned in ADR-0002. |
+| **`NomisClient` + ons.mid_year_estimates + ons.census2021 adapters** | ✅ Phase 1 | `population.total` (MYE) and `population.households.lone_parent_share` (Census) verified live 2026-05-11. Other Census TS table IDs still plausible-but-untested. |
+| **`mhclg.imd2025` + `mhclg.imd2019` adapters (xlsx parse + LSOA→LTLA aggregation)** | ✅ Phase 1 | Both editions verified live 2026-05-11. 2025 reads File 5 (Scores); 2019 reads File 2. Aggregation parameterised by source_id. |
 | **`IndicatorOrchestrator` (concurrent fan-out + level enforcement + dedup)** | ✅ Phase 1 | |
 | **Three tools: `find_place`, `get_indicators`, `get_place_profile`** | ✅ Phase 1 | Single implementation, two transports. |
 | **HTTP routes `/v1/tools/*`, `/v1/tools`, `/v1/sources`, `/v1/catalogue/indicators`** | ✅ Phase 1 | |
@@ -79,15 +80,18 @@ flowchart LR
 | Postgres + PostGIS 16 | Working | Containerised. |
 | ONS Open Geography Portal | Probable | URLs pinned in ADR-0001; some unverified. |
 | ONS Code History Database | Working | Bulk download via `OnsGeographyCodeChangeLoader`. |
-| ONS Nomis API | Probable | Field codes pinned in `catalogue/nomis-mapping.yaml`; unverified, nightly. |
-| MHCLG IMD download | Probable | URL pinned in ADR-0002; falls back to 2019 if 2025 not yet published. |
+| ONS Nomis API | Working | Field codes verified for the indicators exercised by Phase 1 live tests; rest plausible-but-untested. |
+| MHCLG IMD download | Working | 2025 (File 5) and 2019 (File 2) both verified live 2026-05-11. |
 | postcodes.io | Working | |
 | GitHub Actions | Configured | |
 
 ## Known follow-ups for Phase 2
 
-- Verify `nomis-mapping.yaml` dataset/measure/cell codes against live Nomis (first nightly).
-- Verify ADR-0002 IMD URL against gov.uk (first IMD loader run).
+- IMD 2025 deciles/ranks: only Scores (File 5) loaded; Decile/Rank (File 2)
+  not yet wired up for the 2025 edition. Decide whether to add a second
+  download or switch indicator contracts.
+- Census TS-table IDs for indicators beyond `lone_parent_share` are pinned
+  with plausible IDs and not yet exercised — verify when each is used.
 - Capture pipeline (raw_record + sanitised question_record) — Phase 2 plan.
 - Minimal `/` and `/place/{id}` UI — Phase 2 plan.
 - `compare_places` and `get_trend` tools — Phase 3 plan.

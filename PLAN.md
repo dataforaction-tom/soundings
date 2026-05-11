@@ -1,7 +1,8 @@
 # Plan
 
-> Last updated: 2026-05-10
-> Status: **Phase 1 complete.** Tag `v0.2.0-phase-1`.
+> Last updated: 2026-05-11
+> Status: **Phase 1 complete.** Tag `v0.2.0-phase-1`. Phase 1 live URLs all
+> verified end-to-end against real upstreams 2026-05-11.
 
 ## Objective
 
@@ -49,17 +50,34 @@ green → conventional-commit. Block-level commit boundaries.
 | MCP transport via `FastMCP.sse_app()` mounted on FastAPI | Single ASGI process, no separate stdio supervisor. Same tool handlers as the HTTP routes; MCP module is registration boilerplate only. | 2026-05-10 |
 | `cache_status` window estimated from cron via `_cron_to_window_days` | Avoids a new dep; falls back to 30 days for unrecognised patterns. Good enough for v1. | 2026-05-10 |
 | Local git identity = `Tom Watson <tom@good-ship.co.uk>` | Matches active session email. | 2026-05-09 |
+| IMD 2025 + IMD 2019 as parallel sources (`mhclg.imd2025`, `mhclg.imd2019`) | Both editions are useful; 2019 is the established baseline, 2025 is the new release. `fetch_indicator(period=None)` returns latest (2025) by default. Subclassing reuses the parser/loader logic. | 2026-05-11 |
+| IMD 2025 uses File 5 (Scores), IMD 2019 uses File 2 | MHCLG restructured the 2025 release: raw scores moved out of File 2 (now rank/decile only) into File 5. IMD 2019 still has scores + deciles in File 2. | 2026-05-11 |
+| IMD loader pre-filters rows by existing `geography.place` ids | Avoids FK violations during partial seeds (`make seed-light`) and absorbs minor LSOA boundary version mismatches between IMD editions and our geography spine. | 2026-05-11 |
 
 ## Open Questions
 
 - [ ] OGP service URLs in `docs/adr/0001-geography-data-sources.md` marked
       `(unverified)` — confirm against the live portal at first seed.
-- [ ] Nomis dataset/measure/cell codes in `catalogue/nomis-mapping.yaml`
-      marked `(unverified)` — confirm against real API in first nightly.
-- [ ] IMD 2025 download URL in ADR-0002 — confirm or fall back to 2019.
+- [x] Nomis dataset/measure/cell codes in `catalogue/nomis-mapping.yaml`
+      ~~confirm against real API~~ — verified for `population.total` (MYE)
+      and `population.households.lone_parent_share` (Census) via live tests
+      2026-05-11. Other Census TS-table dataset IDs (ethnic group,
+      qualifications, tenure, etc.) are pinned with plausible IDs but only
+      exercised at first integration test or tool use.
+- [x] IMD 2025 download URL in ADR-0002 — ~~confirm or fall back to 2019~~
+      verified live 2026-05-11; switched 2025 to File 5 (Scores) and added
+      `mhclg.imd2019` as a sibling source loading from IMD 2019 File 2.
+- [ ] IMD 2025 deciles — File 2 (deciles/ranks) is not currently loaded for
+      the 2025 edition. Either add a second download in the 2025 loader or
+      switch indicator contracts to use ranks/deciles where MHCLG no longer
+      publishes raw scores in the top-level files.
 - [ ] LTLA-filter for `make seed-light` — currently filters MYE+Census by
       place_filter; geography spine still loads full layers (minus LSOA/MSOA
       in light mode).
+- [ ] Nomis `value_scale` is currently only wired into the Census loader.
+      MYE doesn't need it for `population.total` (count). If a future MYE
+      indicator uses `measures=20301` (percent) it'll need the same
+      treatment — extract a shared helper at that point, not pre-emptively.
 
 ## Out of Scope
 
