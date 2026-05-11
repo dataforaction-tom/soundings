@@ -1,0 +1,28 @@
+# catalogue/sanitisation.yaml — thresholds + rule config for the capture
+# sanitisation pipeline. Loaded once at app startup; not user-mutable at
+# runtime. Bumping `version` is the signal to re-run the sanitiser on
+# historical raw_record rows (see `soundings.capture.replay` — Task 19).
+
+version: "v1"
+
+small_org:
+  # Charities reporting income under this threshold are treated as
+  # identifiable in context; mentions of their name in free-text fields
+  # are redacted. Aligned with design §5.
+  income_threshold_gbp: 100000
+
+asker_purpose:
+  # Free-text field captured under full consent. We truncate first, then
+  # the rest of the pipeline runs over the truncated value.
+  max_chars: 280
+  rate_limit:
+    # After this many full-consent records in a rolling hour, further
+    # records from the same session land as `minimal` even if the cookie
+    # says `full`. The downgrade is silent; the asker sees no error.
+    full_consent_per_session_per_hour: 60
+
+geography:
+  # In free-text fields, references to anything finer than this place
+  # type are redacted (e.g. LSOA codes and LSOA/MSOA names). LTLA and
+  # above stay visible.
+  redact_finer_than: "msoa21"
