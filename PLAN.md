@@ -80,6 +80,18 @@ green → conventional-commit. Block-level commit boundaries.
       MYE doesn't need it for `population.total` (count). If a future MYE
       indicator uses `measures=20301` (percent) it'll need the same
       treatment — extract a shared helper at that point, not pre-emptively.
+- [ ] **Fingertips data endpoint pattern (Phase 3 Task 11)** — the
+      `/api/all_data/json/by_indicator_id` endpoint our adapter targets
+      currently 500s. The working data endpoint appears to be
+      `/api/latest_data/all_indicators_in_profile_group_for_child_areas`,
+      which requires `profile_id` + `group_id` per query (one indicator
+      can live in multiple profile/group combinations).
+      `catalogue/fingertips-mapping.yaml` needs `profile_id` + `group_id`
+      per entry; client `get_indicator_data` must rewrite to target the
+      working endpoint; live test `tests/live/test_fingertips_live.py`
+      is currently skipped pending this. The adapter scaffolding,
+      mapping, and registry registration are in place — just the URL
+      pattern needs verification + a mapping schema bump.
 
 ## Out of Scope
 
