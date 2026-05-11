@@ -33,6 +33,10 @@ class QuestionRecord(Base):
     asker_purpose: Mapped[str | None] = mapped_column(Text, nullable=True)
     marked_useful: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
+    # Sanitisation lifecycle (migration 0005).
+    review_status: Mapped[str] = mapped_column(String(16), default="pending")
+    sanitisation_rules_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
     # v1.5 fields, nullable until then
     composed_artefact: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     gap_signals: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
