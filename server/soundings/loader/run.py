@@ -30,6 +30,7 @@ from soundings.adapters.ons_geography.hierarchy_loader import (
 )
 from soundings.adapters.ons_geography.places_loader import OnsGeographyPlacesLoader
 from soundings.adapters.ons_mid_year_estimates.loader import OnsMidYearEstimatesLoader
+from soundings.capture.retention import delete_old_raw_records
 from soundings.db.engine import get_engine
 
 LoaderCallable = Callable[[], Awaitable[None]]
@@ -83,6 +84,18 @@ async def build_scheduler(
             continue
         trigger = CronTrigger.from_crontab(row.refresh_cadence)
         sched.add_job(loader, trigger=trigger, id=row.id, name=row.id)
+
+    # Cross-source retention: daily at 04:00 UTC, deletes corpus.raw_record
+    # rows older than 30 days. Not in catalogue.source (it's an internal job).
+    async def _retention() -> None:
+        await delete_old_raw_records(engine)
+
+    sched.add_job(
+        _retention,
+        trigger=CronTrigger.from_crontab("0 4 * * *"),
+        id="corpus.retention",
+        name="corpus.retention",
+    )
     return sched
 
 

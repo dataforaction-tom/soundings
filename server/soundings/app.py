@@ -11,6 +11,7 @@ from soundings.adapters.mhclg_imd2025.adapter import MhclgImd2019Adapter, MhclgI
 from soundings.adapters.ons_census2021.adapter import OnsCensus2021Adapter
 from soundings.adapters.ons_mid_year_estimates.adapter import OnsMidYearEstimatesAdapter
 from soundings.adapters.postcodes_io.adapter import PostcodesIoAdapter
+from soundings.alerts import send_alert
 from soundings.capture.middleware import CaptureMiddleware
 from soundings.capture.rate_limit import FullConsentRateLimiter
 from soundings.capture.raw_writer import RawRecordWriter
@@ -84,7 +85,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             ValidateConsentLevel(),
         ]
     )
-    app.state.sanitiser_worker = SanitiserWorker(engine, pipeline, sanitisation_config)
+    app.state.sanitiser_worker = SanitiserWorker(
+        engine, pipeline, sanitisation_config, alert=send_alert
+    )
     app.state.background_tasks = set[asyncio.Task[None]]()
 
     # Catch any sanitiser rows left at 'pending' from a previous crash.
