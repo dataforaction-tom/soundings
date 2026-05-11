@@ -17,6 +17,7 @@ from soundings.geography.service import GeographyService
 from soundings.http.catalogue import router as catalogue_router
 from soundings.http.errors import install_error_envelope
 from soundings.http.health import router as health_router
+from soundings.http.session import SessionMiddleware
 from soundings.http.sources import router as sources_router
 from soundings.http.tools import router as tools_router
 from soundings.mcp.server import build_mcp_server
@@ -57,10 +58,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Soundings", version="0.0.1", lifespan=lifespan)
+app.add_middleware(SessionMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[get_settings().ui_origin],
-    allow_credentials=False,
+    # Cookies (session + consent + sector) must round-trip on UI ↔ API
+    # calls. allow_origins stays locked to SOUNDINGS_UI_ORIGIN.
+    allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
