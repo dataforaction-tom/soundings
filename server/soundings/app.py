@@ -13,6 +13,7 @@ from soundings.adapters.ons_mid_year_estimates.adapter import OnsMidYearEstimate
 from soundings.adapters.postcodes_io.adapter import PostcodesIoAdapter
 from soundings.capture.middleware import CaptureMiddleware
 from soundings.capture.raw_writer import RawRecordWriter
+from soundings.capture.replay import replay_pending
 from soundings.capture.sanitisation.config import load_sanitisation_config
 from soundings.capture.sanitisation.direct_identifiers import StripDirectIdentifiers
 from soundings.capture.sanitisation.normalise import (
@@ -79,6 +80,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     app.state.sanitiser_worker = SanitiserWorker(engine, pipeline, sanitisation_config)
     app.state.background_tasks = set[asyncio.Task[None]]()
+
+    # Catch any sanitiser rows left at 'pending' from a previous crash.
+    # Run as a background task so startup isn't blocked on a backlog.
+    replay_task = asyncio.create_task(replay_pending(engine, app.state.sanitiser_worker))
+    app.state.background_tasks.add(replay_task)
+    replay_task.add_done_callback(app.state.background_tasks.discard)
 
     # MCP server uses the same tool handlers + app.state.
     mcp_server = build_mcp_server(state=app.state)
