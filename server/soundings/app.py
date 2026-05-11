@@ -7,6 +7,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from soundings.adapters.dfe_explore.adapter import DfeExploreAdapter
 from soundings.adapters.dwp_statxplore.adapter import DwpStatXploreAdapter
 from soundings.adapters.mhclg_imd2025.adapter import MhclgImd2019Adapter, MhclgImd2025Adapter
 from soundings.adapters.ohid_fingertips.adapter import OhidFingertipsAdapter
@@ -56,6 +57,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     registry.register("mhclg.imd2019", MhclgImd2019Adapter)
     registry.register("ohid.fingertips", OhidFingertipsAdapter)
     registry.register("dwp.statxplore", DwpStatXploreAdapter)
+    registry.register("dfe.explore", DfeExploreAdapter)
 
     postcodes_io = PostcodesIoAdapter(engine, ttl=POSTCODES_IO_TTL)
 
