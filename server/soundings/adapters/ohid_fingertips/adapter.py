@@ -1,14 +1,13 @@
 """OhidFingertipsAdapter — passthrough over the Fingertips public API.
 
-Fingertips' `/all_data/json/by_indicator_id` returns every area of a
-given child_area_type for one indicator. We cache the whole payload
-per indicator (24h TTL) and filter to the requested place_id at
-request time. That keeps the upstream call count one-per-indicator
-regardless of how many places the orchestrator is asking about in a
-single tool call.
+Fingertips returns a whole (profile × group × area_type) page in one
+call. We cache that page (24h TTL) per (profile_id, group_id,
+area_type_id) and match individual soundings indicators against it
+by (indicator_id, sex_id, age_id). Multiple soundings keys backed by
+the same upstream page share the one network call.
 
-Sex / Age filtering happens client-side because Fingertips doesn't
-accept those as query params on `all_data` endpoints.
+Period strings are taken straight from Fingertips (`"2023 - 25"`) so
+they line up across IndicatorCard rendering on the UI.
 """
 
 from datetime import UTC, datetime, timedelta
@@ -25,7 +24,6 @@ from soundings.adapters.ohid_fingertips.mapping import (
 )
 from soundings.adapters.passthrough_base import PassthroughAdapter
 from soundings.contracts.indicator_value import IndicatorValue
-from soundings.contracts.source_ref import SourceRef
 from soundings.contracts.trend import Trend, TrendPoint
 
 SOURCE_ID = "ohid.fingertips"
@@ -57,13 +55,11 @@ class OhidFingertipsAdapter(PassthroughAdapter):
         if mapping is None:
             return None
         place_code = _strip_type_prefix(place_id)
-        rows = await self._fetch_indicator_rows(indicator_key, mapping)
+        records = await self._fetch_group_page(mapping)
+        rows = _filter_rows_for_indicator(records, mapping, place_code, period=period)
         if not rows:
             return None
-        matched = _filter_rows(rows, place_code, mapping, period=period)
-        if not matched:
-            return None
-        latest = max(matched, key=lambda r: _row_period(r))
+        latest = max(rows, key=_period_string)
         source_ref = await self._build_source_ref(
             retrieved_at=datetime.now(tz=UTC), cache_status="cached"
         )
@@ -72,7 +68,7 @@ class OhidFingertipsAdapter(PassthroughAdapter):
             indicator=indicator_key,
             value=_row_value(latest),
             unit=mapping.unit,
-            period=str(_row_period(latest)),
+            period=_period_string(latest),
             source=source_ref,
             caveats=mapping.caveats,
             confidence="official",
@@ -89,15 +85,13 @@ class OhidFingertipsAdapter(PassthroughAdapter):
         if mapping is None:
             return None
         place_code = _strip_type_prefix(place_id)
-        rows = await self._fetch_indicator_rows(indicator_key, mapping)
+        records = await self._fetch_group_page(mapping)
+        rows = _filter_rows_for_indicator(records, mapping, place_code, period=None)
         if not rows:
             return None
-        matched = _filter_rows(rows, place_code, mapping, period=None)
-        # Reduce to one point per period; sort ascending.
         by_period: dict[str, dict[str, Any]] = {}
-        for row in matched:
-            key = str(_row_period(row))
-            by_period[key] = row
+        for row in rows:
+            by_period[_period_string(row)] = row
         points = [
             TrendPoint(period=p, value=_row_value(by_period[p]))
             for p in sorted(by_period)
@@ -116,50 +110,43 @@ class OhidFingertipsAdapter(PassthroughAdapter):
             source=source_ref,
         )
 
-    async def _fetch_indicator_rows(
-        self, indicator_key: str, mapping: FingertipsMapping
-    ) -> list[dict[str, Any]]:
-        """Cache the entire indicator payload under one key per upstream id.
+    async def _fetch_group_page(self, mapping: FingertipsMapping) -> list[dict[str, Any]]:
+        """One cache entry per (profile_id, group_id, area_type_id, parent).
 
-        Multiple soundings indicator_keys can share the same Fingertips
-        indicator_id (e.g. life_expectancy.female and .male both use 90366
-        and differ only by the Sex filter). Cache by upstream id so they
-        share the network call.
+        All indicators in the same Fingertips group share the response,
+        so multiple soundings keys collapse to one network call.
         """
-        del indicator_key
-        cache_key = f"fingertips:indicator:{mapping.indicator_id}:{mapping.child_area_type_id}"
+        cache_key = (
+            f"fingertips:group:{mapping.profile_id}:{mapping.group_id}"
+            f":{mapping.child_area_type_id}:{mapping.parent_area_code}"
+        )
         cached = await self._cache.get(self.source_id, cache_key)
         if cached is not None and isinstance(cached, list):
             return cached
-        rows = await self._fingertips.get_indicator_data(
-            indicator_id=mapping.indicator_id,
-            child_area_type_id=mapping.child_area_type_id,
-            parent_area_type_id=mapping.parent_area_type_id,
+        records = await self._fingertips.get_group_data(
+            profile_id=mapping.profile_id,
+            group_id=mapping.group_id,
+            area_type_id=mapping.child_area_type_id,
+            parent_area_code=mapping.parent_area_code,
         )
-        if rows:
-            await self._cache.put(self.source_id, cache_key, rows, ttl=self._ttl)
-        return rows
+        if records:
+            await self._cache.put(self.source_id, cache_key, records, ttl=self._ttl)
+        return records
 
     async def _call_upstream(self, client: httpx.AsyncClient, cache_key: str) -> Any:
-        # Required by PassthroughAdapter ABC; we override fetch_indicator
-        # entirely so the base-class path doesn't fire.
         del client, cache_key
         raise NotImplementedError("OhidFingertipsAdapter routes via fetch_indicator override")
 
-    def _build_source_ref_sync(self, *, retrieved_at: datetime, cache_status: str) -> SourceRef:
-        return self.get_source_ref(retrieved_at=retrieved_at, cache_status=cache_status)  # type: ignore[arg-type]
-
 
 def _strip_type_prefix(place_id: str) -> str:
-    # "ltla24:E06000004" → "E06000004"
     if ":" in place_id:
         return place_id.split(":", 1)[1]
     return place_id
 
 
 def _row_value(row: dict[str, Any]) -> float | None:
-    raw = row.get("Value")
-    if raw is None:
+    raw = row.get("Val")
+    if raw is None or raw == -1:
         return None
     try:
         return float(raw)
@@ -167,34 +154,46 @@ def _row_value(row: dict[str, Any]) -> float | None:
         return None
 
 
-def _row_period(row: dict[str, Any]) -> str:
-    # Prefer the TimePeriod string ("2020 - 22"); fall back to Year.
-    if (tp := row.get("TimePeriod")) is not None:
-        return str(tp)
-    if (yr := row.get("Year")) is not None:
-        return str(yr)
-    return ""
+def _period_string(row: dict[str, Any]) -> str:
+    """Fingertips records use Year + YearRange (1 = single year, 3 = 3-year)."""
+    year = row.get("Year")
+    year_range = row.get("YearRange") or 1
+    if year is None:
+        return ""
+    if year_range == 1:
+        return str(year)
+    start = year - year_range + 1
+    return f"{start} - {str(year)[-2:]}"
 
 
-def _filter_rows(
-    rows: list[dict[str, Any]],
-    place_code: str,
+def _filter_rows_for_indicator(
+    records: list[dict[str, Any]],
     mapping: FingertipsMapping,
+    place_code: str,
     *,
     period: str | None,
 ) -> list[dict[str, Any]]:
-    out: list[dict[str, Any]] = []
-    for row in rows:
-        if row.get("AreaCode") != place_code:
+    """Match the (indicator_id, sex_id, age_id) grouping, then filter Data."""
+    matched: list[dict[str, Any]] = []
+    for record in records:
+        sex = record.get("Sex") or {}
+        age = record.get("Age") or {}
+        if sex.get("Id") != mapping.sex_id:
             continue
-        if mapping.sex is not None and row.get("Sex") != mapping.sex:
+        if age.get("Id") != mapping.age_id:
             continue
-        if mapping.age is not None and row.get("Age") != mapping.age:
+        grouping_entries = record.get("Grouping") or []
+        if not any(g.get("IndicatorId") == mapping.indicator_id for g in grouping_entries):
             continue
-        if period is not None and _row_period(row) != period:
-            continue
-        out.append(row)
-    return out
+        for row in record.get("Data") or []:
+            if row.get("AreaCode") != place_code:
+                continue
+            if row.get("IndicatorId") != mapping.indicator_id:
+                continue
+            if period is not None and _period_string(row) != period:
+                continue
+            matched.append(row)
+    return matched
 
 
 def _within_window(period: str, frm: str | None, to: str | None) -> bool:

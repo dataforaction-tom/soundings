@@ -2,14 +2,16 @@
 
 Base: https://fingertips.phe.org.uk/api/
 
-The public API is unauthenticated. We use the `/all_data/json/by_indicator_id`
-endpoint which returns every area of a given `child_area_type_id` for a
-single indicator id; we filter client-side to the requested place_ids.
-A single call returns ~320 LAs × ~10 years for a typical indicator —
-cheap enough that we don't try to query by specific area code.
+The public API is unauthenticated. We hit
+`/latest_data/all_indicators_in_profile_group_for_child_areas` which
+returns every indicator × sex × age × area for a given
+(profile_id, group_id, area_type_id) page. This is the one data
+endpoint that reliably returns JSON; the `/all_data/json/by_indicator_id`
+endpoint older docs mention currently 500s.
 
-Documentation moves around; if `/all_data/json/by_indicator_id` returns
-4xx the live test (Task 11) is the canary.
+Multiple soundings indicator keys can share a single response page,
+so the adapter caches the response by (profile_id, group_id,
+area_type_id) and filters client-side.
 """
 
 from typing import Any
@@ -31,32 +33,33 @@ class FingertipsClient:
         self._owns_client = http_client is None
         self._limiter = AsyncLimiter(max_rate=rate_per_second, time_period=1)
 
-    async def get_indicator_data(
+    async def get_group_data(
         self,
         *,
-        indicator_id: int,
-        child_area_type_id: int,
-        parent_area_type_id: int | None = None,
+        profile_id: int,
+        group_id: int,
+        area_type_id: int,
+        parent_area_code: str = "E92000001",
     ) -> list[dict[str, Any]]:
-        """Returns the full series for every child-area of the supplied type.
+        """Returns the full (indicator × sex × age × area) page.
 
-        Each record looks like:
-            {"AreaCode": "E06000004", "AreaName": "Stockton-on-Tees",
-             "Sex": "Female", "Age": "All ages", "Value": 81.2,
-             "TimePeriod": "2020 - 22", "Year": 2022, ...}
+        Each top-level record has:
+          - Grouping: list of metadata entries with IndicatorId, GroupingId
+          - Sex: {Id, Name}
+          - Age: {Id, Name}
+          - Data: list of {AreaCode, Val, Year, ...} per area
         """
         params: dict[str, str | int] = {
-            "indicator_id": indicator_id,
-            "child_area_type_id": child_area_type_id,
+            "profile_id": profile_id,
+            "group_id": group_id,
+            "area_type_id": area_type_id,
+            "parent_area_code": parent_area_code,
         }
-        if parent_area_type_id is not None:
-            params["parent_area_type_id"] = parent_area_type_id
-
         async with self._limiter:
             client = self._client or httpx.AsyncClient(timeout=30.0)
             try:
                 response = await client.get(
-                    f"{FINGERTIPS_BASE}/all_data/json/by_indicator_id",
+                    f"{FINGERTIPS_BASE}/latest_data/all_indicators_in_profile_group_for_child_areas",
                     params=params,
                 )
                 response.raise_for_status()

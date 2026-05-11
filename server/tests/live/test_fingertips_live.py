@@ -2,15 +2,6 @@
 
 Marker `live` — runs nightly, not in PR CI. Asserts the adapter can
 hit Fingertips and produce a plausible value for Stockton-on-Tees.
-
-**Currently skipped.** Fingertips' `/api/all_data/json/by_indicator_id`
-endpoint that this client uses now returns 500; the live data
-endpoints require `profile_id` + `group_id` which we don't yet
-record per indicator in `catalogue/fingertips-mapping.yaml`. Tracked
-in PLAN.md "Open questions" — once the mapping carries profile/group
-IDs and the client targets the right endpoint
-(`latest_data/all_indicators_in_profile_group_for_child_areas`),
-flip this off skip and re-run.
 """
 
 import pytest
@@ -19,14 +10,7 @@ from sqlalchemy import text
 from soundings.adapters.ohid_fingertips.adapter import OhidFingertipsAdapter
 from soundings.db.engine import get_engine
 
-pytestmark = [
-    pytest.mark.live,
-    pytest.mark.integration,
-    pytest.mark.skip(
-        reason="Fingertips data endpoint pattern needs profile_id + group_id; "
-        "see PLAN.md Phase 3 follow-ups."
-    ),
-]
+pytestmark = [pytest.mark.live, pytest.mark.integration]
 
 
 async def test_fingertips_adapter_returns_plausible_life_expectancy() -> None:

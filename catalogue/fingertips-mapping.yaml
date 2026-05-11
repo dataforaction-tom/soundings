@@ -1,41 +1,57 @@
 # catalogue/fingertips-mapping.yaml — bind soundings indicator keys to
-# OHID Fingertips indicator + area-type IDs.
+# OHID Fingertips (profile, group, indicator, sex, age) tuples.
 #
-# `child_area_type_id` is the geography level Fingertips returns rows
-# for; we map to the soundings place type via `place_type`. Each entry
-# is `(unverified)` until the live test confirms the indicator id is
-# still active.
+# The working data endpoint is
+#   /api/latest_data/all_indicators_in_profile_group_for_child_areas
+# which requires `profile_id` + `group_id` + `area_type_id` + a
+# `parent_area_code` (parent universe — England is E92000001). The
+# response is a list of (indicator × sex × age) groupings each with a
+# Data array of (AreaCode → value) records.
+#
+# Sex IDs:  1 = Male, 2 = Female, 4 = Persons
+# Age IDs:  1 = All ages (most common). Indicator-specific.
+# Profile 19 = Public Health Outcomes Framework (PHOF).
+# Group 1000049 = "A. Overarching indicators" (life expectancy lives here).
+# child_area_type_id 501 = Lower tier local authorities (post Apr 2023).
 
 mappings:
 
   - indicator_key: health.life_expectancy.female
+    profile_id: 19
+    group_id: 1000049
     indicator_id: 90366
-    child_area_type_id: 102
+    sex_id: 2
+    age_id: 1
+    child_area_type_id: 501
     place_type: ltla24
-    sex: "Female"
-    age: "All ages"
     unit: years
 
   - indicator_key: health.life_expectancy.male
+    profile_id: 19
+    group_id: 1000049
     indicator_id: 90366
-    child_area_type_id: 102
+    sex_id: 1
+    age_id: 1
+    child_area_type_id: 501
     place_type: ltla24
-    sex: "Male"
-    age: "All ages"
     unit: years
 
   - indicator_key: health.healthy_life_expectancy.female
+    profile_id: 19
+    group_id: 1000049
     indicator_id: 92543
-    child_area_type_id: 102
+    sex_id: 2
+    age_id: 1
+    child_area_type_id: 501
     place_type: ltla24
-    sex: "Female"
-    age: "All ages"
     unit: years
 
   - indicator_key: health.healthy_life_expectancy.male
+    profile_id: 19
+    group_id: 1000049
     indicator_id: 92543
-    child_area_type_id: 102
+    sex_id: 1
+    age_id: 1
+    child_area_type_id: 501
     place_type: ltla24
-    sex: "Male"
-    age: "All ages"
     unit: years

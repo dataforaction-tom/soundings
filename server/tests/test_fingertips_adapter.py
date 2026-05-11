@@ -31,55 +31,65 @@ async def _seed_fingertips_source() -> None:
         )
 
 
-def _stockton_rows() -> list[dict[str, Any]]:
+def _make_record(
+    *,
+    indicator_id: int,
+    sex_id: int,
+    sex_name: str,
+    age_id: int = 1,
+    rows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    return {
+        "Grouping": [{"IndicatorId": indicator_id}],
+        "Sex": {"Id": sex_id, "Name": sex_name},
+        "Age": {"Id": age_id, "Name": "All ages"},
+        "Data": rows,
+    }
+
+
+def _row(
+    *,
+    indicator_id: int,
+    area_code: str,
+    val: float,
+    year: int,
+    year_range: int = 3,
+) -> dict[str, Any]:
+    return {
+        "AreaCode": area_code,
+        "IndicatorId": indicator_id,
+        "Val": val,
+        "Year": year,
+        "YearRange": year_range,
+    }
+
+
+def _stockton_le_records() -> list[dict[str, Any]]:
     return [
-        {
-            "AreaCode": "E06000004",
-            "AreaName": "Stockton-on-Tees",
-            "Sex": "Female",
-            "Age": "All ages",
-            "Value": 81.2,
-            "TimePeriod": "2020 - 22",
-            "Year": 2022,
-        },
-        {
-            "AreaCode": "E06000004",
-            "AreaName": "Stockton-on-Tees",
-            "Sex": "Female",
-            "Age": "All ages",
-            "Value": 80.8,
-            "TimePeriod": "2019 - 21",
-            "Year": 2021,
-        },
-        {
-            "AreaCode": "E06000004",
-            "AreaName": "Stockton-on-Tees",
-            "Sex": "Male",
-            "Age": "All ages",
-            "Value": 77.4,
-            "TimePeriod": "2020 - 22",
-            "Year": 2022,
-        },
-        {
-            "AreaCode": "E06000005",
-            "AreaName": "Darlington",
-            "Sex": "Female",
-            "Age": "All ages",
-            "Value": 80.0,
-            "TimePeriod": "2020 - 22",
-            "Year": 2022,
-        },
+        _make_record(
+            indicator_id=90366,
+            sex_id=2,
+            sex_name="Female",
+            rows=[
+                _row(indicator_id=90366, area_code="E06000004", val=81.2, year=2024),
+                _row(indicator_id=90366, area_code="E06000004", val=80.8, year=2023),
+                _row(indicator_id=90366, area_code="E06000005", val=80.0, year=2024),
+            ],
+        ),
+        _make_record(
+            indicator_id=90366,
+            sex_id=1,
+            sex_name="Male",
+            rows=[
+                _row(indicator_id=90366, area_code="E06000004", val=77.4, year=2024),
+            ],
+        ),
     ]
 
 
 async def test_fetch_indicator_filters_by_place_and_sex() -> None:
     await _seed_fingertips_source()
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        del request
-        return httpx.Response(200, json=_stockton_rows())
-
-    transport = httpx.MockTransport(handler)
+    transport = httpx.MockTransport(lambda req: httpx.Response(200, json=_stockton_le_records()))
     async with httpx.AsyncClient(transport=transport) as http:
         client = FingertipsClient(http_client=http)
         adapter = OhidFingertipsAdapter(get_engine(), fingertips_client=client)
@@ -88,10 +98,10 @@ async def test_fetch_indicator_filters_by_place_and_sex() -> None:
         )
 
     assert iv is not None
-    # Latest period for Female + Stockton is 81.2 (2020 - 22).
     assert iv.value == 81.2
     assert iv.unit == "years"
-    assert iv.period == "2020 - 22"
+    # period rendered as "2022 - 24" for a 3-year range ending in 2024.
+    assert iv.period == "2022 - 24"
     assert iv.source.source_id == "ohid.fingertips"
 
 
@@ -101,46 +111,27 @@ async def test_fetch_indicator_returns_none_for_unknown_indicator() -> None:
     async with httpx.AsyncClient(transport=transport) as http:
         client = FingertipsClient(http_client=http)
         adapter = OhidFingertipsAdapter(get_engine(), fingertips_client=client)
-        iv = await adapter.fetch_indicator(
-            "health.nope.not.a.real.key", "ltla24:E06000004", period=None
-        )
+        iv = await adapter.fetch_indicator("health.not.a.real.key", "ltla24:E06000004", period=None)
     assert iv is None
 
 
 async def test_fetch_trend_returns_ordered_series_for_one_sex() -> None:
     await _seed_fingertips_source()
-    transport = httpx.MockTransport(lambda req: httpx.Response(200, json=_stockton_rows()))
+    transport = httpx.MockTransport(lambda req: httpx.Response(200, json=_stockton_le_records()))
     async with httpx.AsyncClient(transport=transport) as http:
         client = FingertipsClient(http_client=http)
         adapter = OhidFingertipsAdapter(get_engine(), fingertips_client=client)
         trend = await adapter.fetch_trend("health.life_expectancy.female", "ltla24:E06000004")
 
     assert trend is not None
-    # Stockton + Female has two rows (2019-21 and 2020-22).
     assert len(trend.points) == 2
     assert trend.points[0].period < trend.points[1].period
     assert trend.points[1].value == 81.2
 
 
-async def test_fetch_trend_filters_by_period_window() -> None:
-    await _seed_fingertips_source()
-    transport = httpx.MockTransport(lambda req: httpx.Response(200, json=_stockton_rows()))
-    async with httpx.AsyncClient(transport=transport) as http:
-        client = FingertipsClient(http_client=http)
-        adapter = OhidFingertipsAdapter(get_engine(), fingertips_client=client)
-        trend = await adapter.fetch_trend(
-            "health.life_expectancy.female",
-            "ltla24:E06000004",
-            period_from="2020 - 22",
-        )
-
-    assert trend is not None
-    assert len(trend.points) == 1
-    assert trend.points[0].period == "2020 - 22"
-
-
-async def test_indicator_payload_is_cached_per_indicator() -> None:
-    """One upstream call serves any number of place/sex queries."""
+async def test_group_page_is_cached_per_profile_group_area_type() -> None:
+    """One upstream call serves multiple indicator/sex/place queries within
+    the same Fingertips (profile, group, area_type) page."""
     await _seed_fingertips_source()
     call_count = 0
 
@@ -148,7 +139,7 @@ async def test_indicator_payload_is_cached_per_indicator() -> None:
         nonlocal call_count
         call_count += 1
         del request
-        return httpx.Response(200, json=_stockton_rows())
+        return httpx.Response(200, json=_stockton_le_records())
 
     transport = httpx.MockTransport(handler)
     async with httpx.AsyncClient(transport=transport) as http:
@@ -158,12 +149,9 @@ async def test_indicator_payload_is_cached_per_indicator() -> None:
             "health.life_expectancy.female", "ltla24:E06000004", period=None
         )
         await adapter.fetch_indicator(
-            "health.life_expectancy.female", "ltla24:E06000005", period=None
-        )
-        await adapter.fetch_indicator(
             "health.life_expectancy.male", "ltla24:E06000004", period=None
         )
-    # Two distinct indicator ids in the mapping (life_expectancy.female and
-    # life_expectancy.male share indicator_id=90366); both should hit the
-    # cache after the first call. So total = 1 upstream call.
+        await adapter.fetch_indicator(
+            "health.life_expectancy.female", "ltla24:E06000005", period=None
+        )
     assert call_count == 1

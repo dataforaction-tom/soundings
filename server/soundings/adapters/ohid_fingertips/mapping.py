@@ -1,10 +1,9 @@
 """Pydantic loader for catalogue/fingertips-mapping.yaml.
 
-Same shape pattern as `soundings.adapters.nomis.mapping`. Each entry
-binds a soundings indicator key to a Fingertips (indicator_id +
-area_type_id + filter) tuple. The adapter filters Fingertips' returned
-rows by Sex/Age columns post-query because the API doesn't accept
-those as filter params.
+Each entry binds a soundings indicator key to a Fingertips
+(profile_id, group_id, indicator_id, sex_id, age_id, child_area_type_id)
+tuple. The adapter fetches a whole (profile × group × area_type) page
+at once and filters down to the requested indicator + sex + age + place.
 """
 
 from pathlib import Path
@@ -21,13 +20,15 @@ DEFAULT_MAPPING_PATH = (
 
 class FingertipsMapping(BaseModel):
     indicator_key: str
+    profile_id: int
+    group_id: int
     indicator_id: int
+    sex_id: int
+    age_id: int = 1
     child_area_type_id: int
     place_type: str  # the soundings place type, e.g. "ltla24"
-    sex: str | None = None
-    age: str | None = None
+    parent_area_code: str = "E92000001"  # England by default
     unit: str = "years"
-    parent_area_type_id: int | None = None
     caveats: list[str] = Field(default_factory=list)
 
 
