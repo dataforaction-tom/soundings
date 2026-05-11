@@ -1,0 +1,118 @@
+---
+import Base from "../layouts/Base.astro";
+import { findPlace } from "../lib/api";
+import { readConsentFromCookieString } from "../lib/consent";
+import type { PlaceMatch } from "../lib/types";
+
+const url = new URL(Astro.request.url);
+const query = (url.searchParams.get("q") ?? "").trim();
+const cookieHeader = Astro.request.headers.get("cookie") ?? undefined;
+const { consentLevel } = readConsentFromCookieString(cookieHeader);
+
+let matches: PlaceMatch[] = [];
+let error: string | null = null;
+
+if (query) {
+  try {
+    const result = await findPlace(query, {
+      cookieHeader,
+      nlQuestion: consentLevel === "full" ? query : undefined,
+    });
+    matches = result.matches ?? [];
+  } catch (err) {
+    error = err instanceof Error ? err.message : String(err);
+  }
+
+  if (matches.length === 1) {
+    return Astro.redirect(`/place/${encodeURIComponent(matches[0]!.id)}`);
+  }
+}
+---
+
+<Base title="Soundings">
+  <p>Ask a question about a place — postcode, council, region.</p>
+  <form method="get" action="/">
+    <label>
+      <span>What do you want to know about a place?</span>
+      <input
+        type="text"
+        name="q"
+        value={query}
+        placeholder="Stockton-on-Tees, TS18 1AB, north Tyneside…"
+        autofocus
+        required
+      />
+    </label>
+    <button type="submit">Search</button>
+  </form>
+
+  {error && (
+    <p class="error">
+      Sorry — couldn't reach the indicator service: {error}
+    </p>
+  )}
+
+  {query && !error && matches.length === 0 && (
+    <p class="no-match">
+      No places matched <strong>{query}</strong>. Try a postcode, a full council
+      name, or a region.
+    </p>
+  )}
+
+  {matches.length > 1 && (
+    <section>
+      <h2>{matches.length} matches</h2>
+      <ul class="match-list">
+        {matches.map((m) => (
+          <li>
+            <a href={`/place/${encodeURIComponent(m.id)}`}>
+              <strong>{m.name}</strong>
+              <span class="match-type"> · {m.type}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
+
+  <style>
+    form {
+      display: flex;
+      gap: 0.5rem;
+      align-items: end;
+      margin: 1rem 0;
+    }
+    form label {
+      flex: 1;
+    }
+    form span {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 0.5rem;
+      font-size: 1rem;
+    }
+    .match-list {
+      list-style: none;
+      padding: 0;
+    }
+    .match-list li {
+      padding: 0.5rem 0;
+      border-bottom: 1px solid #eee;
+    }
+    .match-type {
+      color: #666;
+      font-variant: small-caps;
+    }
+    .no-match,
+    .error {
+      margin: 1rem 0;
+    }
+    .error {
+      color: #a00;
+    }
+  </style>
+</Base>
