@@ -53,10 +53,24 @@ services:
     command: ["python", "-m", "soundings.loader.run"]
     restart: unless-stopped
 
+  ui:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.ui
+    depends_on:
+      server:
+        condition: service_healthy
+    environment:
+      SOUNDINGS_API_BASE: "http://server:8000"
+    ports:
+      - "127.0.0.1:4321:4321"
+    restart: unless-stopped
+
   caddy:
     image: caddy:2
     depends_on:
       - server
+      - ui
     volumes:
       - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
