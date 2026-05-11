@@ -16,7 +16,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from soundings.adapters.mhclg_imd2025.aggregation import aggregate_imd_to_ltla
-from soundings.adapters.mhclg_imd2025.loader import MhclgImd2025Loader
+from soundings.adapters.mhclg_imd2025.loader import MhclgImd2019Loader, MhclgImd2025Loader
 from soundings.adapters.ons_census2021.loader import OnsCensus2021Loader
 from soundings.adapters.ons_geography.chains import ALL_CHAINS
 from soundings.adapters.ons_geography.code_change_loader import (
@@ -50,15 +50,20 @@ def build_source_registry(engine: AsyncEngine) -> dict[str, LoaderCallable]:
     async def _census() -> None:
         await OnsCensus2021Loader(engine).load()
 
-    async def _imd() -> None:
+    async def _imd2025() -> None:
         await MhclgImd2025Loader(engine).load()
-        await aggregate_imd_to_ltla(engine)
+        await aggregate_imd_to_ltla(engine, source_id="mhclg.imd2025")
+
+    async def _imd2019() -> None:
+        await MhclgImd2019Loader(engine).load()
+        await aggregate_imd_to_ltla(engine, source_id="mhclg.imd2019")
 
     return {
         "ons.geography": _geography,
         "ons.mid_year_estimates": _mye,
         "ons.census2021": _census,
-        "mhclg.imd2025": _imd,
+        "mhclg.imd2025": _imd2025,
+        "mhclg.imd2019": _imd2019,
     }
 
 

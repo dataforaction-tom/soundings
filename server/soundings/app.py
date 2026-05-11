@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from soundings.adapters.mhclg_imd2025.adapter import MhclgImd2025Adapter
+from soundings.adapters.mhclg_imd2025.adapter import MhclgImd2019Adapter, MhclgImd2025Adapter
 from soundings.adapters.ons_census2021.adapter import OnsCensus2021Adapter
 from soundings.adapters.ons_mid_year_estimates.adapter import OnsMidYearEstimatesAdapter
 from soundings.adapters.postcodes_io.adapter import PostcodesIoAdapter
@@ -40,6 +40,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     registry.register("ons.mid_year_estimates", OnsMidYearEstimatesAdapter)
     registry.register("ons.census2021", OnsCensus2021Adapter)
     registry.register("mhclg.imd2025", MhclgImd2025Adapter)
+    registry.register("mhclg.imd2019", MhclgImd2019Adapter)
 
     postcodes_io = PostcodesIoAdapter(engine, ttl=POSTCODES_IO_TTL)
 

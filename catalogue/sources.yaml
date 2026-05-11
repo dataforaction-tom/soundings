@@ -52,6 +52,15 @@ sources:
     mode: loader
     refresh_cadence: "0 3 1 * *"
 
+  - id: mhclg.imd2019
+    label: English Indices of Deprivation 2019
+    publisher: Ministry of Housing, Communities and Local Government
+    publisher_url: https://www.gov.uk/government/statistics/english-indices-of-deprivation-2019
+    dataset_url: https://www.gov.uk/government/statistics/english-indices-of-deprivation-2019
+    licence: OGL-UK-3.0
+    mode: loader
+    refresh_cadence: "0 3 1 1 *"
+
   - id: ons.mid_year_estimates
     label: ONS Mid-Year Population Estimates
     publisher: Office for National Statistics

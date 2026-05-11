@@ -32,14 +32,25 @@ class ImdRow:
 
 def parse_imd_xlsx(blob: bytes) -> list[ImdRow]:
     wb = load_workbook(io.BytesIO(blob), data_only=True, read_only=True)
-    ws = wb.active
-    if ws is None:
+
+    # IMD 2025 workbooks lead with a 'Notes' sheet; the data sheet is named
+    # variously (e.g. 'IoD2025 Scores', 'IoD2025 Domains'). Scan sheets for
+    # the first one whose header row contains an 'lsoa code' column.
+    ws = None
+    headers: tuple[object, ...] = ()
+    for sheet_name in wb.sheetnames:
+        candidate = wb[sheet_name]
+        first_row = next(candidate.iter_rows(values_only=True), None)
+        if first_row and any(
+            h is not None and "lsoa code" in str(h).strip().lower() for h in first_row
+        ):
+            ws = candidate
+            headers = first_row
+            break
+    if ws is None or not headers:
         return []
 
-    rows_iter = ws.iter_rows(values_only=True)
-    headers = next(rows_iter, None)
-    if headers is None:
-        return []
+    rows_iter = ws.iter_rows(min_row=2, values_only=True)
     header_index: dict[int, str] = {
         idx: str(h).strip().lower() for idx, h in enumerate(headers) if h is not None
     }

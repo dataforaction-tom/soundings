@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from soundings.adapters.base import LoaderResult
 from soundings.adapters.mhclg_imd2025.aggregation import aggregate_imd_to_ltla
-from soundings.adapters.mhclg_imd2025.loader import MhclgImd2025Loader
+from soundings.adapters.mhclg_imd2025.loader import MhclgImd2019Loader, MhclgImd2025Loader
 from soundings.adapters.ons_census2021.loader import OnsCensus2021Loader
 from soundings.adapters.ons_geography.chains import ALL_CHAINS
 from soundings.adapters.ons_geography.code_change_loader import (
@@ -122,10 +122,15 @@ async def _seed(*, full: bool) -> None:
 
     # IMD must run after MYE: the LSOA→LTLA aggregation is population-weighted
     # using mid-year estimate values.
-    imd = MhclgImd2025Loader(engine)
-    await _run_loader(engine, "mhclg.imd2025", "imd", imd.load())
-    aggregated = await aggregate_imd_to_ltla(engine)
-    print(f"[seed] imd_aggregation: {aggregated} LTLA rows")
+    imd2025 = MhclgImd2025Loader(engine)
+    await _run_loader(engine, "mhclg.imd2025", "imd2025", imd2025.load())
+    agg2025 = await aggregate_imd_to_ltla(engine, source_id="mhclg.imd2025")
+    print(f"[seed] imd2025_aggregation: {agg2025} LTLA rows")
+
+    imd2019 = MhclgImd2019Loader(engine)
+    await _run_loader(engine, "mhclg.imd2019", "imd2019", imd2019.load())
+    agg2019 = await aggregate_imd_to_ltla(engine, source_id="mhclg.imd2019")
+    print(f"[seed] imd2019_aggregation: {agg2019} LTLA rows")
 
 
 def main(argv: list[str] | None = None) -> int:
