@@ -136,8 +136,12 @@ def _create_tag_idempotent(tag: str, *, cwd: Path | None) -> bool:
         logger.info("tag %s already exists; skipping", tag)
         return False
     try:
+        # Lightweight tag (no -a) — annotated tags need git identity which
+        # CI runners and stripped containers may not have. The manifest.json
+        # already records all the provenance; the tag is just a named pointer
+        # to the publication commit.
         subprocess.run(  # noqa: S603
-            ["git", "tag", "-a", tag, "-m", f"Corpus snapshot {tag}"],  # noqa: S607
+            ["git", "tag", tag],  # noqa: S607
             cwd=cwd,
             check=True,
         )
