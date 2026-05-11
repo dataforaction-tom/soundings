@@ -96,9 +96,7 @@ class MhclgImd2025Loader(LoaderAdapter):
             existing = {
                 row.id
                 for row in (
-                    await conn.execute(
-                        text("SELECT id FROM geography.place WHERE type = 'lsoa21'")
-                    )
+                    await conn.execute(text("SELECT id FROM geography.place WHERE type = 'lsoa21'"))
                 ).all()
             }
         records = [r for r in records if r["place_id"] in existing]
