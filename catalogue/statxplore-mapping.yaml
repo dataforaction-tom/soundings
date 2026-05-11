@@ -1,0 +1,29 @@
+# catalogue/statxplore-mapping.yaml — bind soundings indicator keys to
+# DWP Stat-Xplore cube queries.
+#
+# Cube identifiers (`database`, `measures`, `dimensions`, `recodes`) are
+# long strings that must match Stat-Xplore's internal schema exactly.
+# Discovery requires the API key (the `/schema` endpoint returns 503
+# without auth). Entries are pinned plausible-but-unverified until
+# the live test (Task 16) confirms — likely needs adjustment per
+# entry against the real cube once `STATXPLORE_API_KEY` is set.
+#
+# `geography_dim` is the dimension we filter on by place_id; the
+# adapter recodes it per request. `date_dim` is the time axis used
+# by fetch_trend.
+#
+# Geography hierarchy IDs vary per cube. The value template uses
+# `{place_code}` which the adapter substitutes (e.g. E06000004).
+
+mappings:
+
+  - indicator_key: welfare.universal_credit.households
+    database: "str:database:UC_Households"
+    measures:
+      - "str:count:UC_Households:V_F_UC_HOUSEHOLDS"
+    geography_dim: "str:field:UC_Households:V_F_UC_HOUSEHOLDS:GEOGRAPHY"
+    geography_value_template:
+      "str:value:UC_Households:V_F_UC_HOUSEHOLDS:GEOGRAPHY:V_C_MASTERGEOG11_UTLA_TO_NATIONAL:{place_code}"
+    date_dim: "str:field:UC_Households:V_F_UC_HOUSEHOLDS:DATE_NAME"
+    place_type: ltla24
+    unit: "households"
