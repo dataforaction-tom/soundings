@@ -1,0 +1,41 @@
+# catalogue/fingertips-mapping.yaml — bind soundings indicator keys to
+# OHID Fingertips indicator + area-type IDs.
+#
+# `child_area_type_id` is the geography level Fingertips returns rows
+# for; we map to the soundings place type via `place_type`. Each entry
+# is `(unverified)` until the live test confirms the indicator id is
+# still active.
+
+mappings:
+
+  - indicator_key: health.life_expectancy.female
+    indicator_id: 90366
+    child_area_type_id: 102
+    place_type: ltla24
+    sex: "Female"
+    age: "All ages"
+    unit: years
+
+  - indicator_key: health.life_expectancy.male
+    indicator_id: 90366
+    child_area_type_id: 102
+    place_type: ltla24
+    sex: "Male"
+    age: "All ages"
+    unit: years
+
+  - indicator_key: health.healthy_life_expectancy.female
+    indicator_id: 92543
+    child_area_type_id: 102
+    place_type: ltla24
+    sex: "Female"
+    age: "All ages"
+    unit: years
+
+  - indicator_key: health.healthy_life_expectancy.male
+    indicator_id: 92543
+    child_area_type_id: 102
+    place_type: ltla24
+    sex: "Male"
+    age: "All ages"
+    unit: years
