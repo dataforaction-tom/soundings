@@ -1,0 +1,87 @@
+---
+import {
+  ASKER_SECTORS,
+  CONSENT_LEVELS,
+  readConsentFromCookieString,
+} from "../lib/consent";
+
+const cookieHeader = Astro.request.headers.get("cookie");
+const { consentLevel, askerSector } = readConsentFromCookieString(cookieHeader);
+---
+
+<aside class="consent-banner" data-current-level={consentLevel}>
+  <form id="consent-form" method="post" action="/v1/capture/consent">
+    <p class="banner-text">
+      Soundings logs every question to a public corpus. Choose what to share —
+      this preference applies for the rest of your session.
+    </p>
+    <fieldset class="consent-levels">
+      <legend>Capture level</legend>
+      {CONSENT_LEVELS.map((level) => (
+        <label>
+          <input
+            type="radio"
+            name="consent_level"
+            value={level}
+            checked={level === consentLevel}
+          />
+          {level}
+        </label>
+      ))}
+    </fieldset>
+    <label class="sector-picker">
+      Self-declared sector (optional)
+      <select name="asker_sector">
+        <option value="">—</option>
+        {ASKER_SECTORS.map((sector) => (
+          <option value={sector} selected={sector === askerSector}>{sector}</option>
+        ))}
+      </select>
+    </label>
+    <button type="submit" class="apply">Apply</button>
+  </form>
+</aside>
+
+<script>
+  // Plain inline script — no framework. POSTs to /v1/capture/consent
+  // and reloads so the SSR pass picks up the new cookies.
+  const form = document.getElementById("consent-form") as HTMLFormElement | null;
+  if (form) {
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const data = new FormData(form);
+      const consent = data.get("consent_level") as string;
+      const sectorRaw = data.get("asker_sector") as string;
+      const body: Record<string, unknown> = { consent_level: consent };
+      if (sectorRaw) body.asker_sector = sectorRaw;
+      const response = await fetch("/v1/capture/consent", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (response.ok) {
+        location.reload();
+      }
+    });
+  }
+</script>
+
+<style>
+  .consent-banner {
+    border: 1px solid var(--border, #444);
+    padding: 1rem;
+    margin: 1rem 0;
+    background: var(--banner-bg, #fafafa);
+  }
+  .consent-banner fieldset {
+    border: none;
+    padding: 0;
+    display: flex;
+    gap: 1rem;
+    margin: 0.5rem 0;
+  }
+  .consent-banner button {
+    margin-top: 0.5rem;
+  }
+</style>
