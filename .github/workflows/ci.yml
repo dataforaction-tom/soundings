@@ -9,8 +9,8 @@ jobs:
   lint-type:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v8
         with:
           version: "0.11.12"
       - run: cd server && uv sync --frozen
@@ -32,8 +32,8 @@ jobs:
           --health-cmd "pg_isready -U soundings"
           --health-interval 5s --health-timeout 3s --health-retries 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v8
         with:
           version: "0.11.12"
       - run: cd server && uv sync --frozen
