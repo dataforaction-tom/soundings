@@ -79,6 +79,7 @@ def _build_raw_payload(ctx: CaptureContext) -> str:
 
     return json.dumps(
         {
+            "capture_level": ctx.consent_level,
             "tool_inputs": ctx.tool_inputs,
             "natural_language_question": ctx.natural_language_question,
             "asker_sector": ctx.asker_sector,
