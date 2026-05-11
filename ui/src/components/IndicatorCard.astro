@@ -1,0 +1,83 @@
+---
+import type { IndicatorValue } from "../lib/types";
+import { formatValue, prettyKey } from "../lib/indicator_display";
+
+interface Props {
+  indicator: IndicatorValue;
+}
+
+const { indicator } = Astro.props;
+---
+
+<article class="indicator-card">
+  <header>
+    <h4>{prettyKey(indicator.indicator)}</h4>
+    <span class={`cache-status cache-${indicator.source.cache_status}`}>
+      {indicator.source.cache_status}
+    </span>
+  </header>
+  <p class="value">
+    <span class="number">{formatValue(indicator.value)}</span>
+    {indicator.unit && <span class="unit">{indicator.unit}</span>}
+  </p>
+  <p class="period">
+    {indicator.period} · <span class="source-label">{indicator.source.source_label}</span>
+  </p>
+  {indicator.caveats.length > 0 && (
+    <ul class="caveats">
+      {indicator.caveats.map((c) => <li>{c}</li>)}
+    </ul>
+  )}
+</article>
+
+<style>
+  .indicator-card {
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    background: #fff;
+  }
+  .indicator-card header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .indicator-card h4 {
+    margin: 0;
+    font-size: 0.9375rem;
+    font-weight: 600;
+  }
+  .value {
+    margin: 0.5rem 0 0;
+    font-size: 1.5rem;
+    font-weight: 500;
+  }
+  .number {
+    font-variant-numeric: tabular-nums;
+  }
+  .unit {
+    font-size: 0.875rem;
+    color: #555;
+    margin-left: 0.25rem;
+  }
+  .period {
+    margin: 0.25rem 0 0;
+    color: #666;
+    font-size: 0.8125rem;
+  }
+  .caveats {
+    font-size: 0.8125rem;
+    color: #555;
+    margin: 0.5rem 0 0;
+    padding-left: 1rem;
+  }
+  .cache-status {
+    font-size: 0.6875rem;
+    padding: 0.05rem 0.4rem;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+  .cache-live { background: #cfe; }
+  .cache-cached { background: #ece; }
+  .cache-stale { background: #fdd; }
+</style>
