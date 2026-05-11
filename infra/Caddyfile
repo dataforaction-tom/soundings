@@ -1,4 +1,7 @@
 :80 {
+    handle /mcp/* {
+        reverse_proxy server:8000
+    }
     handle /v1/* {
         reverse_proxy server:8000
     }
@@ -6,6 +9,6 @@
         reverse_proxy server:8000
     }
     handle {
-        respond "soundings phase 0 — UI not yet wired" 200
+        reverse_proxy ui:4321
     }
 }
