@@ -1,0 +1,68 @@
+---
+import type { SourceRef } from "../lib/types";
+import { dedupeSources } from "../lib/sources";
+
+interface Props {
+  sources: SourceRef[];
+}
+
+const { sources } = Astro.props;
+const unique = dedupeSources(sources);
+---
+
+{unique.length > 0 && (
+  <section class="source-citations">
+    <h3>Sources</h3>
+    <ul>
+      {unique.map((ref) => (
+        <li>
+          <a href={ref.dataset_url} target="_blank" rel="noopener">
+            {ref.source_label || ref.source_id}
+          </a>
+          <span class="publisher"> · {ref.publisher}</span>
+          <span class={`cache-status cache-${ref.cache_status}`}>
+            {ref.cache_status}
+          </span>
+          <span class="retrieved">
+            retrieved {ref.retrieved_at.slice(0, 10)}
+          </span>
+        </li>
+      ))}
+    </ul>
+  </section>
+)}
+
+<style>
+  .source-citations {
+    margin: 1.5rem 0;
+    font-size: 0.875rem;
+  }
+  .source-citations ul {
+    list-style: none;
+    padding: 0;
+  }
+  .source-citations li {
+    padding: 0.25rem 0;
+  }
+  .publisher,
+  .retrieved {
+    color: #555;
+  }
+  .cache-status {
+    display: inline-block;
+    margin: 0 0.5rem;
+    padding: 0.05rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+  }
+  .cache-live {
+    background: #cfe;
+  }
+  .cache-cached {
+    background: #ece;
+  }
+  .cache-stale {
+    background: #fdd;
+  }
+</style>

@@ -1,0 +1,37 @@
+---
+interface Props {
+  toolName: string;
+  request: object;
+  response: object;
+}
+
+const { toolName, request, response } = Astro.props;
+---
+
+<details class="data-panel">
+  <summary>Data behind this · {toolName}</summary>
+  <h4>Request</h4>
+  <pre><code>{JSON.stringify(request, null, 2)}</code></pre>
+  <h4>Response</h4>
+  <pre><code>{JSON.stringify(response, null, 2)}</code></pre>
+</details>
+
+<style>
+  .data-panel {
+    margin: 1.5rem 0;
+    border: 1px solid #ddd;
+    padding: 0.5rem 1rem;
+    background: #fafafa;
+  }
+  .data-panel summary {
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .data-panel pre {
+    overflow-x: auto;
+    font-size: 0.8125rem;
+    background: #fff;
+    padding: 0.5rem;
+    border: 1px solid #eee;
+  }
+</style>
