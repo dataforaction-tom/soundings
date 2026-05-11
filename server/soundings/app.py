@@ -14,6 +14,7 @@ from soundings.catalogue.loader import load_catalogue_into_db
 from soundings.core.config import get_settings
 from soundings.db.engine import get_engine
 from soundings.geography.service import GeographyService
+from soundings.http.capture import router as capture_router
 from soundings.http.catalogue import router as catalogue_router
 from soundings.http.errors import install_error_envelope
 from soundings.http.health import router as health_router
@@ -72,4 +73,5 @@ app.include_router(health_router)
 app.include_router(tools_router)
 app.include_router(sources_router)
 app.include_router(catalogue_router)
+app.include_router(capture_router)
 install_error_envelope(app)
