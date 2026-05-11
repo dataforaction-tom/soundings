@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import timedelta
@@ -12,6 +13,14 @@ from soundings.adapters.ons_mid_year_estimates.adapter import OnsMidYearEstimate
 from soundings.adapters.postcodes_io.adapter import PostcodesIoAdapter
 from soundings.capture.middleware import CaptureMiddleware
 from soundings.capture.raw_writer import RawRecordWriter
+from soundings.capture.sanitisation.config import load_sanitisation_config
+from soundings.capture.sanitisation.direct_identifiers import StripDirectIdentifiers
+from soundings.capture.sanitisation.normalise import (
+    NormaliseAskerPurpose,
+    ValidateConsentLevel,
+)
+from soundings.capture.sanitisation.pipeline import SanitisationPipeline
+from soundings.capture.sanitiser_worker import SanitiserWorker
 from soundings.catalogue.loader import load_catalogue_into_db
 from soundings.core.config import get_settings
 from soundings.db.engine import get_engine
@@ -53,6 +62,23 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.orchestrator = IndicatorOrchestrator(engine, registry)
     app.state.geography_service = GeographyService(engine, postcodes_io)
     app.state.raw_writer = RawRecordWriter(engine)
+
+    # Sanitiser pipeline. Block C wires the minimal rules that don't
+    # need DB lookups or the spaCy NER model — the latter two get added
+    # in a follow-up that loads `fine_place_names` from `geography.place`
+    # and instantiates `StripPersonalNamesViaNER`. Phase 4 brings the
+    # Charity Commission seed that populates `data.organisation` so
+    # `StripSmallOrgNames` becomes useful.
+    sanitisation_config = load_sanitisation_config()
+    pipeline = SanitisationPipeline(
+        rules=[
+            StripDirectIdentifiers(),
+            NormaliseAskerPurpose(),
+            ValidateConsentLevel(),
+        ]
+    )
+    app.state.sanitiser_worker = SanitiserWorker(engine, pipeline, sanitisation_config)
+    app.state.background_tasks = set[asyncio.Task[None]]()
 
     # MCP server uses the same tool handlers + app.state.
     mcp_server = build_mcp_server(state=app.state)

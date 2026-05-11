@@ -25,8 +25,10 @@ pass-through — this keeps the existing test suite from breaking before
 Task 6 wires the real writer into app startup.
 """
 
+import asyncio
 import json
 from typing import Any, Protocol
+from uuid import UUID
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
@@ -40,7 +42,13 @@ TOOLS_PATH_PREFIX = "/v1/tools/"
 
 
 class RawWriter(Protocol):
-    async def write(self, ctx: CaptureContext) -> None: ...
+    async def write(self, ctx: CaptureContext) -> UUID | None: ...
+
+
+class SanitiserScheduler(Protocol):
+    """Anything with an async `sanitise(record_id)` — SanitiserWorker fits."""
+
+    async def sanitise(self, record_id: UUID) -> None: ...
 
 
 def _extract_tool_name(path: str) -> str:
@@ -53,6 +61,33 @@ def _safe_json_loads(blob: bytes) -> Any:
         return json.loads(blob) if blob else None
     except json.JSONDecodeError:
         return None
+
+
+def _schedule_sanitiser(app_obj: Any, record_id: UUID) -> None:
+    """Fire-and-forget the sanitiser via `asyncio.create_task`.
+
+    Holds a strong reference in `app.state.background_tasks` so the event
+    loop can't GC the task before it completes — a known FastAPI/asyncio
+    footgun under memory pressure. The task removes itself from the set
+    on completion via add_done_callback.
+    """
+    if app_obj is None:
+        return
+    sanitiser: SanitiserScheduler | None = getattr(app_obj.state, "sanitiser_worker", None)
+    if sanitiser is None:
+        return
+    background_tasks: set[asyncio.Task[None]] | None = getattr(
+        app_obj.state, "background_tasks", None
+    )
+    if background_tasks is None:
+        # Lifespan didn't initialise the set — be defensive rather than crash
+        # (some tests construct an app without it).
+        background_tasks = set()
+        app_obj.state.background_tasks = background_tasks
+
+    task = asyncio.create_task(sanitiser.sanitise(record_id))
+    background_tasks.add(task)
+    task.add_done_callback(background_tasks.discard)
 
 
 def _extract_capture_fields(response_payload: Any) -> dict[str, Any]:
@@ -191,7 +226,9 @@ class CaptureMiddleware:
             sources_used=extras["sources_used"],
             geography_referenced=extras["geography_referenced"],
         )
-        await writer.write(ctx)
+        record_id = await writer.write(ctx)
+        if record_id is not None:
+            _schedule_sanitiser(app_obj, record_id)
 
         # Forward buffered response to the real downstream send.
         await send(

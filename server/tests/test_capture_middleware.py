@@ -5,8 +5,9 @@ exercise the middleware in isolation — without spinning up the real
 adapter registry / geography service from soundings.app.
 """
 
+import asyncio
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import httpx
 import pytest
@@ -22,9 +23,22 @@ class FakeRawWriter:
 
     def __init__(self) -> None:
         self.calls: list[CaptureContext] = []
+        self._next_id = uuid4()
 
-    async def write(self, ctx: CaptureContext) -> None:
+    async def write(self, ctx: CaptureContext) -> UUID | None:
         self.calls.append(ctx)
+        return self._next_id
+
+
+class FakeSanitiser:
+    def __init__(self, delay: float = 0.0) -> None:
+        self.calls: list[UUID] = []
+        self.delay = delay
+
+    async def sanitise(self, record_id: UUID) -> None:
+        if self.delay:
+            await asyncio.sleep(self.delay)
+        self.calls.append(record_id)
 
 
 @pytest.fixture
@@ -183,6 +197,69 @@ async def test_middleware_works_without_session_middleware_upstream() -> None:
 
     assert len(writer.calls) == 1
     assert writer.calls[0].consent_level == "full"
+
+
+async def test_middleware_schedules_sanitiser_after_raw_write() -> None:
+    """Successful capture should fire the sanitiser via create_task."""
+    app = FastAPI()
+    writer = FakeRawWriter()
+    sanitiser = FakeSanitiser()
+    app.state.raw_writer = writer
+    app.state.sanitiser_worker = sanitiser
+    app.state.background_tasks = set[asyncio.Task[None]]()
+    app.add_middleware(CaptureMiddleware)
+    app.add_middleware(SessionMiddleware)
+
+    @app.post("/v1/tools/find_place")
+    async def find_place(body: dict[str, Any]) -> dict[str, Any]:
+        del body
+        return {"matches": [], "sources": []}
+
+    transport = httpx.ASGITransport(app=app)
+    cookies = {"soundings_session": str(uuid4()), "soundings_consent": "minimal"}
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", cookies=cookies
+    ) as client:
+        await client.post("/v1/tools/find_place", json={"query": "Stockton"})
+
+    # The sanitiser task may not have run by the time the HTTP response
+    # came back. Give the event loop a tick to drain.
+    while app.state.background_tasks:
+        await asyncio.sleep(0)
+
+    assert len(sanitiser.calls) == 1
+    assert sanitiser.calls[0] == writer._next_id
+
+
+async def test_background_tasks_set_is_populated_then_drained() -> None:
+    """Strong reference must exist between scheduling and completion."""
+    app = FastAPI()
+    writer = FakeRawWriter()
+    sanitiser = FakeSanitiser(delay=0.05)
+    app.state.raw_writer = writer
+    app.state.sanitiser_worker = sanitiser
+    app.state.background_tasks = set[asyncio.Task[None]]()
+    app.add_middleware(CaptureMiddleware)
+    app.add_middleware(SessionMiddleware)
+
+    @app.post("/v1/tools/find_place")
+    async def find_place(body: dict[str, Any]) -> dict[str, Any]:
+        del body
+        return {"matches": [], "sources": []}
+
+    transport = httpx.ASGITransport(app=app)
+    cookies = {"soundings_session": str(uuid4()), "soundings_consent": "minimal"}
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", cookies=cookies
+    ) as client:
+        await client.post("/v1/tools/find_place", json={"query": "Stockton"})
+        # Sanitiser is sleeping 50ms; task must be tracked.
+        assert len(app.state.background_tasks) == 1
+        await asyncio.sleep(0.1)
+
+    # Once it finishes, the discard callback removes it from the set.
+    assert app.state.background_tasks == set()
+    assert len(sanitiser.calls) == 1
 
 
 async def test_middleware_short_circuits_when_no_writer_configured() -> None:

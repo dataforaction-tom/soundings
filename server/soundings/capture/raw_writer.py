@@ -26,9 +26,10 @@ class RawRecordWriter:
     def __init__(self, engine: AsyncEngine) -> None:
         self._engine = engine
 
-    async def write(self, ctx: CaptureContext) -> None:
+    async def write(self, ctx: CaptureContext) -> uuid.UUID | None:
+        """Returns the new record_id, or None if the write was skipped."""
         if ctx.consent_level == "none" or ctx.session_id is None:
-            return
+            return None
 
         record_id = uuid.uuid4()
         timestamp = datetime.now(tz=UTC)
@@ -72,6 +73,7 @@ class RawRecordWriter:
                     "payload": _build_raw_payload(ctx),
                 },
             )
+        return record_id
 
 
 def _build_raw_payload(ctx: CaptureContext) -> str:
