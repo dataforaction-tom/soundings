@@ -38,8 +38,45 @@ async def healthz() -> dict[str, Any]:
     except Exception as exc:
         checks["loader_runs"] = f"fail: {exc.__class__.__name__}"
 
+    try:
+        engine = get_engine()
+        checks["capture"] = await _capture_check(engine)
+    except Exception as exc:
+        checks["capture"] = f"fail: {exc.__class__.__name__}"
+
     overall = "ok" if all(v == "ok" for v in checks.values()) else "degraded"
     return {"status": overall, "checks": checks}
+
+
+async def _capture_check(engine: object) -> str:
+    """Returns 'ok' or a degraded reason.
+
+    Degraded when:
+    - the pending-sanitisation backlog exceeds 1000 rows, OR
+    - more than 100 records have been pending for over an hour
+      (suggests the sanitiser is stuck rather than just busy).
+    """
+    async with engine.connect() as conn:  # type: ignore[attr-defined]
+        backlog = (
+            await conn.execute(
+                text("SELECT COUNT(*) FROM corpus.question_record WHERE review_status = 'pending'")
+            )
+        ).scalar_one()
+        cutoff = datetime.now(tz=UTC) - timedelta(hours=1)
+        stuck = (
+            await conn.execute(
+                text(
+                    "SELECT COUNT(*) FROM corpus.question_record "
+                    "WHERE review_status = 'pending' AND timestamp < :cutoff"
+                ),
+                {"cutoff": cutoff},
+            )
+        ).scalar_one()
+    if backlog > 1000:
+        return f"backlog: {backlog} pending"
+    if stuck > 100:
+        return f"stuck: {stuck} older than 1h"
+    return "ok"
 
 
 async def _stale_loader_sources(engine: object) -> list[str]:

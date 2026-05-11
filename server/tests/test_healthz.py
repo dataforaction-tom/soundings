@@ -38,6 +38,11 @@ async def _seed_recent_loader_runs() -> None:
 
 
 async def test_healthz_returns_ok_when_db_catalogue_and_loaders_fresh() -> None:
+    # Clean any stuck pending records left by other integration tests.
+    engine = get_engine()
+    async with engine.begin() as conn:
+        await conn.execute(text("DELETE FROM corpus.raw_record"))
+        await conn.execute(text("DELETE FROM corpus.question_record"))
     async with app.router.lifespan_context(app):
         await _seed_recent_loader_runs()
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
@@ -47,6 +52,7 @@ async def test_healthz_returns_ok_when_db_catalogue_and_loaders_fresh() -> None:
     assert body["checks"]["postgres"] == "ok"
     assert body["checks"]["catalogue"] == "ok"
     assert body["checks"]["loader_runs"] == "ok"
+    assert body["checks"]["capture"] == "ok"
     assert body["status"] == "ok"
 
 
@@ -61,3 +67,38 @@ async def test_healthz_degrades_when_loader_runs_are_stale() -> None:
     body = response.json()
     assert body["status"] == "degraded"
     assert "stale" in body["checks"]["loader_runs"]
+
+
+async def test_healthz_degrades_when_capture_backlog_is_large() -> None:
+    engine = get_engine()
+    async with engine.begin() as conn:
+        await conn.execute(text("DELETE FROM corpus.raw_record"))
+        await conn.execute(text("DELETE FROM corpus.question_record"))
+        # Seed > 100 records pending and > 1 hour old to trip the stuck check.
+        old = datetime.now(tz=UTC) - timedelta(hours=2)
+        for _ in range(101):
+            await conn.execute(
+                text(
+                    "INSERT INTO corpus.question_record ("
+                    "id, timestamp, session_id, consent_version, capture_level, "
+                    "tool_called, tool_inputs_redacted, geography_referenced, "
+                    "indicators_returned, sources_used, result_status, gap_signals, "
+                    "review_status"
+                    ") VALUES ("
+                    ":id, :ts, :sid, 'v1.0', 'minimal', 'find_place', "
+                    "'{}'::jsonb, '{}'::jsonb, ARRAY[]::varchar[], ARRAY[]::varchar[], "
+                    "'ok', ARRAY[]::varchar[], 'pending'"
+                    ")"
+                ),
+                {"id": uuid.uuid4(), "ts": old, "sid": uuid.uuid4()},
+            )
+    async with app.router.lifespan_context(app):
+        await _seed_recent_loader_runs()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            response = await ac.get("/healthz")
+    body = response.json()
+    assert body["status"] == "degraded"
+    assert body["checks"]["capture"].startswith(("stuck", "backlog"))
+    # Cleanup so the next test doesn't inherit the backlog.
+    async with engine.begin() as conn:
+        await conn.execute(text("DELETE FROM corpus.question_record"))
