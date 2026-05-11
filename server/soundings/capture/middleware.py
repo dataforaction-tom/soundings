@@ -31,7 +31,10 @@ from typing import Any, Protocol
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from soundings.capture.context import CaptureContext
-from soundings.http.session import SessionState
+from soundings.http.session import (
+    cookies_from_asgi_scope,
+    session_state_from_cookies,
+)
 
 TOOLS_PATH_PREFIX = "/v1/tools/"
 
@@ -107,6 +110,20 @@ class CaptureMiddleware:
             await self.app(scope, receive, send)
             return
 
+        # Parse the session directly from the raw ASGI scope so we don't
+        # depend on whether SessionMiddleware has run upstream (it has, but
+        # the dependency would be implicit and fragile across Starlette
+        # versions). Short-circuit before touching the request body if
+        # there's no capture work to do.
+        session = session_state_from_cookies(cookies_from_asgi_scope(scope))
+        app_obj = scope.get("app")
+        writer: RawWriter | None = (
+            getattr(app_obj.state, "raw_writer", None) if app_obj is not None else None
+        )
+        if writer is None or session.consent_level == "none":
+            await self.app(scope, receive, send)
+            return
+
         # Drain the request body so we can inspect and possibly rewrite it.
         body_chunks: list[bytes] = []
         more_body = True
@@ -119,15 +136,8 @@ class CaptureMiddleware:
         body_json = _safe_json_loads(body_bytes)
         tool_inputs: dict[str, Any] = body_json if isinstance(body_json, dict) else {}
 
-        # SessionMiddleware (Task 3) puts a SessionState on `scope["state"]`
-        # via `request.state.session = ...`. If it didn't run upstream, we
-        # treat the caller as anonymous (consent="none", no capture).
-        state = scope.get("state") or {}
-        session: SessionState | None = state.get("session") if isinstance(state, dict) else None
-        session_consent = session.consent_level if session is not None else "none"
-
         nl_question: str | None = None
-        if session_consent == "full" and isinstance(tool_inputs.get("nl_question"), str):
+        if session.consent_level == "full" and isinstance(tool_inputs.get("nl_question"), str):
             nl_question = tool_inputs["nl_question"]
         tool_inputs.pop("nl_question", None)
 
@@ -164,32 +174,24 @@ class CaptureMiddleware:
 
         response_bytes = b"".join(response_body_chunks)
 
-        # Capture path: only when we have a writer, a session, and consent
-        # above 'none'. Otherwise just forward the response unchanged.
-        app_obj = scope.get("app")
-        writer: RawWriter | None = (
-            getattr(app_obj.state, "raw_writer", None) if app_obj is not None else None
+        response_payload = _safe_json_loads(response_bytes)
+        extras = _extract_capture_fields(response_payload)
+        ctx = CaptureContext(
+            session_id=session.session_id,
+            consent_level=session.consent_level,
+            consent_version=session.consent_version,
+            tool_called=_extract_tool_name(scope["path"]),
+            tool_inputs=tool_inputs,
+            natural_language_question=nl_question,
+            asker_sector=session.asker_sector,
+            asker_purpose=None,
+            result_status=extras["result_status"],
+            error_class=extras["error_class"],
+            indicators_returned=extras["indicators_returned"],
+            sources_used=extras["sources_used"],
+            geography_referenced=extras["geography_referenced"],
         )
-
-        if writer is not None and session is not None and session.consent_level != "none":
-            response_payload = _safe_json_loads(response_bytes)
-            extras = _extract_capture_fields(response_payload)
-            ctx = CaptureContext(
-                session_id=session.session_id,
-                consent_level=session.consent_level,
-                consent_version=session.consent_version,
-                tool_called=_extract_tool_name(scope["path"]),
-                tool_inputs=tool_inputs,
-                natural_language_question=nl_question,
-                asker_sector=session.asker_sector,
-                asker_purpose=None,
-                result_status=extras["result_status"],
-                error_class=extras["error_class"],
-                indicators_returned=extras["indicators_returned"],
-                sources_used=extras["sources_used"],
-                geography_referenced=extras["geography_referenced"],
-            )
-            await writer.write(ctx)
+        await writer.write(ctx)
 
         # Forward buffered response to the real downstream send.
         await send(

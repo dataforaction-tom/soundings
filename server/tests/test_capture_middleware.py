@@ -152,3 +152,74 @@ async def test_middleware_skips_non_tool_routes(
         await client.get("/healthz")
 
     assert writer.calls == []
+
+
+async def test_middleware_works_without_session_middleware_upstream() -> None:
+    """CaptureMiddleware must parse cookies itself.
+
+    Guards against quietly degrading to anonymous capture if SessionMiddleware
+    isn't in the stack — e.g. if a future refactor swaps middleware order
+    or someone wires a partial test app.
+    """
+    app = FastAPI()
+    writer = FakeRawWriter()
+    app.state.raw_writer = writer
+    # Note: only CaptureMiddleware; SessionMiddleware deliberately omitted.
+    app.add_middleware(CaptureMiddleware)
+
+    @app.post("/v1/tools/find_place")
+    async def find_place(body: dict[str, Any]) -> dict[str, Any]:
+        return {"matches": [], "sources": []}
+
+    transport = httpx.ASGITransport(app=app)
+    cookies = {
+        "soundings_session": str(uuid4()),
+        "soundings_consent": "full",
+    }
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", cookies=cookies
+    ) as client:
+        await client.post("/v1/tools/find_place", json={"query": "Stockton"})
+
+    assert len(writer.calls) == 1
+    assert writer.calls[0].consent_level == "full"
+
+
+async def test_middleware_short_circuits_when_no_writer_configured() -> None:
+    """Without a writer the middleware must not touch body or response.
+
+    Performance guard: drainage + buffering shouldn't run for routes that
+    aren't going to be captured.
+    """
+    app = FastAPI()
+    # No raw_writer on app.state — capture is dormant.
+    app.add_middleware(CaptureMiddleware)
+    app.add_middleware(SessionMiddleware)
+
+    body_received_by_handler: dict[str, Any] = {}
+
+    @app.post("/v1/tools/find_place")
+    async def find_place(body: dict[str, Any]) -> dict[str, Any]:
+        body_received_by_handler.update(body)
+        return {"matches": [], "sources": []}
+
+    transport = httpx.ASGITransport(app=app)
+    cookies = {
+        "soundings_session": str(uuid4()),
+        "soundings_consent": "full",
+    }
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", cookies=cookies
+    ) as client:
+        await client.post(
+            "/v1/tools/find_place",
+            json={"query": "Stockton", "nl_question": "passes straight through"},
+        )
+
+    # Without a writer the middleware short-circuits before stripping
+    # nl_question — the handler sees the original body. Tools accept the
+    # extra field thanks to Pydantic's default extra="ignore".
+    assert body_received_by_handler == {
+        "query": "Stockton",
+        "nl_question": "passes straight through",
+    }
