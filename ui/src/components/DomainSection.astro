@@ -1,0 +1,35 @@
+---
+import IndicatorCard from "./IndicatorCard.astro";
+import type { IndicatorValue } from "../lib/types";
+
+interface Props {
+  title: string;
+  indicators: IndicatorValue[];
+}
+
+const { title, indicators } = Astro.props;
+---
+
+{indicators.length > 0 && (
+  <section class="domain-section">
+    <h3>{title}</h3>
+    <div class="domain-grid">
+      {indicators.map((ind) => <IndicatorCard indicator={ind} />)}
+    </div>
+  </section>
+)}
+
+<style>
+  .domain-section {
+    margin: 1.5rem 0;
+  }
+  .domain-section h3 {
+    text-transform: capitalize;
+    margin-bottom: 0.5rem;
+  }
+  .domain-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+    gap: 0.75rem;
+  }
+</style>

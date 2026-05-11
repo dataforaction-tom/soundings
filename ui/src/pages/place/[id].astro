@@ -1,9 +1,11 @@
 ---
 import Base from "../../layouts/Base.astro";
+import DomainSection from "../../components/DomainSection.astro";
 import SourceCitations from "../../components/SourceCitations.astro";
 import DataPanel from "../../components/DataPanel.astro";
 import { getPlaceProfile } from "../../lib/api";
-import type { PlaceProfile, SourceRef } from "../../lib/types";
+import { domainOf } from "../../lib/indicator_display";
+import type { IndicatorValue, PlaceProfile, SourceRef } from "../../lib/types";
 
 export const prerender = false;
 
@@ -22,6 +24,18 @@ if (placeId) {
   }
 }
 
+function groupByDomain(rows: IndicatorValue[]): Map<string, IndicatorValue[]> {
+  const out = new Map<string, IndicatorValue[]>();
+  for (const row of rows) {
+    const domain = domainOf(row.indicator);
+    const list = out.get(domain) ?? [];
+    list.push(row);
+    out.set(domain, list);
+  }
+  return out;
+}
+
+const grouped = profile ? groupByDomain(profile.indicators) : new Map();
 const sources: SourceRef[] = profile
   ? profile.indicators.map((row) => row.source)
   : [];
@@ -42,25 +56,9 @@ const sources: SourceRef[] = profile
       {profile.indicators.length === 0 ? (
         <p>No indicators available for this place yet.</p>
       ) : (
-        <ul class="indicator-list">
-          {profile.indicators.map((row) => (
-            <li>
-              <strong>{row.indicator}</strong>:{" "}
-              {row.value === null ? (
-                <em>no data</em>
-              ) : (
-                <>
-                  {Number.isFinite(row.value) ? row.value.toLocaleString("en-GB") : row.value}
-                  {row.unit && <span class="unit"> {row.unit}</span>}
-                </>
-              )}
-              <span class="period"> · {row.period}</span>
-              {row.caveats.length > 0 && (
-                <span class="caveats"> ({row.caveats.join("; ")})</span>
-              )}
-            </li>
-          ))}
-        </ul>
+        [...grouped.entries()].map(([domain, indicators]) => (
+          <DomainSection title={domain} indicators={indicators} />
+        ))
       )}
 
       <SourceCitations sources={sources} />
@@ -80,20 +78,6 @@ const sources: SourceRef[] = profile
     .place-type {
       color: #555;
       margin-top: 0;
-    }
-    .indicator-list {
-      list-style: none;
-      padding: 0;
-    }
-    .indicator-list li {
-      padding: 0.5rem 0;
-      border-bottom: 1px solid #eee;
-    }
-    .unit,
-    .period,
-    .caveats {
-      color: #666;
-      font-size: 0.875rem;
     }
     .error {
       color: #a00;
