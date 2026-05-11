@@ -19,6 +19,7 @@ from soundings.adapters.source_ref_factory import SourceRefFactory
 from soundings.cache.source_cache import SourceCacheStore
 from soundings.contracts.indicator_value import IndicatorValue
 from soundings.contracts.source_ref import CacheStatus, SourceRef
+from soundings.contracts.trend import Trend
 
 
 class PassthroughAdapter(ABC):
@@ -79,6 +80,89 @@ class PassthroughAdapter(ABC):
             retrieved_at=datetime.now(tz=UTC), cache_status=status
         )
         return self._materialise(payload, indicator_key, place_id, period, source_ref)
+
+    # ----- trend support (Phase 3) -----
+
+    async def _call_upstream_trend(
+        self,
+        client: httpx.AsyncClient,
+        cache_key: str,
+        indicator_key: str,
+        place_id: str,
+        period_from: str | None,
+        period_to: str | None,
+    ) -> Any | None:
+        """Subclasses that publish time series override this.
+
+        Default refuses, mirroring _materialise's stance: adapters that
+        don't publish trends inherit a NotImplementedError on call rather
+        than silently returning an empty series.
+        """
+        del client, cache_key, indicator_key, place_id, period_from, period_to
+        raise NotImplementedError(f"{type(self).__name__} does not publish time series")
+
+    def _materialise_trend(
+        self,
+        payload: Any,
+        indicator_key: str,
+        place_id: str,
+        source_ref: SourceRef,
+    ) -> Trend:
+        raise NotImplementedError(f"{type(self).__name__} does not publish time series")
+
+    @staticmethod
+    def _trend_cache_key(
+        indicator_key: str,
+        place_id: str,
+        period_from: str | None,
+        period_to: str | None,
+    ) -> str:
+        return f"{indicator_key}|{place_id}|trend|{period_from or 'open'}-{period_to or 'open'}"
+
+    async def fetch_trend(
+        self,
+        indicator_key: str,
+        place_id: str,
+        period_from: str | None = None,
+        period_to: str | None = None,
+    ) -> Trend | None:
+        cache_key = self._trend_cache_key(indicator_key, place_id, period_from, period_to)
+        payload, status = await self._fetch_trend_with_status(
+            cache_key, indicator_key, place_id, period_from, period_to
+        )
+        if payload is None:
+            return None
+        source_ref = await self._build_source_ref(
+            retrieved_at=datetime.now(tz=UTC), cache_status=status
+        )
+        return self._materialise_trend(payload, indicator_key, place_id, source_ref)
+
+    async def _fetch_trend_with_status(
+        self,
+        cache_key: str,
+        indicator_key: str,
+        place_id: str,
+        period_from: str | None,
+        period_to: str | None,
+    ) -> tuple[Any | None, CacheStatus]:
+        cached = await self._cache.get(self.source_id, cache_key)
+        if cached is not None:
+            return cached, "cached"
+
+        async with self._limiter:
+            client = self._client or httpx.AsyncClient(timeout=30.0)
+            try:
+                payload = await self._call_upstream_trend(
+                    client, cache_key, indicator_key, place_id, period_from, period_to
+                )
+            finally:
+                if self._client is None:
+                    await client.aclose()
+
+        if payload is not None:
+            await self._cache.put(self.source_id, cache_key, payload, ttl=self._ttl)
+            return payload, "live"
+        return None, "live"
 
     async def list_available_indicators(self) -> list[str]:
         async with self._engine.connect() as conn:
