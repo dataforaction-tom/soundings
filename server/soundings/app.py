@@ -16,13 +16,8 @@ from soundings.capture.middleware import CaptureMiddleware
 from soundings.capture.rate_limit import FullConsentRateLimiter
 from soundings.capture.raw_writer import RawRecordWriter
 from soundings.capture.replay import replay_pending
+from soundings.capture.sanitisation.build import build_default_pipeline
 from soundings.capture.sanitisation.config import load_sanitisation_config
-from soundings.capture.sanitisation.direct_identifiers import StripDirectIdentifiers
-from soundings.capture.sanitisation.normalise import (
-    NormaliseAskerPurpose,
-    ValidateConsentLevel,
-)
-from soundings.capture.sanitisation.pipeline import SanitisationPipeline
 from soundings.capture.sanitiser_worker import SanitiserWorker
 from soundings.catalogue.loader import load_catalogue_into_db
 from soundings.core.config import get_settings
@@ -72,19 +67,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         threshold=sanitisation_config.asker_purpose.rate_limit.full_consent_per_session_per_hour,
     )
 
-    # Sanitiser pipeline. Block C wires the minimal rules that don't
-    # need DB lookups or the spaCy NER model — the latter two get added
-    # in a follow-up that loads `fine_place_names` from `geography.place`
-    # and instantiates `StripPersonalNamesViaNER`. Phase 4 brings the
-    # Charity Commission seed that populates `data.organisation` so
-    # `StripSmallOrgNames` becomes useful.
-    pipeline = SanitisationPipeline(
-        rules=[
-            StripDirectIdentifiers(),
-            NormaliseAskerPurpose(),
-            ValidateConsentLevel(),
-        ]
-    )
+    # Full six-rule pipeline assembled by build_default_pipeline. Loads
+    # LSOA/MSOA names from geography.place and spaCy en_core_web_sm.
+    # data.organisation is empty in Phase 3; Phase 4 (Charity Commission)
+    # populates it so StripSmallOrgNames starts catching real names.
+    pipeline = await build_default_pipeline(engine, sanitisation_config)
     app.state.sanitiser_worker = SanitiserWorker(
         engine, pipeline, sanitisation_config, alert=send_alert
     )
