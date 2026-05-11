@@ -1,0 +1,102 @@
+---
+import Base from "../../layouts/Base.astro";
+import SourceCitations from "../../components/SourceCitations.astro";
+import DataPanel from "../../components/DataPanel.astro";
+import { getPlaceProfile } from "../../lib/api";
+import type { PlaceProfile, SourceRef } from "../../lib/types";
+
+export const prerender = false;
+
+const placeId = decodeURIComponent(Astro.params.id ?? "");
+const cookieHeader = Astro.request.headers.get("cookie") ?? undefined;
+
+const include = ["population", "deprivation"];
+let profile: PlaceProfile | null = null;
+let error: string | null = null;
+
+if (placeId) {
+  try {
+    profile = await getPlaceProfile(placeId, include, { cookieHeader });
+  } catch (err) {
+    error = err instanceof Error ? err.message : String(err);
+  }
+}
+
+const sources: SourceRef[] = profile
+  ? profile.indicators.map((row) => row.source)
+  : [];
+---
+
+<Base title={profile ? profile.place.name : placeId}>
+  {error && (
+    <p class="error">Couldn't load profile: {error}</p>
+  )}
+
+  {profile && (
+    <>
+      <header class="place-header">
+        <h2>{profile.place.name}</h2>
+        <p class="place-type">{profile.place.type} · <code>{profile.place.id}</code></p>
+      </header>
+
+      {profile.indicators.length === 0 ? (
+        <p>No indicators available for this place yet.</p>
+      ) : (
+        <ul class="indicator-list">
+          {profile.indicators.map((row) => (
+            <li>
+              <strong>{row.indicator}</strong>:{" "}
+              {row.value === null ? (
+                <em>no data</em>
+              ) : (
+                <>
+                  {Number.isFinite(row.value) ? row.value.toLocaleString("en-GB") : row.value}
+                  {row.unit && <span class="unit"> {row.unit}</span>}
+                </>
+              )}
+              <span class="period"> · {row.period}</span>
+              {row.caveats.length > 0 && (
+                <span class="caveats"> ({row.caveats.join("; ")})</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <SourceCitations sources={sources} />
+
+      <DataPanel
+        toolName="get_place_profile"
+        request={{ place_id: profile.place.id, include }}
+        response={profile}
+      />
+    </>
+  )}
+
+  <style>
+    .place-header h2 {
+      margin-bottom: 0.25rem;
+    }
+    .place-type {
+      color: #555;
+      margin-top: 0;
+    }
+    .indicator-list {
+      list-style: none;
+      padding: 0;
+    }
+    .indicator-list li {
+      padding: 0.5rem 0;
+      border-bottom: 1px solid #eee;
+    }
+    .unit,
+    .period,
+    .caveats {
+      color: #666;
+      font-size: 0.875rem;
+    }
+    .error {
+      color: #a00;
+    }
+  </style>
+</Base>
