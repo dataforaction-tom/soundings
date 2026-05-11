@@ -30,7 +30,7 @@ async def _seed_statxplore_source() -> None:
 
 
 def _sample_payload(values: list[float], periods: list[str]) -> dict:
-    measure_id = "str:count:UC_Households:V_F_UC_HOUSEHOLDS"
+    measure_id = "str:count:UC_Monthly:V_F_UC_CASELOAD_FULL"
     return {
         "cubes": {measure_id: {"values": [values]}},
         "fields": [
@@ -57,13 +57,13 @@ async def test_fetch_indicator_returns_latest_period(
         client = StatXploreClient(http_client=http)
         adapter = DwpStatXploreAdapter(get_engine(), statxplore_client=client)
         iv = await adapter.fetch_indicator(
-            "welfare.universal_credit.households", "ltla24:E06000004", period=None
+            "economy.universal_credit_claimants", "ltla24:E06000004", period=None
         )
 
     assert iv is not None
     assert iv.value == 145.0
     assert iv.period == "202403"
-    assert iv.unit == "households"
+    assert iv.unit == "people"
     assert iv.source.source_id == "dwp.statxplore"
 
 
@@ -82,7 +82,7 @@ async def test_fetch_indicator_by_explicit_period(
         client = StatXploreClient(http_client=http)
         adapter = DwpStatXploreAdapter(get_engine(), statxplore_client=client)
         iv = await adapter.fetch_indicator(
-            "welfare.universal_credit.households",
+            "economy.universal_credit_claimants",
             "ltla24:E06000004",
             period="202402",
         )
@@ -104,7 +104,7 @@ async def test_fetch_trend_returns_ordered_series(
     async with httpx.AsyncClient(transport=transport) as http:
         client = StatXploreClient(http_client=http)
         adapter = DwpStatXploreAdapter(get_engine(), statxplore_client=client)
-        trend = await adapter.fetch_trend("welfare.universal_credit.households", "ltla24:E06000004")
+        trend = await adapter.fetch_trend("economy.universal_credit_claimants", "ltla24:E06000004")
 
     assert trend is not None
     assert len(trend.points) == 3
@@ -127,7 +127,7 @@ async def test_fetch_trend_filters_by_window(
         client = StatXploreClient(http_client=http)
         adapter = DwpStatXploreAdapter(get_engine(), statxplore_client=client)
         trend = await adapter.fetch_trend(
-            "welfare.universal_credit.households",
+            "economy.universal_credit_claimants",
             "ltla24:E06000004",
             period_from="202402",
         )
@@ -167,7 +167,7 @@ async def test_per_place_query_is_cached(
         client = StatXploreClient(http_client=http)
         adapter = DwpStatXploreAdapter(get_engine(), statxplore_client=client)
         await adapter.fetch_indicator(
-            "welfare.universal_credit.households", "ltla24:E06000004", period=None
+            "economy.universal_credit_claimants", "ltla24:E06000004", period=None
         )
-        await adapter.fetch_trend("welfare.universal_credit.households", "ltla24:E06000004")
+        await adapter.fetch_trend("economy.universal_credit_claimants", "ltla24:E06000004")
     assert call_count == 1

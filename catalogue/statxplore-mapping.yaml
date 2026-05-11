@@ -17,13 +17,41 @@
 
 mappings:
 
-  - indicator_key: welfare.universal_credit.households
-    database: "str:database:UC_Households"
+  - indicator_key: economy.universal_credit_claimants
+    database: "str:database:UC_Monthly"
     measures:
-      - "str:count:UC_Households:V_F_UC_HOUSEHOLDS"
-    geography_dim: "str:field:UC_Households:V_F_UC_HOUSEHOLDS:GEOGRAPHY"
+      - "str:count:UC_Monthly:V_F_UC_CASELOAD_FULL"
+    geography_dim: "str:field:UC_Monthly:V_F_UC_CASELOAD_FULL:GEOGRAPHY"
     geography_value_template:
-      "str:value:UC_Households:V_F_UC_HOUSEHOLDS:GEOGRAPHY:V_C_MASTERGEOG11_UTLA_TO_NATIONAL:{place_code}"
-    date_dim: "str:field:UC_Households:V_F_UC_HOUSEHOLDS:DATE_NAME"
+      "str:value:UC_Monthly:V_F_UC_CASELOAD_FULL:GEOGRAPHY:V_C_MASTERGEOG11_UTLA_TO_NATIONAL:{place_code}"
+    date_dim: "str:field:UC_Monthly:V_F_UC_CASELOAD_FULL:DATE_NAME"
     place_type: ltla24
-    unit: "households"
+    unit: "people"
+
+  - indicator_key: economy.claimant_count_rate
+    database: "str:database:cc_quarterly"
+    measures:
+      - "str:count:cc_quarterly:V_F_CC_QUARTERLY"
+    geography_dim: "str:field:cc_quarterly:V_F_CC_QUARTERLY:GEOGRAPHY"
+    geography_value_template:
+      "str:value:cc_quarterly:V_F_CC_QUARTERLY:GEOGRAPHY:V_C_MASTERGEOG11_UTLA_TO_NATIONAL:{place_code}"
+    date_dim: "str:field:cc_quarterly:V_F_CC_QUARTERLY:DATE_NAME"
+    place_type: ltla24
+    unit: "proportion"
+    caveats:
+      - "Claimant count includes JSA recipients and UC claimants required to seek work."
+
+  - indicator_key: deprivation.child_poverty_ahc
+    database: "str:database:children_in_low_income_families_ahc"
+    measures:
+      - "str:count:children_in_low_income_families_ahc:V_F_CHILDREN"
+    geography_dim:
+      "str:field:children_in_low_income_families_ahc:V_F_CHILDREN:GEOGRAPHY"
+    geography_value_template:
+      "str:value:children_in_low_income_families_ahc:V_F_CHILDREN:GEOGRAPHY:V_C_MASTERGEOG11_UTLA_TO_NATIONAL:{place_code}"
+    date_dim:
+      "str:field:children_in_low_income_families_ahc:V_F_CHILDREN:DATE_NAME"
+    place_type: ltla24
+    unit: "proportion"
+    caveats:
+      - "Local-area child poverty AHC statistics published from FYE 2024 onwards."

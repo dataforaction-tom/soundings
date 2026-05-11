@@ -13,14 +13,23 @@ def test_mapping_loads_at_least_one_entry() -> None:
     assert len(mappings) >= 1
 
 
-def test_uc_households_entry_carries_long_identifiers() -> None:
+def test_uc_caseload_entry_carries_long_identifiers() -> None:
     mappings = load_statxplore_mapping()
     by_key = {m.indicator_key: m for m in mappings}
-    uc = by_key["welfare.universal_credit.households"]
+    uc = by_key["economy.universal_credit_claimants"]
     assert uc.database.startswith("str:database:")
     assert uc.measures[0].startswith("str:count:")
     assert uc.geography_dim.startswith("str:field:")
     assert uc.date_dim.startswith("str:field:")
     assert "{place_code}" in uc.geography_value_template
     assert uc.place_type == "ltla24"
-    assert uc.unit == "households"
+    assert uc.unit == "people"
+
+
+def test_mapping_covers_catalogue_statxplore_indicators() -> None:
+    """All catalogue indicators sourced from dwp.statxplore have mappings."""
+    mappings = load_statxplore_mapping()
+    keys = {m.indicator_key for m in mappings}
+    assert "economy.universal_credit_claimants" in keys
+    assert "economy.claimant_count_rate" in keys
+    assert "deprivation.child_poverty_ahc" in keys
