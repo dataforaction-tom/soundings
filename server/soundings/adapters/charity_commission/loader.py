@@ -16,6 +16,7 @@ aggregates at the end of each load.
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncEngine
 
@@ -68,14 +69,141 @@ class CharityCommissionLoader(LoaderAdapter):
         await self._upsert_organisations(org_rows)
         await self._upsert_operates_in(operates_in_rows)
 
+        # Phase 4 Task 7: end-of-load aggregates into data.indicator_value.
+        # Period = YYYY-MM (CC publishes monthly); UPSERT so re-runs in the
+        # same calendar month overwrite the latest count.
+        period = retrieved_at.strftime("%Y-%m")
+        aggregate_notes = await self._aggregate_indicators(period, retrieved_at)
+
         unresolved = sum(1 for r in rows if not resolved.get(r.get("postcode", "")))
-        notes: str | None = None
+        note_pieces: list[str] = []
         if unresolved:
-            notes = (
+            note_pieces.append(
                 f"{unresolved} charities with unresolved postcodes — "
                 "registered_address_place_id null"
             )
+        if aggregate_notes:
+            note_pieces.append(aggregate_notes)
+        notes = "; ".join(note_pieces) if note_pieces else None
         return LoaderResult(rows_written=len(org_rows), notes=notes)
+
+    async def _aggregate_indicators(self, period: str, retrieved_at: datetime) -> str | None:
+        """UPSERT `civil_society.active_charities_count` and
+        `civil_society.active_charities_per_10k` into data.indicator_value
+        for every LTLA that has fresh CC rows.
+
+        Restricts to organisations touched in THIS load
+        (retrieved_at >= the load's threshold, minus a 1-second buffer
+        for clock skew). Charities that fell out of the register
+        between loads don't carry forward into the new aggregate.
+
+        Per_10k joins to the latest `population.total` for each place;
+        LTLAs without a population row get the count but not the rate
+        — counted in the returned notes string.
+        """
+        threshold = retrieved_at - timedelta(seconds=1)
+        async with self._engine.begin() as conn:
+            # Count UPSERT — overwrites any previous monthly count.
+            await conn.execute(
+                text(
+                    "WITH counts AS ("
+                    "  SELECT registered_address_place_id AS place_id, "
+                    "         COUNT(*) AS cnt "
+                    "  FROM data.organisation "
+                    "  WHERE source_id = :sid "
+                    "    AND registered_address_place_id IS NOT NULL "
+                    "    AND retrieved_at >= :ts "
+                    "    AND raw->>'status' = 'Registered' "
+                    "  GROUP BY registered_address_place_id"
+                    ") "
+                    "INSERT INTO data.indicator_value "
+                    "(place_id, indicator_key, period, value, source_id, "
+                    " retrieved_at, caveats) "
+                    "SELECT place_id, 'civil_society.active_charities_count', "
+                    "       :period, cnt, :sid, :now, '[]'::jsonb "
+                    "FROM counts "
+                    "ON CONFLICT (place_id, indicator_key, period) "
+                    "DO UPDATE SET value = EXCLUDED.value, "
+                    "              retrieved_at = EXCLUDED.retrieved_at, "
+                    "              source_id = EXCLUDED.source_id"
+                ),
+                {
+                    "sid": self.source_id,
+                    "ts": threshold,
+                    "period": period,
+                    "now": retrieved_at,
+                },
+            )
+            # Per_10k UPSERT — needs population.total INNER JOIN, so any
+            # place without population is skipped silently here. The
+            # notes line below logs how many.
+            await conn.execute(
+                text(
+                    "WITH counts AS ("
+                    "  SELECT registered_address_place_id AS place_id, "
+                    "         COUNT(*) AS cnt "
+                    "  FROM data.organisation "
+                    "  WHERE source_id = :sid "
+                    "    AND registered_address_place_id IS NOT NULL "
+                    "    AND retrieved_at >= :ts "
+                    "    AND raw->>'status' = 'Registered' "
+                    "  GROUP BY registered_address_place_id"
+                    "), populations AS ("
+                    "  SELECT DISTINCT ON (place_id) place_id, value AS pop "
+                    "  FROM data.indicator_value "
+                    "  WHERE indicator_key = 'population.total' "
+                    "    AND value IS NOT NULL "
+                    "  ORDER BY place_id, period DESC"
+                    ") "
+                    "INSERT INTO data.indicator_value "
+                    "(place_id, indicator_key, period, value, source_id, "
+                    " retrieved_at, caveats) "
+                    "SELECT c.place_id, "
+                    "       'civil_society.active_charities_per_10k', "
+                    "       :period, c.cnt::numeric / p.pop * 10000.0, "
+                    "       :sid, :now, '[]'::jsonb "
+                    "FROM counts c "
+                    "INNER JOIN populations p ON p.place_id = c.place_id "
+                    "WHERE p.pop > 0 "
+                    "ON CONFLICT (place_id, indicator_key, period) "
+                    "DO UPDATE SET value = EXCLUDED.value, "
+                    "              retrieved_at = EXCLUDED.retrieved_at, "
+                    "              source_id = EXCLUDED.source_id"
+                ),
+                {
+                    "sid": self.source_id,
+                    "ts": threshold,
+                    "period": period,
+                    "now": retrieved_at,
+                },
+            )
+            # Count places we have a charity-count for but no per_10k —
+            # those are the missing-population places.
+            missing_pop_row = (
+                await conn.execute(
+                    text(
+                        "SELECT COUNT(*) AS n FROM ("
+                        "  SELECT registered_address_place_id AS place_id "
+                        "  FROM data.organisation "
+                        "  WHERE source_id = :sid "
+                        "    AND registered_address_place_id IS NOT NULL "
+                        "    AND retrieved_at >= :ts "
+                        "    AND raw->>'status' = 'Registered' "
+                        "  GROUP BY registered_address_place_id"
+                        ") c "
+                        "WHERE NOT EXISTS ("
+                        "  SELECT 1 FROM data.indicator_value iv "
+                        "  WHERE iv.place_id = c.place_id "
+                        "    AND iv.indicator_key = 'population.total'"
+                        ")"
+                    ),
+                    {"sid": self.source_id, "ts": threshold},
+                )
+            ).first()
+        missing_pop = int(missing_pop_row.n) if missing_pop_row else 0
+        if missing_pop:
+            return f"{missing_pop} LTLAs without population.total — per_10k skipped"
+        return None
 
     @staticmethod
     def _build_org_rows(
