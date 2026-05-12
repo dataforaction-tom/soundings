@@ -60,6 +60,15 @@ def tool_spec() -> dict[str, object]:
 async def compare_places(
     input: ComparePlacesInput, orchestrator: "IndicatorOrchestrator"
 ) -> ComparePlacesOutput:
-    # Phase 3 Task 27 ships the schema; Task 28 wires
-    # `orchestrator.compare_places` and replaces this body.
-    raise NotImplementedError("compare_places orchestrator path wired in Phase 3 Task 28")
+    result = await orchestrator.compare_places(
+        place_ids=input.place_ids,
+        indicators=input.indicators,
+        basis=input.comparison_basis,
+        period=input.period,
+    )
+    return ComparePlacesOutput(
+        results=result.comparisons,
+        sources=result.sources,
+        caveats=result.caveats,
+        partial=result.partial,
+    )
