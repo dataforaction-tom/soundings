@@ -10,11 +10,13 @@ the batching + caching + LTLA extraction.
 """
 
 import json
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
 import pytest
+import pytest_asyncio
 from sqlalchemy import text
 
 from soundings.adapters.charity_commission.mapping import resolve_postcodes_to_ltlas
@@ -22,6 +24,14 @@ from soundings.adapters.postcodes_io.adapter import PostcodesIoAdapter
 from soundings.db.engine import get_engine
 
 pytestmark = pytest.mark.integration
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def _cleanup_postcode_state() -> AsyncIterator[None]:
+    yield
+    engine = get_engine()
+    async with engine.begin() as conn:
+        await conn.execute(text("DELETE FROM geography.postcode"))
 
 
 def _bulk_payload(rows: list[tuple[str, str | None]]) -> dict[str, Any]:
