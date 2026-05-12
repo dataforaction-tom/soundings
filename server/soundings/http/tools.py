@@ -7,6 +7,12 @@ implementations are also registered with the MCP server at `/mcp`.
 
 from fastapi import APIRouter, Request
 
+from soundings.tools.compare_places import (
+    ComparePlacesInput,
+    ComparePlacesOutput,
+    compare_places,
+)
+from soundings.tools.compare_places import tool_spec as compare_places_spec
 from soundings.tools.find_place import (
     FindPlaceInput,
     FindPlaceOutput,
@@ -36,6 +42,7 @@ async def list_tools() -> dict[str, list[dict[str, object]]]:
             find_place_spec(),
             get_indicators_spec(),
             get_place_profile_spec(),
+            compare_places_spec(),
         ]
     }
 
@@ -59,3 +66,8 @@ async def http_get_place_profile(
         request.app.state.orchestrator,
         request.app.state.engine,
     )
+
+
+@router.post("/compare_places", response_model=ComparePlacesOutput)
+async def http_compare_places(input: ComparePlacesInput, request: Request) -> ComparePlacesOutput:
+    return await compare_places(input, request.app.state.orchestrator)
