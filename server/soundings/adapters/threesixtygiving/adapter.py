@@ -251,6 +251,31 @@ class ThreeSixtyGivingAdapter(PassthroughAdapter):
         del client, cache_key
         raise NotImplementedError("ThreeSixtyGivingAdapter routes via fetch_indicator override")
 
+    # ----- pre_warmer hook ------------------------------------------------
+
+    async def pre_warm_for_places(self, place_ids: list[str]) -> None:
+        """Walk every supplied LTLA, fan out + populate
+        `360g:place_grants:{place_id}` + the underlying per-org caches.
+        Driven by the `pre_warmer` daemon (Block 0) on the source's
+        `refresh_cadence` cron — weekly per sources.yaml.
+
+        Pre-warming at the per-place level means user-facing
+        `fetch_indicator` calls always hit a warm cache for the LTLA
+        universe we know about. Cold misses only happen for newly-
+        added LTLAs between warmer runs.
+        """
+        import logging
+
+        log = logging.getLogger(__name__)
+        for place_id in place_ids:
+            try:
+                await self._fetch_grants_for_place(place_id)
+            except Exception:
+                # Best-effort — `safe_pre_warm` wraps the outer call,
+                # but log per-place failures here so one bad LTLA
+                # doesn't blank the rest of the warm pass.
+                log.exception("360G pre_warm failed for place_id=%s", place_id)
+
 
 # --- helpers ----------------------------------------------------------------
 
