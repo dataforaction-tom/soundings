@@ -15,6 +15,7 @@ from soundings.tools.compare_places import ComparePlacesInput, compare_places
 from soundings.tools.find_place import FindPlaceInput, find_place
 from soundings.tools.get_indicators import GetIndicatorsInput, get_indicators
 from soundings.tools.get_place_profile import GetPlaceProfileInput, get_place_profile
+from soundings.tools.get_trend import GetTrendInput, get_trend
 
 _MCP_SERVER: FastMCP | None = None
 
@@ -89,6 +90,26 @@ def build_mcp_server(state: Any | None = None) -> FastMCP:
                 indicators=indicators,
                 comparison_basis=comparison_basis,
                 period=period,
+            ),
+            state.orchestrator,
+        )
+        return result.model_dump(mode="json")
+
+    @mcp.tool(name="get_trend")
+    async def _get_trend(
+        place_id: str,
+        indicator: str,
+        period_from: str | None = None,
+        period_to: str | None = None,
+    ) -> dict[str, Any]:
+        if state is None:
+            raise RuntimeError("MCP get_trend invoked without app state")
+        result = await get_trend(
+            GetTrendInput(
+                place_id=place_id,
+                indicator=indicator,
+                period_from=period_from,
+                period_to=period_to,
             ),
             state.orchestrator,
         )

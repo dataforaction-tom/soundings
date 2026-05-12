@@ -101,7 +101,13 @@ async def test_get_v1_tools_lists_specs() -> None:
     assert response.status_code == 200
     body = response.json()
     names = {t["name"] for t in body["tools"]}
-    assert names == {"find_place", "get_indicators", "get_place_profile", "compare_places"}
+    assert names == {
+        "find_place",
+        "get_indicators",
+        "get_place_profile",
+        "compare_places",
+        "get_trend",
+    }
 
 
 async def test_post_tool_validates_input() -> None:
