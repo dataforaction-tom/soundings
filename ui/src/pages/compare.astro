@@ -1,0 +1,158 @@
+---
+import Base from "../layouts/Base.astro";
+import CompareChart from "../components/CompareChart.astro";
+import SourceCitations from "../components/SourceCitations.astro";
+import DataPanel from "../components/DataPanel.astro";
+import { comparePlaces } from "../lib/api";
+import type { ComparePlacesResponse, ComparisonBasis, SourceRef } from "../lib/types";
+
+export const prerender = false;
+
+const url = new URL(Astro.request.url);
+const placesParam = (url.searchParams.get("places") ?? "").trim();
+const indicatorsParam = (url.searchParams.get("indicators") ?? "").trim();
+const basisParam = url.searchParams.get("basis");
+const cookieHeader = Astro.request.headers.get("cookie") ?? undefined;
+
+function splitCsv(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+const placeIds = splitCsv(placesParam);
+const indicators = splitCsv(indicatorsParam);
+const basis: ComparisonBasis =
+  basisParam === "rank" || basisParam === "absolute" || basisParam === "rate"
+    ? basisParam
+    : "percentile";
+
+let response: ComparePlacesResponse | null = null;
+let error: string | null = null;
+const ready = placeIds.length > 0 && indicators.length > 0;
+
+if (ready) {
+  try {
+    response = await comparePlaces(placeIds, indicators, {
+      basis,
+      cookieHeader,
+    });
+  } catch (err) {
+    error = err instanceof Error ? err.message : String(err);
+  }
+}
+
+const sources: SourceRef[] = response
+  ? response.results.map((c) => c.source)
+  : [];
+---
+
+<Base title="Compare places">
+  <header class="compare-header">
+    <h2>Compare places</h2>
+    <p>
+      Query: <code>?places=ltla24:E06000004,ltla24:E08000001&amp;indicators=population.total,deprivation.imd.score</code>
+    </p>
+  </header>
+
+  <form method="get" action="/compare" class="compare-form">
+    <label>
+      <span>Places (comma-separated IDs)</span>
+      <input type="text" name="places" value={placesParam} required />
+    </label>
+    <label>
+      <span>Indicators (comma-separated keys)</span>
+      <input type="text" name="indicators" value={indicatorsParam} required />
+    </label>
+    <label>
+      <span>Basis</span>
+      <select name="basis">
+        <option value="percentile" selected={basis === "percentile"}>percentile</option>
+        <option value="rank" selected={basis === "rank"}>rank</option>
+        <option value="absolute" selected={basis === "absolute"}>absolute</option>
+        <option value="rate" selected={basis === "rate"}>rate</option>
+      </select>
+    </label>
+    <button type="submit">Compare</button>
+  </form>
+
+  {!ready && (
+    <p class="hint">
+      Add at least one place and one indicator to the URL or the form above.
+    </p>
+  )}
+
+  {error && (
+    <p class="error">Sorry — compare_places failed: {error}</p>
+  )}
+
+  {response && response.results.length === 0 && (
+    <p>No comparisons returned for the supplied places + indicators.</p>
+  )}
+
+  {response && response.results.map((comparison) => (
+    <CompareChart comparison={comparison} />
+  ))}
+
+  {response && response.caveats && response.caveats.length > 0 && (
+    <section class="caveats">
+      <h3>Caveats</h3>
+      <ul>
+        {response.caveats.map((c) => <li>{c}</li>)}
+      </ul>
+    </section>
+  )}
+
+  {response && (
+    <>
+      <SourceCitations sources={sources} />
+      <DataPanel
+        toolName="compare_places"
+        request={{ place_ids: placeIds, indicators, comparison_basis: basis }}
+        response={response}
+      />
+    </>
+  )}
+
+  <style>
+    .compare-header h2 {
+      margin-bottom: 0.25rem;
+    }
+    .compare-header code {
+      font-size: 0.8125rem;
+    }
+    .compare-form {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem 1rem;
+      align-items: end;
+      margin: 1rem 0;
+    }
+    .compare-form span {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+    .compare-form input,
+    .compare-form select {
+      width: 100%;
+      padding: 0.4rem;
+      font-size: 0.9375rem;
+    }
+    .compare-form button {
+      grid-column: 1 / -1;
+      justify-self: start;
+    }
+    .error {
+      color: #a00;
+    }
+    .hint {
+      color: #666;
+    }
+    .caveats {
+      margin-top: 1rem;
+      font-size: 0.875rem;
+    }
+  </style>
+</Base>
