@@ -157,32 +157,28 @@ mappings:
 
   - indicator_key: economy.employment_rate
     source_id: ons.aps
-    dataset_id: NM_17_5           # APS - regional summary (unverified)
-    measures: "20100"
+    dataset_id: NM_17_5           # APS - variables (percentages)
+    measures: "20599"             # Variable (the rate value itself)
     geography_type_codes:
       ltla24: TYPE424
       utla24: TYPE423
       region: TYPE480
       country: TYPE499
     extra_params:
-      variable: "45"              # T08 economic activity - in employment
-      sex: "7"                    # Total
-      age: "8"                    # 16-64
+      variable: "45"              # Employment rate - aged 16-64
     value_scale: 0.01
 
   - indicator_key: economy.unemployment_rate
     source_id: ons.aps
     dataset_id: NM_17_5
-    measures: "20100"
+    measures: "20599"
     geography_type_codes:
       ltla24: TYPE424
       utla24: TYPE423
       region: TYPE480
       country: TYPE499
     extra_params:
-      variable: "84"              # ILO unemployment rate (unverified)
-      sex: "7"
-      age: "0"
+      variable: "84"              # Unemployment rate - aged 16-64
     value_scale: 0.01
 
   - indicator_key: economy.median_pay_resident
