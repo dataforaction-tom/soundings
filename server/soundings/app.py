@@ -11,6 +11,7 @@ from soundings.adapters.dfe_explore.adapter import DfeExploreAdapter
 from soundings.adapters.dwp_statxplore.adapter import DwpStatXploreAdapter
 from soundings.adapters.mhclg_imd2025.adapter import MhclgImd2019Adapter, MhclgImd2025Adapter
 from soundings.adapters.ohid_fingertips.adapter import OhidFingertipsAdapter
+from soundings.adapters.ons_aps.adapter import OnsApsAdapter
 from soundings.adapters.ons_census2021.adapter import OnsCensus2021Adapter
 from soundings.adapters.ons_mid_year_estimates.adapter import OnsMidYearEstimatesAdapter
 from soundings.adapters.police_uk.adapter import PoliceUkAdapter
@@ -60,6 +61,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     registry.register("dwp.statxplore", DwpStatXploreAdapter)
     registry.register("dfe.explore", DfeExploreAdapter)
     registry.register("police_uk", PoliceUkAdapter)
+    registry.register("ons.aps", OnsApsAdapter)
 
     postcodes_io = PostcodesIoAdapter(engine, ttl=POSTCODES_IO_TTL)
 
