@@ -6,7 +6,7 @@ import "./dom-polyfill";
 
 import * as Plot from "@observablehq/plot";
 
-import type { Comparison, ComparisonValue, TrendPoint } from "./types";
+import type { Comparison, ComparisonBasis, ComparisonValue, TrendPoint } from "./types";
 
 interface SparklineOptions {
   width?: number;
@@ -38,9 +38,10 @@ function toChartPoints(points: TrendPoint[]): ChartPoint[] {
 interface CompareBarsOptions {
   width?: number;
   height?: number;
+  basis?: ComparisonBasis;
 }
 
-const COMPARE_DEFAULTS: Required<CompareBarsOptions> = {
+const COMPARE_DEFAULTS: Required<Pick<CompareBarsOptions, "width" | "height">> = {
   width: 480,
   height: 200,
 };
@@ -48,23 +49,44 @@ const COMPARE_DEFAULTS: Required<CompareBarsOptions> = {
 interface BarPoint {
   place_id: string;
   value: number;
-  percentile: number | null;
   label: string;
 }
 
-function toBarPoints(values: ComparisonValue[]): BarPoint[] {
+function formatShort(value: number): string {
+  // Compact human-readable label: 196k, 1.5M, 0.14, 12.5
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (abs >= 10_000) return `${Math.round(value / 1000)}k`;
+  if (abs >= 1000) return `${(value / 1000).toFixed(1)}k`;
+  if (abs >= 10) return Math.round(value).toString();
+  if (abs >= 1) return value.toFixed(1);
+  return value.toFixed(3);
+}
+
+function makeBasisLabel(v: ComparisonValue, basis: ComparisonBasis): string {
+  switch (basis) {
+    case "rank":
+      return v.rank != null ? `#${v.rank}` : "";
+    case "absolute":
+      return v.value != null ? formatShort(v.value) : "";
+    case "rate":
+      return v.value != null ? `${formatShort(v.value)}/1k` : "";
+    case "percentile":
+    default:
+      return v.percentile != null ? `p${Math.round(v.percentile)}` : "";
+  }
+}
+
+function toBarPoints(values: ComparisonValue[], basis: ComparisonBasis): BarPoint[] {
   const out: BarPoint[] = [];
   for (const v of values) {
     if (v.value === null || v.value === undefined) {
       continue;
     }
-    const pct = v.percentile ?? null;
-    const label = pct !== null ? `p${Math.round(pct)}` : "";
     out.push({
       place_id: v.place_id,
       value: v.value,
-      percentile: pct,
-      label,
+      label: makeBasisLabel(v, basis),
     });
   }
   return out;
@@ -74,11 +96,12 @@ export function renderCompareBars(
   comparison: Comparison,
   opts: CompareBarsOptions = {},
 ): string {
-  const bars = toBarPoints(comparison.values);
+  const basis = opts.basis ?? "percentile";
+  const bars = toBarPoints(comparison.values, basis);
   if (bars.length === 0) {
     return "";
   }
-  const { width, height } = { ...COMPARE_DEFAULTS, ...opts };
+  const { width, height } = { ...COMPARE_DEFAULTS, width: opts.width ?? COMPARE_DEFAULTS.width, height: opts.height ?? COMPARE_DEFAULTS.height };
   const node = Plot.plot({
     width,
     height,

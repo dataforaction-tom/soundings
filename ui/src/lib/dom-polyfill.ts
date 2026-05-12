@@ -12,6 +12,7 @@
 import { parseHTML } from "linkedom";
 
 interface PolyfillGlobals {
+  window?: unknown;
   document?: unknown;
   DocumentFragment?: unknown;
   HTMLElement?: unknown;
@@ -26,6 +27,12 @@ const target = globalThis as PolyfillGlobals;
 
 if (target.document === undefined) {
   const dom = parseHTML("<!doctype html><html><body></body></html>");
+  // `window` must be set too: `@observablehq/plot`'s createContext defaults
+  // its `document` parameter via `typeof window !== "undefined" ? window.document : undefined`
+  // — without a window the document fallback evaluates to undefined and
+  // Plot.plot() crashes with "Cannot read properties of undefined (reading
+  // 'documentElement')".
+  target.window = dom.window ?? dom;
   target.document = dom.document;
   target.DocumentFragment = dom.DocumentFragment;
   target.HTMLElement = dom.HTMLElement;

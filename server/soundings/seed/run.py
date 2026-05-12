@@ -52,8 +52,9 @@ async def _run_loader(
     async with engine.begin() as conn:
         await conn.execute(
             text(
-                "INSERT INTO data.loader_run (id, source_id, started_at, status) "
-                "VALUES (:id, :sid, :st, 'running')"
+                "INSERT INTO data.loader_run "
+                "(id, source_id, started_at, status, rows_written) "
+                "VALUES (:id, :sid, :st, 'running', 0)"
             ),
             {"id": run_id, "sid": source_id, "st": started},
         )

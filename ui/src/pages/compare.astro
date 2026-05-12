@@ -92,7 +92,7 @@ const sources: SourceRef[] = response
   )}
 
   {response && response.results.map((comparison) => (
-    <CompareChart comparison={comparison} />
+    <CompareChart comparison={comparison} basis={basis} />
   ))}
 
   {response && response.caveats && response.caveats.length > 0 && (
