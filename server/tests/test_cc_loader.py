@@ -78,11 +78,14 @@ async def _seed_baseline() -> None:
             )
         # Pre-seed postcode → LTLA so the loader doesn't need to hit
         # postcodes.io in unit tests. Real loads use the bulk_upsert path.
+        # NULL ltla24 for ZZ99 9ZZ — represents a known-unresolvable
+        # postcode the resolver can short-circuit without an API call.
         for postcode, ltla_code in [
             ("TS181AB", "E06000004"),
             ("TS261AB", "E06000001"),
             ("TS11AB", "E06000002"),
             ("OX42JY", "E06000004"),
+            ("ZZ999ZZ", None),
         ]:
             await conn.execute(
                 text(
@@ -91,7 +94,7 @@ async def _seed_baseline() -> None:
                 ),
                 {
                     "p": postcode,
-                    "ltla": f"ltla24:{ltla_code}",
+                    "ltla": f"ltla24:{ltla_code}" if ltla_code else None,
                     "ret": datetime.now(tz=UTC),
                 },
             )
