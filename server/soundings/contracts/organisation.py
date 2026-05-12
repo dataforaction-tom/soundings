@@ -1,0 +1,32 @@
+"""OrganisationRef + GrantRef — civil-society response shapes.
+
+Per spec §4.6. Returned by `find_organisations_in_place` and, by
+extension, every passthrough adapter that overrides
+`fetch_organisations` (CC, FTC in Phase 4; org self-registration in
+v2). `recent_grants` is enriched by the 360Giving adapter, but
+remains optional so adapters that don't carry grants leave it empty.
+"""
+
+from pydantic import BaseModel, Field
+
+from soundings.contracts.source_ref import SourceRef
+
+
+class GrantRef(BaseModel):
+    funder: str
+    amount: float
+    currency: str = "GBP"
+    date: str  # ISO date string from the upstream record
+    purpose: str | None = None
+    source: SourceRef
+
+
+class OrganisationRef(BaseModel):
+    id: str  # `{regulator}:{registration_number}` namespacing
+    name: str
+    classification: list[str] = Field(default_factory=list)
+    registered_address_place_id: str | None = None
+    operates_in_place_ids: list[str] = Field(default_factory=list)
+    recent_grants: list[GrantRef] = Field(default_factory=list)
+    source: SourceRef
+    methodology_note: str | None = None
