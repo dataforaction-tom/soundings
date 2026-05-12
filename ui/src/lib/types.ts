@@ -66,6 +66,58 @@ export interface PlaceProfile {
   indicators: IndicatorValue[];
 }
 
+// compare_places (spec §4.4 / Phase 3 Block G) ------------------------------
+
+export type ComparisonBasis = "percentile" | "rank" | "absolute" | "rate";
+
+export interface ComparisonValue {
+  place_id: string;
+  value: number | null;
+  rank?: number | null;
+  percentile?: number | null;
+}
+
+export interface Comparison {
+  indicator: string;
+  unit: string;
+  period: string;
+  values: ComparisonValue[];
+  source: SourceRef;
+  methodology_note?: string | null;
+  caveats: string[];
+}
+
+export interface ComparePlacesResponse {
+  results: Comparison[];
+  sources?: SourceRef[];
+  caveats?: string[];
+  partial?: boolean;
+}
+
+// get_trend (spec §4.5 / Phase 3 Block H) -----------------------------------
+
+export interface TrendPoint {
+  period: string;
+  value: number | null;
+  revised?: boolean;
+}
+
+export interface Trend {
+  place_id: string;
+  indicator: string;
+  unit: string;
+  points: TrendPoint[];
+  source: SourceRef;
+  breaks_in_series?: string[];
+}
+
+export interface GetTrendResponse {
+  trend: Trend | null;
+  sources?: SourceRef[];
+  caveats?: string[];
+  partial?: boolean;
+}
+
 export interface ConsentResponse {
   session_id: string;
   consent_level: ConsentLevel;

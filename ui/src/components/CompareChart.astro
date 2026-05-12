@@ -1,0 +1,75 @@
+---
+import "../lib/dom-polyfill";
+import { renderCompareBars } from "../lib/chart";
+import { prettyKey } from "../lib/indicator_display";
+import type { Comparison } from "../lib/types";
+
+interface Props {
+  comparison: Comparison;
+}
+
+const { comparison } = Astro.props;
+const svg = renderCompareBars(comparison);
+---
+
+<section class="compare-chart">
+  <header>
+    <h3>{prettyKey(comparison.indicator)}</h3>
+    <p class="meta">
+      {comparison.period}
+      <span aria-hidden="true"> · </span>
+      <span class="unit">{comparison.unit}</span>
+      <span aria-hidden="true"> · </span>
+      <a href={comparison.source.dataset_url || comparison.source.publisher_url || "#"}>
+        {comparison.source.source_label}
+      </a>
+    </p>
+  </header>
+  {svg ? (
+    <div class="chart" set:html={svg} />
+  ) : (
+    <p class="no-data">No values returned for the selected places.</p>
+  )}
+  {comparison.caveats.length > 0 && (
+    <ul class="caveats">
+      {comparison.caveats.map((c) => <li>{c}</li>)}
+    </ul>
+  )}
+</section>
+
+<style>
+  .compare-chart {
+    margin: 1.5rem 0;
+    padding: 1rem;
+    border: 1px solid #e6e6e6;
+    border-radius: 6px;
+    background: #fff;
+  }
+  .compare-chart header {
+    margin-bottom: 0.5rem;
+  }
+  .compare-chart h3 {
+    margin: 0;
+    text-transform: capitalize;
+    font-size: 1.0625rem;
+  }
+  .compare-chart .meta {
+    margin: 0.125rem 0 0;
+    color: #666;
+    font-size: 0.8125rem;
+  }
+  .compare-chart .chart svg {
+    width: 100%;
+    height: auto;
+  }
+  .compare-chart .no-data {
+    color: #888;
+    font-style: italic;
+  }
+  .compare-chart .caveats {
+    font-size: 0.8125rem;
+    color: #555;
+    margin: 0.5rem 0 0;
+    padding-left: 1rem;
+  }
+</style>

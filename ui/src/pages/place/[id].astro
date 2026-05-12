@@ -3,9 +3,14 @@ import Base from "../../layouts/Base.astro";
 import DomainSection from "../../components/DomainSection.astro";
 import SourceCitations from "../../components/SourceCitations.astro";
 import DataPanel from "../../components/DataPanel.astro";
-import { getPlaceProfile } from "../../lib/api";
+import { getPlaceProfile, getTrend } from "../../lib/api";
 import { domainOf } from "../../lib/indicator_display";
-import type { IndicatorValue, PlaceProfile, SourceRef } from "../../lib/types";
+import type {
+  IndicatorValue,
+  PlaceProfile,
+  SourceRef,
+  TrendPoint,
+} from "../../lib/types";
 
 export const prerender = false;
 
@@ -35,7 +40,37 @@ function groupByDomain(rows: IndicatorValue[]): Map<string, IndicatorValue[]> {
   return out;
 }
 
+// Fan out trend requests for every indicator on the profile in parallel.
+// The server returns `trend: null` cheaply when no series is available
+// (loader-mode indicators with empty data.trend_point, passthrough
+// indicators without a series), so a redundant request isn't expensive.
+async function loadTrends(
+  placeId: string,
+  rows: IndicatorValue[],
+  cookieHeader: string | undefined,
+): Promise<Map<string, TrendPoint[]>> {
+  const out = new Map<string, TrendPoint[]>();
+  const settled = await Promise.allSettled(
+    rows.map((row) =>
+      getTrend(placeId, row.indicator, { cookieHeader }).then((response) => ({
+        indicator: row.indicator,
+        trend: response.trend,
+      })),
+    ),
+  );
+  for (const result of settled) {
+    if (result.status !== "fulfilled" || result.value.trend === null) {
+      continue;
+    }
+    out.set(result.value.indicator, result.value.trend.points);
+  }
+  return out;
+}
+
 const grouped = profile ? groupByDomain(profile.indicators) : new Map();
+const trendsByIndicator: Map<string, TrendPoint[]> = profile
+  ? await loadTrends(profile.place.id, profile.indicators, cookieHeader)
+  : new Map();
 const sources: SourceRef[] = profile
   ? profile.indicators.map((row) => row.source)
   : [];
@@ -57,7 +92,11 @@ const sources: SourceRef[] = profile
         <p>No indicators available for this place yet.</p>
       ) : (
         [...grouped.entries()].map(([domain, indicators]) => (
-          <DomainSection title={domain} indicators={indicators} />
+          <DomainSection
+            title={domain}
+            indicators={indicators}
+            trends={trendsByIndicator}
+          />
         ))
       )}
 

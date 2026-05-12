@@ -1,20 +1,26 @@
 ---
 import IndicatorCard from "./IndicatorCard.astro";
-import type { IndicatorValue } from "../lib/types";
+import type { IndicatorValue, TrendPoint } from "../lib/types";
 
 interface Props {
   title: string;
   indicators: IndicatorValue[];
+  trends?: Map<string, TrendPoint[]>;
 }
 
-const { title, indicators } = Astro.props;
+const { title, indicators, trends } = Astro.props;
 ---
 
 {indicators.length > 0 && (
   <section class="domain-section">
     <h3>{title}</h3>
     <div class="domain-grid">
-      {indicators.map((ind) => <IndicatorCard indicator={ind} />)}
+      {indicators.map((ind) => (
+        <IndicatorCard
+          indicator={ind}
+          trend={trends?.get(ind.indicator)}
+        />
+      ))}
     </div>
   </section>
 )}

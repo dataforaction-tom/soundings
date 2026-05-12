@@ -1,0 +1,36 @@
+---
+import "../lib/dom-polyfill";
+import { renderSparkline } from "../lib/chart";
+import type { TrendPoint } from "../lib/types";
+
+interface Props {
+  points: TrendPoint[];
+  caption?: string;
+}
+
+const { points, caption } = Astro.props;
+const svg = renderSparkline(points);
+---
+
+{svg && (
+  <figure class="indicator-chart">
+    <div class="chart" set:html={svg} aria-hidden="true" />
+    {caption && <figcaption>{caption}</figcaption>}
+  </figure>
+)}
+
+<style>
+  .indicator-chart {
+    margin: 0.5rem 0 0;
+    color: #2a5bd7;
+  }
+  .indicator-chart .chart svg {
+    width: 100%;
+    height: auto;
+  }
+  .indicator-chart figcaption {
+    font-size: 0.75rem;
+    color: #666;
+    margin-top: 0.125rem;
+  }
+</style>
