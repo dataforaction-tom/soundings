@@ -13,6 +13,7 @@ from soundings.adapters.mhclg_imd2025.adapter import MhclgImd2019Adapter, MhclgI
 from soundings.adapters.ohid_fingertips.adapter import OhidFingertipsAdapter
 from soundings.adapters.ons_census2021.adapter import OnsCensus2021Adapter
 from soundings.adapters.ons_mid_year_estimates.adapter import OnsMidYearEstimatesAdapter
+from soundings.adapters.police_uk.adapter import PoliceUkAdapter
 from soundings.adapters.postcodes_io.adapter import PostcodesIoAdapter
 from soundings.alerts import send_alert
 from soundings.capture.middleware import CaptureMiddleware
@@ -58,6 +59,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     registry.register("ohid.fingertips", OhidFingertipsAdapter)
     registry.register("dwp.statxplore", DwpStatXploreAdapter)
     registry.register("dfe.explore", DfeExploreAdapter)
+    registry.register("police_uk", PoliceUkAdapter)
 
     postcodes_io = PostcodesIoAdapter(engine, ttl=POSTCODES_IO_TTL)
 
