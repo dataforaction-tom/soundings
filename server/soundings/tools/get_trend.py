@@ -55,6 +55,15 @@ def tool_spec() -> dict[str, object]:
 
 
 async def get_trend(input: GetTrendInput, orchestrator: "IndicatorOrchestrator") -> GetTrendOutput:
-    # Phase 3 Task 32 ships the schema; Task 33 wires
-    # `orchestrator.get_trend` and replaces this body.
-    raise NotImplementedError("get_trend orchestrator path wired in Phase 3 Task 33")
+    result = await orchestrator.get_trend(
+        indicator_key=input.indicator,
+        place_id=input.place_id,
+        period_from=input.period_from,
+        period_to=input.period_to,
+    )
+    return GetTrendOutput(
+        trend=result.trend,
+        sources=result.sources,
+        caveats=result.caveats,
+        partial=result.partial,
+    )

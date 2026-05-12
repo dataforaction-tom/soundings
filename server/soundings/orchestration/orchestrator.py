@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from soundings.contracts.comparison import Comparison, ComparisonValue
 from soundings.contracts.indicator_value import IndicatorValue
 from soundings.contracts.source_ref import SourceRef
+from soundings.contracts.trend import Trend, TrendPoint
 from soundings.orchestration.errors import (
     IndicatorNotAvailableAtLevelError,
     IndicatorNotRegisteredError,
@@ -50,6 +51,17 @@ class CompareResult:
     sources: list[SourceRef] = field(default_factory=list)
     caveats: list[str] = field(default_factory=list)
     partial: bool = False
+
+
+@dataclass
+class GetTrendResult:
+    trend: Trend | None
+    sources: list[SourceRef] = field(default_factory=list)
+    caveats: list[str] = field(default_factory=list)
+    partial: bool = False
+
+
+SERIES_BREAK_PREFIX = "series_break:"
 
 
 class IndicatorOrchestrator:
@@ -393,6 +405,141 @@ class IndicatorOrchestrator:
         if row is None:
             return None
         return {"unit": row.unit}
+
+    # ----- get_trend (Phase 3 Block H) -----
+
+    async def get_trend(
+        self,
+        *,
+        indicator_key: str,
+        place_id: str,
+        period_from: str | None = None,
+        period_to: str | None = None,
+    ) -> GetTrendResult:
+        try:
+            await self._enforce_level(indicator_key, place_id)
+        except IndicatorNotAvailableAtLevelError as e:
+            return GetTrendResult(
+                trend=None,
+                sources=[],
+                caveats=[f"INDICATOR_NOT_AVAILABLE_AT_LEVEL: {e}"],
+                partial=True,
+            )
+        try:
+            adapter = await self._registry.adapter_for_indicator(indicator_key)
+        except IndicatorNotRegisteredError as e:
+            return GetTrendResult(
+                trend=None, sources=[], caveats=[f"{indicator_key}: {e}"], partial=True
+            )
+
+        mode = getattr(adapter, "mode", "loader")
+        if mode == "loader":
+            trend = await self._loader_trend(
+                adapter=adapter,
+                indicator_key=indicator_key,
+                place_id=place_id,
+                period_from=period_from,
+                period_to=period_to,
+            )
+        else:
+            trend = await adapter.fetch_trend(indicator_key, place_id, period_from, period_to)
+
+        if trend is None:
+            return GetTrendResult(
+                trend=None,
+                sources=[],
+                caveats=[f"No trend for indicator {indicator_key} at {place_id}"],
+                partial=True,
+            )
+
+        catalogue_caveats = await self._load_indicator_caveats(indicator_key)
+        general, breaks = _split_series_breaks(catalogue_caveats)
+        trend.breaks_in_series = breaks
+        return GetTrendResult(
+            trend=trend,
+            sources=[trend.source],
+            caveats=[f"{indicator_key}: {c}" for c in general] if general else [],
+            partial=False,
+        )
+
+    async def _loader_trend(
+        self,
+        *,
+        adapter: Any,
+        indicator_key: str,
+        place_id: str,
+        period_from: str | None,
+        period_to: str | None,
+    ) -> Trend | None:
+        async with self._engine.connect() as conn:
+            rows = (
+                await conn.execute(
+                    text(
+                        "SELECT period, value, revised FROM data.trend_point "
+                        "WHERE place_id = :pid AND indicator_key = :ik "
+                        "AND (CAST(:pf AS text) IS NULL OR period >= :pf) "
+                        "AND (CAST(:pt AS text) IS NULL OR period <= :pt) "
+                        "ORDER BY period"
+                    ),
+                    {
+                        "pid": place_id,
+                        "ik": indicator_key,
+                        "pf": period_from,
+                        "pt": period_to,
+                    },
+                )
+            ).all()
+        if not rows:
+            return None
+        points = [
+            TrendPoint(
+                period=r.period,
+                value=float(r.value) if r.value is not None else None,
+                revised=bool(r.revised),
+            )
+            for r in rows
+        ]
+        meta = await self._load_indicator_meta(indicator_key)
+        source_ref = adapter.get_source_ref(
+            retrieved_at=datetime.now(tz=UTC), cache_status="cached"
+        )
+        return Trend(
+            place_id=place_id,
+            indicator=indicator_key,
+            unit=meta["unit"] if meta else "value",
+            points=points,
+            source=source_ref,
+        )
+
+    async def _load_indicator_caveats(self, indicator_key: str) -> list[str]:
+        async with self._engine.connect() as conn:
+            row = (
+                await conn.execute(
+                    text("SELECT caveats FROM catalogue.indicator WHERE key = :k"),
+                    {"k": indicator_key},
+                )
+            ).first()
+        if row is None:
+            return []
+        raw = row.caveats or []
+        return [str(c) for c in raw]
+
+
+def _split_series_breaks(caveats: list[str]) -> tuple[list[str], list[str]]:
+    """Partition catalogue caveats into (general, series-breaks).
+
+    Series-break caveats use the `series_break:` prefix (Phase 3 plan Task 2
+    convention). The prefix is stripped from the breaks list since it's
+    structural — consumers want the human-readable note.
+    """
+    general: list[str] = []
+    breaks: list[str] = []
+    for raw in caveats:
+        if raw.startswith(SERIES_BREAK_PREFIX):
+            breaks.append(raw[len(SERIES_BREAK_PREFIX) :].strip())
+        else:
+            general.append(raw)
+    return general, breaks
 
 
 def _ranks_descending(peer_values: dict[str, float | None]) -> dict[str, int]:
