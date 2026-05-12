@@ -6,11 +6,14 @@
 // consent cookies round-trip on UI ↔ API calls.
 
 import type {
+  ComparePlacesResponse,
+  ComparisonBasis,
   ConsentLevel,
   ConsentResponse,
   FeedbackResponse,
   FindPlaceResponse,
   GetIndicatorsResponse,
+  GetTrendResponse,
   PlaceProfile,
 } from "./types";
 
@@ -88,6 +91,54 @@ export async function getIndicators(
     { place_id: placeId, indicators },
     opts,
   );
+}
+
+export async function comparePlaces(
+  placeIds: string[],
+  indicators: string[],
+  opts: {
+    basis?: ComparisonBasis;
+    period?: string | null;
+    cookieHeader?: string;
+  } = {},
+): Promise<ComparePlacesResponse> {
+  const body: Record<string, unknown> = {
+    place_ids: placeIds,
+    indicators,
+  };
+  if (opts.basis !== undefined) {
+    body.comparison_basis = opts.basis;
+  }
+  if (opts.period !== undefined && opts.period !== null) {
+    body.period = opts.period;
+  }
+  return postJSON<ComparePlacesResponse>("/v1/tools/compare_places", body, {
+    cookieHeader: opts.cookieHeader,
+  });
+}
+
+export async function getTrend(
+  placeId: string,
+  indicator: string,
+  opts: {
+    periodFrom?: string | null;
+    periodTo?: string | null;
+    cookieHeader?: string;
+  } = {},
+): Promise<GetTrendResponse> {
+  const body: Record<string, unknown> = {
+    place_id: placeId,
+    indicator,
+  };
+  if (opts.periodFrom) {
+    body.period_from = opts.periodFrom;
+  }
+  if (opts.periodTo) {
+    body.period_to = opts.periodTo;
+  }
+  return postJSON<GetTrendResponse>("/v1/tools/get_trend", body, {
+    cookieHeader: opts.cookieHeader,
+  });
 }
 
 export async function postConsent(

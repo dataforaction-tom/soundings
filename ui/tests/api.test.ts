@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   apiBase,
+  comparePlaces,
   findPlace,
   getPlaceProfile,
+  getTrend,
   postConsent,
   postFeedback,
 } from "../src/lib/api";
@@ -96,6 +98,59 @@ describe("postFeedback", () => {
     expect(JSON.parse(init.body as string)).toEqual({
       question_record_id: "00000000-0000-0000-0000-000000000000",
       marked_useful: true,
+    });
+  });
+});
+
+describe("comparePlaces", () => {
+  it("POSTs place_ids, indicators, and basis", async () => {
+    const spy = mockFetch({ results: [], sources: [] });
+    await comparePlaces(["ltla24:E06000004", "ltla24:E06000005"], ["population.total"], {
+      basis: "percentile",
+    });
+    const [url, init] = spy.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/v1/tools/compare_places");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({
+      place_ids: ["ltla24:E06000004", "ltla24:E06000005"],
+      indicators: ["population.total"],
+      comparison_basis: "percentile",
+    });
+  });
+
+  it("omits comparison_basis when not supplied", async () => {
+    const spy = mockFetch({ results: [] });
+    await comparePlaces(["ltla24:E06000004"], ["population.total"]);
+    const init = spy.mock.calls[0]?.[1] as RequestInit;
+    const parsed = JSON.parse(init.body as string) as Record<string, unknown>;
+    expect(parsed).not.toHaveProperty("comparison_basis");
+  });
+});
+
+describe("getTrend", () => {
+  it("POSTs place_id + indicator", async () => {
+    const spy = mockFetch({ trend: null });
+    await getTrend("ltla24:E06000004", "population.total");
+    const [url, init] = spy.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/v1/tools/get_trend");
+    expect(JSON.parse(init.body as string)).toEqual({
+      place_id: "ltla24:E06000004",
+      indicator: "population.total",
+    });
+  });
+
+  it("includes period_from / period_to when supplied", async () => {
+    const spy = mockFetch({ trend: null });
+    await getTrend("ltla24:E06000004", "population.total", {
+      periodFrom: "2022",
+      periodTo: "2024",
+    });
+    const init = spy.mock.calls[0]?.[1] as RequestInit;
+    expect(JSON.parse(init.body as string)).toEqual({
+      place_id: "ltla24:E06000004",
+      indicator: "population.total",
+      period_from: "2022",
+      period_to: "2024",
     });
   });
 });
