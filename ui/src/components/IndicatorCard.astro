@@ -1,12 +1,15 @@
 ---
-import type { IndicatorValue } from "../lib/types";
+import IndicatorChart from "./IndicatorChart.astro";
+import type { IndicatorValue, TrendPoint } from "../lib/types";
 import { formatValue, prettyKey } from "../lib/indicator_display";
 
 interface Props {
   indicator: IndicatorValue;
+  trend?: TrendPoint[];
 }
 
-const { indicator } = Astro.props;
+const { indicator, trend } = Astro.props;
+const hasTrend = trend !== undefined && trend.length >= 2;
 ---
 
 <article class="indicator-card">
@@ -23,6 +26,9 @@ const { indicator } = Astro.props;
   <p class="period">
     {indicator.period} · <span class="source-label">{indicator.source.source_label}</span>
   </p>
+  {hasTrend && (
+    <IndicatorChart points={trend!} />
+  )}
   {indicator.caveats.length > 0 && (
     <ul class="caveats">
       {indicator.caveats.map((c) => <li>{c}</li>)}
