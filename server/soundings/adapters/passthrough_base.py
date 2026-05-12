@@ -6,6 +6,7 @@ the fresh payload back into the cache. Subclasses implement `_call_upstream`
 and `_materialise`.
 """
 
+import logging
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -18,8 +19,11 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from soundings.adapters.source_ref_factory import SourceRefFactory
 from soundings.cache.source_cache import SourceCacheStore
 from soundings.contracts.indicator_value import IndicatorValue
+from soundings.contracts.organisation import OrganisationRef
 from soundings.contracts.source_ref import CacheStatus, SourceRef
 from soundings.contracts.trend import Trend
+
+_log = logging.getLogger(__name__)
 
 
 class PassthroughAdapter(ABC):
@@ -163,6 +167,50 @@ class PassthroughAdapter(ABC):
             await self._cache.put(self.source_id, cache_key, payload, ttl=self._ttl)
             return payload, "live"
         return None, "live"
+
+    # ----- Phase 4: organisations + cache pre-warming -----
+
+    async def fetch_organisations(
+        self,
+        place_id: str,
+        filters: list[str] | None = None,
+        limit: int = 50,
+    ) -> list[OrganisationRef]:
+        """Return organisations associated with a place.
+
+        Default returns []. Adapters that publish organisational data
+        (Phase 4: charity_commission, find_that_charity) override this.
+        `filters` is a free-form list of activity / classification
+        tags; adapters that don't apply them ignore the param.
+        """
+        del place_id, filters, limit
+        return []
+
+    async def pre_warm_for_places(self, place_ids: list[str]) -> None:
+        """Pre-populate the cache for a set of places.
+
+        Default is a no-op. Adapters that publish slow-changing
+        aggregates (Phase 4: civil_society.* counts via CC, 360G grant
+        sums) override this so the pre_warmer daemon can keep
+        user-facing reads on a warm cache.
+        """
+        del place_ids
+
+    async def safe_pre_warm(self, place_ids: list[str]) -> None:
+        """Best-effort wrapper around `pre_warm_for_places`.
+
+        The pre_warmer daemon calls this so a single misbehaving
+        adapter can't poison the loop. Exceptions are logged and
+        swallowed; the daemon moves on to the next adapter.
+        """
+        try:
+            await self.pre_warm_for_places(place_ids)
+        except Exception:
+            _log.exception(
+                "pre_warm_for_places failed for source_id=%s (%d places)",
+                self.source_id,
+                len(place_ids),
+            )
 
     async def list_available_indicators(self) -> list[str]:
         async with self._engine.connect() as conn:
