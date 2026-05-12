@@ -11,6 +11,7 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
+from soundings.tools.compare_places import ComparePlacesInput, compare_places
 from soundings.tools.find_place import FindPlaceInput, find_place
 from soundings.tools.get_indicators import GetIndicatorsInput, get_indicators
 from soundings.tools.get_place_profile import GetPlaceProfileInput, get_place_profile
@@ -70,6 +71,26 @@ def build_mcp_server(state: Any | None = None) -> FastMCP:
             GetPlaceProfileInput(place_id=place_id, include=include or []),
             state.orchestrator,
             state.engine,
+        )
+        return result.model_dump(mode="json")
+
+    @mcp.tool(name="compare_places")
+    async def _compare_places(
+        place_ids: list[str],
+        indicators: list[str],
+        comparison_basis: str = "percentile",
+        period: str | None = None,
+    ) -> dict[str, Any]:
+        if state is None:
+            raise RuntimeError("MCP compare_places invoked without app state")
+        result = await compare_places(
+            ComparePlacesInput(
+                place_ids=place_ids,
+                indicators=indicators,
+                comparison_basis=comparison_basis,
+                period=period,
+            ),
+            state.orchestrator,
         )
         return result.model_dump(mode="json")
 
