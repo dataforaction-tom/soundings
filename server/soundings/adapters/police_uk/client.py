@@ -65,3 +65,24 @@ class PoliceUkClient:
         if not isinstance(payload, list):
             return []
         return payload
+
+    async def get_last_updated(self) -> str:
+        """Return the latest YYYY-MM with published crime data.
+
+        Police.uk responds with `{"date": "YYYY-MM-DD"}`; we strip to
+        the month component to align with the `date=` query parameter
+        on `/crimes-street`.
+        """
+        async with self._limiter:
+            client = self._client or httpx.AsyncClient(timeout=30.0)
+            try:
+                response = await client.get(f"{POLICE_UK_BASE}/crime-last-updated")
+                response.raise_for_status()
+                payload = response.json()
+            finally:
+                if self._owns_client:
+                    await client.aclose()
+        raw = payload.get("date") if isinstance(payload, dict) else None
+        if not isinstance(raw, str) or len(raw) < 7:
+            raise RuntimeError("police.uk /crime-last-updated returned no usable date")
+        return raw[:7]
