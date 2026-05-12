@@ -1,7 +1,11 @@
 # State
 
-> Last updated: 2026-05-11
-> Phase: **2 — capture + sanitisation + UI** (complete, tag `v0.3.0-phase-2`).
+> Last updated: 2026-05-12 (session 3)
+> Phase: **3 complete.** All 45 tasks across blocks A–J shipped via
+> PRs #1 (Blocks C-G adapters + compare_places), #2 (Block H get_trend),
+> #3 (Block I UI charts), and the present PR (Block J integration +
+> tag prep). `v0.4.0-phase-3` tag pending the manual browser smoke
+> documented in `docs/runbook-phase-3-smoke.md`.
 
 ## System State Diagram
 
@@ -14,10 +18,12 @@ stateDiagram-v2
     Phase1Build --> Phase1Done: e2e (HTTP + MCP) green, tag pushed
     Phase1Done --> Phase2Build: planning underway
     Phase2Build --> Phase2Done: capture + UI live, e2e green, tag pushed
-    Phase2Done --> Phase3Build: planning underway
-    Phase3Build --> [*]: not started
+    Phase2Done --> Phase3Build: phase 3 plan accepted
+    Phase3Build --> Phase3Done: blocks A–J complete, tag v0.4.0-phase-3
+    Phase3Done --> Phase4Build: phase 4 plan accepted
+    Phase4Build --> [*]: not started
 
-    note right of Phase2Done: ← WE ARE HERE
+    note right of Phase3Done: ← WE ARE HERE (browser smoke pending)
 ```
 
 ## Component Status
@@ -30,59 +36,46 @@ stateDiagram-v2
 | Indicator + source catalogue (`catalogue/*.yaml`) | ✅ Phase 0 | |
 | FastAPI app + `/healthz` + lifespan catalogue load | ✅ Phase 0 | |
 | `ons.geography` loaders (places, hierarchy, geometries, code change) | ✅ Phase 0 | OGP URLs partly unverified — nightly live tests confirm. |
-| `postcodes.io` adapter (lookup + upsert) | ✅ Phase 0 | |
-| GeographyService (postcode/name/hierarchy/point) | ✅ Phase 0 | |
-| **`IndicatorValue` + `SourceRef` contracts + `SourceAdapter` Protocol** | ✅ Phase 1 | |
-| **`LoaderAdapter.fetch_indicator` default reading `data.indicator_value`** | ✅ Phase 1 | cache_status derived from `loader_run` age vs cron. |
-| **`PassthroughAdapter.fetch_indicator` + `SourceRefFactory`** | ✅ Phase 1 | |
-| **`NomisClient` + ons.mid_year_estimates + ons.census2021 adapters** | ✅ Phase 1 | `population.total` (MYE) and `population.households.lone_parent_share` (Census) verified live 2026-05-11. Other Census TS table IDs still plausible-but-untested. |
-| **`mhclg.imd2025` + `mhclg.imd2019` adapters (xlsx parse + LSOA→LTLA aggregation)** | ✅ Phase 1 | Both editions verified live 2026-05-11. 2025 reads File 5 (Scores); 2019 reads File 2. Aggregation parameterised by source_id. |
-| **`IndicatorOrchestrator` (concurrent fan-out + level enforcement + dedup)** | ✅ Phase 1 | |
-| **Three tools: `find_place`, `get_indicators`, `get_place_profile`** | ✅ Phase 1 | Single implementation, two transports. |
-| **HTTP routes `/v1/tools/*`, `/v1/tools`, `/v1/sources`, `/v1/catalogue/indicators`** | ✅ Phase 1 | |
-| **Error envelope middleware** | ✅ Phase 1 | Maps `OrchestrationError` subclasses to design §4 codes/status. |
-| **MCP server mounted at `/mcp` over SSE** | ✅ Phase 1 | FastMCP; tools registered against `app.state`. |
-| **CORS locked to `SOUNDINGS_UI_ORIGIN`** | ✅ Phase 1 | |
-| **Loader daemon (APScheduler) + `loader` Docker service** | ✅ Phase 1 | `--once <source_id>` for ops debugging. |
-| **`/healthz` reports stale loader runs** | ✅ Phase 1 | Flips degraded if any source older than 1.5× refresh_cadence. |
-| **Exponential retry on transient loader failures** | ✅ Phase 1 | 1s/4s/16s on 5xx + connect errors; no retry on 4xx. |
-| Seed CLI (`make seed`, `make seed-light`) | ✅ Phase 0 + 1 | Now seeds MYE + Census + IMD after the geography spine. |
-| GitHub Actions CI + nightly live workflow | ✅ Phase 0 | Live tests run nightly; MYE + Census + IMD live tests added. |
-| Smoke deploy config (Caddy + cloudflared runbook) | ✅ Phase 0 | |
-| **Capture middleware + RawRecordWriter (stub + raw in one txn)** | ✅ Phase 2 | Raw ASGI middleware; tracks sanitiser tasks via app.state.background_tasks. |
-| **Sanitisation pipeline (6 rules + pipeline runner)** | ✅ Phase 2 | direct identifiers, fine geography, spaCy NER, small orgs, normalise, validate. Pipeline runner flags review_status=flagged at total_fires ≥ 2. |
-| **Migration 0005 — review_status + sanitisation_rules_version** | ✅ Phase 2 | |
-| **SanitiserWorker + startup replay** | ✅ Phase 2 | Replay capped at 4 concurrent spaCy invocations. |
-| **POST /v1/capture/consent + /v1/capture/feedback** | ✅ Phase 2 | Issues session/consent/sector cookies; feedback enforces same-session ownership. |
-| **FullConsentRateLimiter (60/hour silent downgrade)** | ✅ Phase 2 | |
-| **Resend alerts + 30-day raw_record retention cron** | ✅ Phase 2 | Daily 04:00 UTC; failure paths route through send_alert. |
-| **Publication CLI (`make publish-corpus`)** | ✅ Phase 2 | CSV + JSONL + SHA-256 manifest + local git tag; deterministic byte output. |
-| **Astro 5 UI (`/`, `/place/[id]`, `/about`)** | ✅ Phase 2 | SSR everywhere. Typed `lib/api.ts` mirrors Pydantic shapes; ADR-0005. |
-| **Caddyfile path routing for /v1, /mcp, ui** | ✅ Phase 2 | Replaces the Phase 0 placeholder. |
-| **`/healthz` capture-pipeline freshness** | ✅ Phase 2 | Pending backlog + stuck >1h checks. |
+| `postcodes.io` adapter | ✅ Phase 0 | |
+| GeographyService | ✅ Phase 0 | |
+| Loader + passthrough adapter contracts | ✅ Phase 1 | |
+| `NomisClient` + ons.mid_year_estimates + ons.census2021 adapters | ✅ Phase 1 | `population.total` + `population.households.lone_parent_share` verified live; rest plausible. |
+| `mhclg.imd2025` + `mhclg.imd2019` adapters | ✅ Phase 1 | Both editions verified live 2026-05-11. |
+| `IndicatorOrchestrator.fetch` (concurrent fan-out + level enforcement + dedup) | ✅ Phase 1 | |
+| Three Phase 1 tools (`find_place`, `get_indicators`, `get_place_profile`) | ✅ Phase 1 | |
+| HTTP + MCP transports for the Phase 1 tools | ✅ Phase 1 | Mounted at `/v1/tools/*` and `/mcp`. |
+| Capture pipeline (6 sanitisation rules) + replay + alerts + corpus publish | ✅ Phase 2 | |
+| Astro UI (`/`, `/place/[id]`, `/about`) | ✅ Phase 2 | SSR everywhere. |
+| **`OhidFingertipsAdapter`** | ✅ Phase 3 (Block B) | Live test green for Stockton female LE. |
+| **`DwpStatXploreAdapter`** | ✅ Phase 3 (Block C) | Code shipped; live test skips without `STATXPLORE_API_KEY`. Cube IDs plausible-but-unverified. |
+| **`DfeExploreAdapter`** | ✅ Phase 3 (Block D) | FSM UUID real; KS4 + persistent absence placeholders. Live test fails-closed by design. |
+| **`PoliceUkAdapter`** | ✅ Phase 3 (Block E) | Centroid + rolling 12-month aggregation. METHODOLOGY_CAVEAT asserted verbatim. Live test green for Stockton recorded crime. |
+| **`OnsApsAdapter`** | ✅ Phase 3 (Block F) | Reuses NomisClient; employment_rate verified live (NM_17_5 variable 45, measure 20599); other mapped indicators (unemployment, median pay, affordability) still plausible-but-unverified. |
+| **`IndicatorOrchestrator.compare_places`** | ✅ Phase 3 (Block G) | Ranks against full peer universe; loader = SELECT, passthrough = fan-out with 200-budget caveat; supports percentile / rank / absolute / rate. |
+| **`IndicatorOrchestrator.get_trend`** | ✅ Phase 3 (Block H) | Loader = SELECT from `data.trend_point`, passthrough = `adapter.fetch_trend`. `series_break:` prefix partitions catalogue caveats into `Trend.breaks_in_series`. |
+| **`compare_places` + `get_trend` tools** | ✅ Phase 3 (Block G + H) | HTTP `/v1/tools/{compare_places,get_trend}` + FastMCP registrations; e2e via both transports. |
+| **UI Observable Plot charts (linkedom polyfill)** | ✅ Phase 3 (Block I) | Sparklines per IndicatorCard on `/place/[id]`; `/compare` page with bar charts + percentile badges; `/about` updated. |
+| **Phase 3 server e2e (`compare_places` + `get_trend` + Fingertips cache)** | ✅ Phase 3 (Block J) | Seeds 3 LTLAs + a Fingertips life-expectancy cache row, asserts ranked compare + ordered three-point trend. |
+| **Browser smoke runbook** | ✅ Phase 3 (Block J) | `docs/runbook-phase-3-smoke.md` — gates the `v0.4.0-phase-3` tag. |
+| **`v0.4.0-phase-3` tag** | ⏳ Phase 3 (Block J) | Pending browser smoke pass. |
 
 Status markers: ⏳ Not started · 🔧 In progress · ✅ Done · 🚫 Blocked · ⚠️ Needs attention.
 
-## Data Flow (Phase 1)
+## Data Flow (Phase 3)
 
 ```mermaid
 flowchart LR
-    user[HTTP or MCP client] --> tools[Tools: find_place / get_indicators / get_place_profile]
+    user[HTTP or MCP client] --> tools["Tools: find_place / get_indicators / get_place_profile / compare_places / get_trend"]
     tools --> orchestrator[IndicatorOrchestrator]
-    tools --> geo[GeographyService]
     orchestrator -->|adapter_for_indicator| registry[AdapterRegistry]
-    registry --> mye[OnsMidYearEstimatesAdapter]
-    registry --> census[OnsCensus2021Adapter]
-    registry --> imd[MhclgImd2025Adapter]
-    mye --> data[(data.indicator_value)]
-    census --> data
-    imd --> data
-    loader[APScheduler daemon] --> mye_l[MYE loader]
-    loader --> census_l[Census loader]
-    loader --> imd_l[IMD loader]
-    mye_l --> data
-    census_l --> data
-    imd_l --> data
+    registry --> loaders[Loader-mode adapters]
+    registry --> passthrough[Passthrough adapters]
+    loaders --> data[(data.indicator_value / data.trend_point)]
+    passthrough --> upstream[(Upstream APIs)]
+    passthrough --> cache[(cache.source_cache)]
+    upstream --> cache
+    ui[Astro SSR] --> tools
+    ui --> charts["IndicatorChart / CompareChart (Plot + linkedom)"]
 ```
 
 ## Dependencies
@@ -91,32 +84,44 @@ flowchart LR
 |------------|--------|-------|
 | Postgres + PostGIS 16 | Working | Containerised. |
 | ONS Open Geography Portal | Probable | URLs pinned in ADR-0001; some unverified. |
-| ONS Code History Database | Working | Bulk download via `OnsGeographyCodeChangeLoader`. |
-| ONS Nomis API | Working | Field codes verified for the indicators exercised by Phase 1 live tests; rest plausible-but-untested. |
-| MHCLG IMD download | Working | 2025 (File 5) and 2019 (File 2) both verified live 2026-05-11. |
+| ONS Code History Database | Working | |
+| ONS Nomis API | Working | MYE + Census + APS employment verified; other field codes plausible. |
+| MHCLG IMD downloads | Working | 2025 (File 5) + 2019 (File 2). |
 | postcodes.io | Working | |
-| GitHub Actions | Configured | |
+| OHID Fingertips API | Working | Stockton female LE live test green. |
+| DWP Stat-Xplore | Auth-gated | Code paths shipped; needs `STATXPLORE_API_KEY` for live verification. |
+| DfE Explore Education Statistics | Working | FSM dataset confirmed; other UUIDs pending live discovery. |
+| data.police.uk | Working | Stockton recorded crime live test green; no auth. |
+| GitHub Actions | Configured | Unit + integration on every push; nightly live workflow runs the live-marked tests. |
 
-## Known follow-ups (Phase 3 and beyond)
+## Known follow-ups (Phase 4 and beyond)
 
+- **`data.trend_point` not yet populated by loader-mode adapters**: the
+  table exists and `get_trend` reads from it, but MYE / Census / IMD
+  loaders don't write to it yet — passthrough adapters provide the only
+  populated trends in Phase 3 prod. Phase 4 should wire trend writes
+  during the loader pass.
 - **Production sanitisation pipeline missing rules**: app.py lifespan
   composes only StripDirectIdentifiers + NormaliseAskerPurpose +
-  ValidateConsentLevel. StripFineGeographyInFreeText,
-  StripPersonalNamesViaNER, and StripSmallOrgNames exist + are tested
-  but not wired into the runtime pipeline. Bundling that wire-up with
-  loading the DB-backed name lists from `geography.place` and
-  `data.organisation` is the next sanitiser improvement.
-- **No Vitest in CI**: GitHub Actions runs the Python suite only.
-  `cd ui && npm test` runs locally. CI extension is a small workflow
-  patch.
-- **No Playwright UI e2e**: deferred per the Phase 2 plan
-  "best-effort" provision.
-- **IMD 2025 deciles/ranks**: only Scores (File 5) loaded for 2025;
-  Decile/Rank in File 2 not yet wired.
+  ValidateConsentLevel. The other three rules exist + are tested but not
+  wired.
+- **Vitest in CI**: GitHub Actions runs the Python suite only; `cd ui &&
+  npm test` runs locally. Trivial workflow addition.
+- **Playwright UI e2e**: deferred per the Phase 2 plan "best-effort"
+  provision.
+- **IMD 2025 deciles/ranks**: only Scores (File 5) loaded for 2025.
 - **Census TS-table IDs**: indicators beyond `lone_parent_share` are
-  pinned with plausible IDs, not yet exercised.
+  plausible-but-untested.
+- **Nomis APS pay + affordability codes**: live-discover the dataset +
+  variable IDs next time these indicators are exercised.
+- **Stat-Xplore cube IDs**: unblock by adding `STATXPLORE_API_KEY` to
+  GitHub Secrets, then iterate.
+- **DfE EES KS4 + persistent absence UUIDs**: live discovery via the
+  EES dataset metadata endpoint.
+- **Police.uk smokes for violence + ASB**: only `crime.recorded_crime_rate`
+  has a live test.
 - **Backblaze B2 publication push**: deferred per ADR-0004.
-- **Permanent-orphan pending stubs**: edge case from ADR-0003; cron
-  hard-deleting pending stubs older than 60 days is a Phase 3 task.
-- **`compare_places` and `get_trend` tools** — Phase 3 plan.
-- **Observable Plot charts** — deferred to Phase 3 per ADR-0007.
+- **Permanent-orphan pending stubs cron**: ADR-0003 edge case.
+- **Observable Plot CompareChart polish**: percentile labels are
+  positioned with a fixed offset; could improve readability with a
+  tooltip layer.
