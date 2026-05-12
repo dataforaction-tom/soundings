@@ -44,8 +44,8 @@ to `main`.
       pending browser smoke.
 - [ ] Phase 4 — Adapters for Charity Commission (loader; bulk register),
       360Giving + Find That Charity (passthrough);
-      `find_organisations_in_place`. **Block 0 + Block A landed**;
-      Blocks B–F pending.
+      `find_organisations_in_place`. **Blocks 0, A, B landed**;
+      Blocks C–F pending.
 - [ ] Phase 5 — First monthly corpus release, doc pass.
 - [ ] Phase 6 — Public soft launch on the Mac mini.
 
