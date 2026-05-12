@@ -42,8 +42,10 @@ to `main`.
       ONS APS; `compare_places` and `get_trend` tools; UI sparklines on
       `/place/[id]` and a new `/compare` page. Tag `v0.4.0-phase-3`
       pending browser smoke.
-- [ ] Phase 4 — Adapters for Charity Commission, 360Giving, Find That Charity;
-      `find_organisations_in_place`.
+- [ ] Phase 4 — Adapters for Charity Commission (loader; bulk register),
+      360Giving + Find That Charity (passthrough);
+      `find_organisations_in_place`. **Block 0 + Block A landed**;
+      Blocks B–F pending.
 - [ ] Phase 5 — First monthly corpus release, doc pass.
 - [ ] Phase 6 — Public soft launch on the Mac mini.
 
