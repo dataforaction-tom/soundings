@@ -8,10 +8,13 @@ don't see redundant citations.
 
 import asyncio
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import Any, Literal
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from soundings.contracts.comparison import Comparison, ComparisonValue
 from soundings.contracts.indicator_value import IndicatorValue
 from soundings.contracts.source_ref import SourceRef
 from soundings.orchestration.errors import (
@@ -22,11 +25,28 @@ from soundings.orchestration.errors import (
 from soundings.orchestration.registry import AdapterRegistry
 
 DEFAULT_TIMEOUT = 10.0
+# Soft budget for passthrough peer-universe fan-out per design §4 and Phase 3
+# plan Task 28. Above this, the orchestrator falls back to ranking only the
+# caller's highlighted places against each other with a methodology caveat.
+PASSTHROUGH_PEER_BUDGET = 200
+ComparisonBasis = Literal["percentile", "rank", "absolute", "rate"]
+BUDGET_CAVEAT = (
+    "percentile computed against caller-provided peers only; "
+    "indicator is passthrough-mode at this granularity"
+)
 
 
 @dataclass
 class OrchestrationResult:
     values: list[IndicatorValue]
+    sources: list[SourceRef] = field(default_factory=list)
+    caveats: list[str] = field(default_factory=list)
+    partial: bool = False
+
+
+@dataclass
+class CompareResult:
+    comparisons: list[Comparison]
     sources: list[SourceRef] = field(default_factory=list)
     caveats: list[str] = field(default_factory=list)
     partial: bool = False
@@ -126,3 +146,279 @@ class IndicatorOrchestrator:
             seen.add(key)
             out.append(r)
         return out
+
+    # ----- compare_places (Phase 3 Block G) -----
+
+    async def compare_places(
+        self,
+        *,
+        place_ids: list[str],
+        indicators: list[str],
+        basis: ComparisonBasis = "percentile",
+        period: str | None = None,
+    ) -> CompareResult:
+        comparisons: list[Comparison] = []
+        sources: list[SourceRef] = []
+        caveats: list[str] = []
+        partial = False
+
+        if not place_ids:
+            return CompareResult(comparisons=[], sources=[], caveats=[], partial=False)
+        peer_type, _, _ = place_ids[0].partition(":")
+
+        for indicator_key in indicators:
+            try:
+                comparison, ind_caveats = await self._compare_one(
+                    indicator_key=indicator_key,
+                    peer_type=peer_type,
+                    place_ids=place_ids,
+                    basis=basis,
+                    period=period,
+                )
+            except (
+                IndicatorNotRegisteredError,
+                IndicatorNotAvailableAtLevelError,
+                OrchestrationError,
+            ) as e:
+                partial = True
+                caveats.append(f"{indicator_key}: {e}")
+                continue
+            if comparison is None:
+                partial = True
+                caveats.append(f"{indicator_key}: no values returned for peer universe")
+                continue
+            comparisons.append(comparison)
+            sources.append(comparison.source)
+            caveats.extend(ind_caveats)
+
+        return CompareResult(
+            comparisons=comparisons,
+            sources=self._dedup_sources(sources),
+            caveats=caveats,
+            partial=partial,
+        )
+
+    async def _compare_one(
+        self,
+        *,
+        indicator_key: str,
+        peer_type: str,
+        place_ids: list[str],
+        basis: ComparisonBasis,
+        period: str | None,
+    ) -> tuple[Comparison | None, list[str]]:
+        # Level enforcement against the first place_id is enough — the spec
+        # disallows mixing types in one call.
+        await self._enforce_level(indicator_key, place_ids[0])
+        adapter = await self._registry.adapter_for_indicator(indicator_key)
+        adapter_mode = getattr(adapter, "mode", "loader")
+
+        ind_caveats: list[str] = []
+        if adapter_mode == "loader":
+            peer_values, period_used = await self._peer_values_loader(
+                indicator_key=indicator_key, peer_type=peer_type, period=period
+            )
+        else:
+            peer_values, period_used, budget_hit = await self._peer_values_passthrough(
+                adapter=adapter,
+                indicator_key=indicator_key,
+                peer_type=peer_type,
+                period=period,
+                place_ids=place_ids,
+            )
+            if budget_hit:
+                ind_caveats.append(BUDGET_CAVEAT)
+
+        if not peer_values:
+            return None, ind_caveats
+
+        # Rate basis: divide each peer's value by population.total × 1000.
+        if basis == "rate":
+            populations = await self._peer_populations(peer_type=peer_type)
+            peer_values = {
+                pid: (val / populations[pid] * 1000.0)
+                if (val is not None and populations.get(pid))
+                else None
+                for pid, val in peer_values.items()
+            }
+
+        ranked_by_id = _ranks_descending(peer_values)
+        comparison_values: list[ComparisonValue] = []
+        n_with_values = sum(1 for v in peer_values.values() if v is not None)
+        for pid in place_ids:
+            value = peer_values.get(pid)
+            rank = ranked_by_id.get(pid)
+            percentile = (
+                _percentile_from_rank(rank, n_with_values)
+                if (rank is not None and basis == "percentile")
+                else None
+            )
+            if basis in {"absolute"}:
+                rank = None
+                percentile = None
+            if basis == "rank":
+                percentile = None
+            comparison_values.append(
+                ComparisonValue(
+                    place_id=pid,
+                    value=value,
+                    rank=rank,
+                    percentile=percentile,
+                )
+            )
+
+        meta = await self._load_indicator_meta(indicator_key)
+        source_ref = adapter.get_source_ref(
+            retrieved_at=datetime.now(tz=UTC), cache_status="cached"
+        )
+        comparison = Comparison(
+            indicator=indicator_key,
+            unit=meta["unit"] if meta else "value",
+            period=period_used,
+            values=comparison_values,
+            source=source_ref,
+            caveats=ind_caveats,
+        )
+        return comparison, ind_caveats
+
+    async def _peer_values_loader(
+        self,
+        *,
+        indicator_key: str,
+        peer_type: str,
+        period: str | None,
+    ) -> tuple[dict[str, float | None], str]:
+        """Read all peer values in a single SELECT. Picks the most recent
+        per (place, indicator) so partial seeds still rank — or the supplied
+        `period` when explicit."""
+        sql = (
+            "SELECT DISTINCT ON (iv.place_id) iv.place_id, iv.value, iv.period "
+            "FROM data.indicator_value iv "
+            "JOIN geography.place p ON p.id = iv.place_id "
+            "WHERE iv.indicator_key = :k AND p.type = :pt "
+            "AND (CAST(:period AS text) IS NULL OR iv.period = :period) "
+            "ORDER BY iv.place_id, iv.period DESC"
+        )
+        async with self._engine.connect() as conn:
+            rows = (
+                await conn.execute(
+                    text(sql),
+                    {"k": indicator_key, "pt": peer_type, "period": period},
+                )
+            ).all()
+        peer_values: dict[str, float | None] = {
+            r.place_id: (float(r.value) if r.value is not None else None) for r in rows
+        }
+        # Choose a period to report: the supplied one, else the most common
+        # observed period (good enough for v1; rows on partial seeds align).
+        period_used = period or (rows[0].period if rows else "")
+        return peer_values, str(period_used)
+
+    async def _peer_values_passthrough(
+        self,
+        *,
+        adapter: Any,
+        indicator_key: str,
+        peer_type: str,
+        period: str | None,
+        place_ids: list[str],
+    ) -> tuple[dict[str, float | None], str, bool]:
+        """For passthrough adapters, fan out across the peer universe (with
+        a soft budget). Above the budget we fall back to ranking only the
+        caller-provided slice — the budget caveat propagates back."""
+        async with self._engine.connect() as conn:
+            count_row = (
+                await conn.execute(
+                    text("SELECT COUNT(*) AS n FROM geography.place WHERE type = :pt"),
+                    {"pt": peer_type},
+                )
+            ).first()
+        total_peers = int(count_row.n) if count_row else 0
+
+        if total_peers > PASSTHROUGH_PEER_BUDGET:
+            fetch_targets = list(dict.fromkeys(place_ids))
+            budget_hit = True
+        else:
+            async with self._engine.connect() as conn:
+                rows = (
+                    await conn.execute(
+                        text("SELECT id FROM geography.place WHERE type = :pt"),
+                        {"pt": peer_type},
+                    )
+                ).all()
+            fetch_targets = [r.id for r in rows]
+            budget_hit = False
+
+        results = await asyncio.gather(
+            *(adapter.fetch_indicator(indicator_key, pid, period) for pid in fetch_targets),
+            return_exceptions=True,
+        )
+
+        peer_values: dict[str, float | None] = {}
+        period_used = period or ""
+        for pid, outcome in zip(fetch_targets, results, strict=True):
+            if isinstance(outcome, BaseException) or outcome is None:
+                peer_values[pid] = None
+                continue
+            peer_values[pid] = outcome.value
+            if not period_used and outcome.period:
+                period_used = outcome.period
+        return peer_values, period_used, budget_hit
+
+    async def _peer_populations(self, *, peer_type: str) -> dict[str, float]:
+        """Look up the latest population.total per peer for `rate` basis."""
+        async with self._engine.connect() as conn:
+            rows = (
+                await conn.execute(
+                    text(
+                        "SELECT DISTINCT ON (iv.place_id) iv.place_id, iv.value "
+                        "FROM data.indicator_value iv "
+                        "JOIN geography.place p ON p.id = iv.place_id "
+                        "WHERE iv.indicator_key = 'population.total' AND p.type = :pt "
+                        "ORDER BY iv.place_id, iv.period DESC"
+                    ),
+                    {"pt": peer_type},
+                )
+            ).all()
+        return {r.place_id: float(r.value) for r in rows if r.value is not None}
+
+    async def _load_indicator_meta(self, indicator_key: str) -> dict[str, str] | None:
+        async with self._engine.connect() as conn:
+            row = (
+                await conn.execute(
+                    text("SELECT unit FROM catalogue.indicator WHERE key = :k"),
+                    {"k": indicator_key},
+                )
+            ).first()
+        if row is None:
+            return None
+        return {"unit": row.unit}
+
+
+def _ranks_descending(peer_values: dict[str, float | None]) -> dict[str, int]:
+    """Return rank (1-based, highest value = rank 1). Ties share the lower
+    rank (dense ranking). Places with `None` value are excluded — they get
+    no rank in the comparison output."""
+    with_values = [(pid, val) for pid, val in peer_values.items() if val is not None]
+    with_values.sort(key=lambda pv: pv[1], reverse=True)
+    ranks: dict[str, int] = {}
+    last_value: float | None = None
+    last_rank = 0
+    for index, (pid, val) in enumerate(with_values, start=1):
+        if last_value is not None and val == last_value:
+            ranks[pid] = last_rank
+        else:
+            ranks[pid] = index
+            last_rank = index
+            last_value = val
+    return ranks
+
+
+def _percentile_from_rank(rank: int | None, n: int) -> float | None:
+    """`(below_count / (n-1)) * 100`. Median of 11 = 50.0; top = 100.0;
+    bottom = 0.0. With one peer in the universe, the percentile is
+    undefined — return None rather than NaN."""
+    if rank is None or n <= 1:
+        return None
+    below = n - rank
+    return below / (n - 1) * 100.0

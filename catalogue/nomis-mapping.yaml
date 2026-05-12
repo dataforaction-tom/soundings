@@ -145,3 +145,62 @@ mappings:
       ltla24: TYPE424
     period: "2021"
     value_scale: 0.01
+
+  # --- ONS Annual Population Survey (Phase 3 Block F) ----------------------
+  # APS is delivered via Nomis; `OnsApsAdapter` is a passthrough that pulls
+  # the most recent 20 quarterly periods (`time=latestMINUS19-latest`) per
+  # request. Field codes below are plausible-but-unverified pending the live
+  # test in `tests/live/test_aps_live.py` — Nomis APS uses a variable-coded
+  # schema and the live response is the only reliable way to confirm them.
+  # value_scale=0.01 turns Nomis percent (0–100) into a fraction (0–1) for
+  # rate-shaped indicators.
+
+  - indicator_key: economy.employment_rate
+    source_id: ons.aps
+    dataset_id: NM_17_5           # APS - variables (percentages)
+    measures: "20599"             # Variable (the rate value itself)
+    geography_type_codes:
+      ltla24: TYPE424
+      utla24: TYPE423
+      region: TYPE480
+      country: TYPE499
+    extra_params:
+      variable: "45"              # Employment rate - aged 16-64
+    value_scale: 0.01
+
+  - indicator_key: economy.unemployment_rate
+    source_id: ons.aps
+    dataset_id: NM_17_5
+    measures: "20599"
+    geography_type_codes:
+      ltla24: TYPE424
+      utla24: TYPE423
+      region: TYPE480
+      country: TYPE499
+    extra_params:
+      variable: "84"              # Unemployment rate - aged 16-64
+    value_scale: 0.01
+
+  - indicator_key: economy.median_pay_resident
+    source_id: ons.aps
+    dataset_id: NM_30_1           # ASHE resident analysis (unverified)
+    measures: "20100"
+    geography_type_codes:
+      ltla24: TYPE424
+      utla24: TYPE423
+      region: TYPE480
+      country: TYPE499
+    extra_params:
+      sex: "7"
+      item: "2"                   # Weekly pay - gross (unverified)
+      pay: "7"                    # Median
+
+  - indicator_key: housing.affordability_ratio
+    source_id: ons.aps
+    dataset_id: NM_173_1          # ONS workplace-based affordability (unverified)
+    measures: "20100"
+    geography_type_codes:
+      ltla24: TYPE424
+      utla24: TYPE423
+      region: TYPE480
+      country: TYPE499

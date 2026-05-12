@@ -1,0 +1,50 @@
+# catalogue/dfe-mapping.yaml — bind soundings indicator keys to DfE
+# Explore Education Statistics datasets.
+#
+# Each entry pins a dataset UUID + indicator UUID + optional filter
+# selection. DfE republishes datasets annually under fresh UUIDs, so
+# these IDs rot — the live test (Task 20) asserts a plausible value
+# so an expired dataset_id fails nightly rather than silently
+# returning no-data.
+#
+# Discovery: browse data-catalogue/data-set/<uuid> on the public site
+# to see filter/indicator IDs; or query GET /data-sets/{id}/meta.
+# Filter + indicator IDs are not URL-visible, only meta-visible —
+# entries below carry placeholders to be filled by Task 20's live
+# iteration. The mapping schema is correct; the IDs themselves are
+# unverified pending that live run.
+#
+# `location_level` is the DfE-native level code (e.g. "LA" for local
+# authorities, "NAT" for national, "REG" for region). The adapter
+# translates soundings place_id → DfE location code via place mapping.
+
+mappings:
+
+  - indicator_key: education.fsm_eligibility_share
+    data_set_id: "b79e17fb-82b1-4bcc-a295-a7ceea23e34a"
+    indicator_id: "PLACEHOLDER_FSM_INDICATOR_ID"
+    filters: {}
+    location_level: "LA"
+    time_period_code: "AY"
+    place_type: ltla24
+    unit: "proportion"
+    caveats:
+      - "FSM eligibility based on school census; uses 6-year-extended definition where available."
+
+  - indicator_key: education.ks4_attainment_8
+    data_set_id: "PLACEHOLDER_KS4_DATASET_ID"
+    indicator_id: "PLACEHOLDER_ATTAINMENT_8_INDICATOR_ID"
+    filters: {}
+    location_level: "LA"
+    time_period_code: "AY"
+    place_type: ltla24
+    unit: "score"
+
+  - indicator_key: education.persistent_absence_share
+    data_set_id: "PLACEHOLDER_ABSENCE_DATASET_ID"
+    indicator_id: "PLACEHOLDER_ABSENCE_INDICATOR_ID"
+    filters: {}
+    location_level: "LA"
+    time_period_code: "AY"
+    place_type: ltla24
+    unit: "proportion"
