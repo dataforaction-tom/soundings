@@ -15,6 +15,7 @@ from apscheduler.triggers.cron import CronTrigger  # type: ignore[import-untyped
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from soundings.adapters.charity_commission.loader import CharityCommissionLoader
 from soundings.adapters.mhclg_imd2025.aggregation import aggregate_imd_to_ltla
 from soundings.adapters.mhclg_imd2025.loader import MhclgImd2019Loader, MhclgImd2025Loader
 from soundings.adapters.ons_census2021.loader import OnsCensus2021Loader
@@ -59,12 +60,16 @@ def build_source_registry(engine: AsyncEngine) -> dict[str, LoaderCallable]:
         await MhclgImd2019Loader(engine).load()
         await aggregate_imd_to_ltla(engine, source_id="mhclg.imd2019")
 
+    async def _charity_commission() -> None:
+        await CharityCommissionLoader(engine).load()
+
     return {
         "ons.geography": _geography,
         "ons.mid_year_estimates": _mye,
         "ons.census2021": _census,
         "mhclg.imd2025": _imd2025,
         "mhclg.imd2019": _imd2019,
+        "charity_commission": _charity_commission,
     }
 
 

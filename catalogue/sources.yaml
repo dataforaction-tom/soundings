@@ -124,10 +124,13 @@ sources:
     label: Charity Commission Register
     publisher: Charity Commission for England and Wales
     publisher_url: https://register-of-charities.charitycommission.gov.uk/
-    dataset_url: https://register-of-charities.charitycommission.gov.uk/register/api
+    dataset_url: https://register-of-charities.charitycommission.gov.uk/register/full-register-download
     licence: OGL-UK-3.0
     mode: loader
-    refresh_cadence: "0 2 * * *"
+    # CC publishes the bulk register monthly (typically mid-month). Cron on
+    # the 18th at 04:00 UTC gives a few days' buffer. Daily would be wasteful
+    # — there's nothing new to pull until the next monthly publication.
+    refresh_cadence: "0 4 18 * *"
 
   - id: threesixtygiving
     label: 360Giving Datastore

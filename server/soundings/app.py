@@ -7,6 +7,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from soundings.adapters.charity_commission import CharityCommissionAdapter
 from soundings.adapters.dfe_explore.adapter import DfeExploreAdapter
 from soundings.adapters.dwp_statxplore.adapter import DwpStatXploreAdapter
 from soundings.adapters.mhclg_imd2025.adapter import MhclgImd2019Adapter, MhclgImd2025Adapter
@@ -58,6 +59,7 @@ def build_adapter_registry(engine: object) -> AdapterRegistry:
     registry.register("dfe.explore", DfeExploreAdapter)
     registry.register("police_uk", PoliceUkAdapter)
     registry.register("ons.aps", OnsApsAdapter)
+    registry.register("charity_commission", CharityCommissionAdapter)
     return registry
 
 
