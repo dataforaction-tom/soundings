@@ -43,16 +43,12 @@ CATALOGUE_DIR = Path(__file__).resolve().parent.parent.parent / "catalogue"
 POSTCODES_IO_TTL = timedelta(hours=720)
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    engine = get_engine()
-    await load_catalogue_into_db(
-        engine,
-        sources_path=CATALOGUE_DIR / "sources.yaml",
-        indicators_path=CATALOGUE_DIR / "indicators.yaml",
-    )
-
-    registry = AdapterRegistry(engine)
+def build_adapter_registry(engine: object) -> AdapterRegistry:
+    """Shared registry construction for the FastAPI lifespan and the
+    standalone `pre_warmer` daemon. Both processes need the same adapter
+    set; this keeps them in lock-step.
+    """
+    registry = AdapterRegistry(engine)  # type: ignore[arg-type]
     registry.register("ons.mid_year_estimates", OnsMidYearEstimatesAdapter)
     registry.register("ons.census2021", OnsCensus2021Adapter)
     registry.register("mhclg.imd2025", MhclgImd2025Adapter)
@@ -62,6 +58,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     registry.register("dfe.explore", DfeExploreAdapter)
     registry.register("police_uk", PoliceUkAdapter)
     registry.register("ons.aps", OnsApsAdapter)
+    return registry
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    engine = get_engine()
+    await load_catalogue_into_db(
+        engine,
+        sources_path=CATALOGUE_DIR / "sources.yaml",
+        indicators_path=CATALOGUE_DIR / "indicators.yaml",
+    )
+
+    registry = build_adapter_registry(engine)
 
     postcodes_io = PostcodesIoAdapter(engine, ttl=POSTCODES_IO_TTL)
 
