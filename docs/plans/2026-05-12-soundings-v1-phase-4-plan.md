@@ -6,33 +6,45 @@
 
 ## Architectural principle (sets the shape of every block)
 
-**API-first. Cache, don't mirror.** Phase 4 onwards, every new public
-data source ships as a **passthrough adapter** — we hold a cached
-response in `cache.source_cache`, not a long-lived copy of the
-publisher's register. The canonical source is the source. Our DB is
-the geography spine plus the questions corpus, not a shadow of CC /
-360G / etc.
+**API-first where the upstream API supports our access pattern.**
+Phase 4 onwards, every new public data source ships as a
+**passthrough adapter** by default — we hold a TTL'd cached response
+in `cache.source_cache`, not a long-lived copy of the publisher's
+register. The canonical source is the source. Our DB is the
+geography spine plus the questions corpus, not a shadow of CC / 360G
+/ etc.
+
+**The documented carve-out: Charity Commission.** Endpoint probing
+during Block A confirmed CC API v2 is detail-lookup only (`GET
+/register/api/allcharitydetailsV2/{regNumber}/{subNumber}`). There is
+no search-by-postcode, search-by-area, or list-with-filter endpoint.
+CC's bulk register download IS the publisher's official discovery
+surface — so for CC, "API-first" actually means "bulk download
+first", refreshed at the same monthly cadence CC themselves publish
+at. Same pattern as Phase 1's IMD loader: cron-scheduled bulk pull,
+streamed parse, idempotent upsert. 360G + FTC remain passthrough.
 
 Implications:
 
-- **No `data.organisation` / `data.grant_record` writes in Phase 4.**
-  Those tables stay in the schema as v2 enrichment destinations
-  (org self-registration, contributed observations) but Phase 4
-  doesn't populate them.
-- **Aggregate indicators that need full-register traversal** (like
-  `civil_society.active_charities_count`) ride on upstream pagination
-  metadata where available (`totalCount` / `totalReturned` fields).
-  Where the upstream doesn't expose a cheap count, the adapter logs
-  the gap in `caveats` rather than paging through 220k rows on every
-  call.
-- **Pre-warm + long TTL** is the workhorse for aggregates. Each
-  passthrough adapter that publishes a slow-changing aggregate
-  exposes an optional `pre_warm_for_places(place_ids)` method; a
-  separate `pre_warmer` daemon (split from the existing `loader`
-  daemon) runs it on a cron so user-facing calls almost always hit a
-  warm cache. TTLs match `sources.yaml` `refresh_cadence`.
-- **No raw 50MB CSV / XLSX downloads in Phase 4.** The CC bulk
-  register, 360G data dumps, etc. are NOT touched. Live API only.
+- **`data.organisation` is populated by the CC loader** at monthly
+  cadence — that's where `find_organisations_in_place` reads from
+  for E&W. Scotland/NI route to the FTC passthrough adapter live.
+  `data.grant_record` stays empty in Phase 4 (360G is passthrough).
+- **Aggregate indicators (`civil_society.active_charities_*`) are
+  loader-aggregated** at the end of each CC pass into
+  `data.indicator_value`. Same shape as MYE / Census. Grant
+  aggregates (`grants_in_last_12m_*`) ride on 360G GrantNav's
+  pagination `totalCount` field, cached.
+- **Pre-warm + long TTL** is the workhorse for 360G's aggregates.
+  Each passthrough adapter that publishes a slow-changing aggregate
+  overrides `pre_warm_for_places(place_ids)`; the `pre_warmer`
+  daemon (Block 0) runs it on a cron so user-facing calls hit warm
+  cache. CC doesn't need pre-warming — its values come from
+  `data.indicator_value` already.
+- **Carve-out criteria** for future bulk exceptions: (a) the
+  publisher's API offers no discovery surface for the access pattern
+  we need, AND (b) the data is structurally slow-changing (monthly+
+  cadence). Anything not meeting both is passthrough by default.
 
 This back-applies as a principle to Phase 5+ but does **not** mean
 ripping out Phase 1's MYE / Census / IMD loaders — those work, they
@@ -49,12 +61,14 @@ answers. Phase 4 ends when:
 1. Tool `find_organisations_in_place` is live on HTTP + MCP.
 2. The four catalogue `civil_society.*` indicators already declared in
    `catalogue/indicators.yaml` resolve to real values via
-   `get_indicators` / `get_place_profile`, served from live CC + 360G
-   API calls (cached).
-3. Three new passthrough adapters wired through `AdapterRegistry`:
-   `charity_commission`, `threesixtygiving`, `find_that_charity`.
-4. A `pre_warmer` daemon runs on a cron, pre-populating the cache for
-   the E&W LTLA universe so user-facing reads hit warm cache.
+   `get_indicators` / `get_place_profile`. Charity counts come from
+   `data.indicator_value` (CC loader writes); grant aggregates come
+   from cached 360G GrantNav queries (passthrough).
+3. Three new adapters wired through `AdapterRegistry`:
+   `charity_commission` (loader-mode, monthly bulk), `threesixtygiving`
+   (passthrough), `find_that_charity` (passthrough).
+4. The `pre_warmer` daemon (Block 0) covers 360G's grant aggregates.
+   CC values don't need pre-warming — they live in `data.indicator_value`.
 5. `/place/[id]` shows an "Organisations" section with the top N
    active charities + a "Recent grants in" summary.
 6. Live tests for all three new adapters run nightly.
@@ -79,26 +93,22 @@ DfE, APS, police.uk) inherit them without change.
 | (no new JS deps) | UI re-uses the existing `IndicatorCard` / `SourceCitations` shapes for the Organisations section | n/a |
 | Second supervisor process (`pre_warmer`) | Same image as `loader`, different command — `python -m soundings.pre_warmer.run` | New process, no new image |
 
-**Estimated scope:** ~28 tasks across 6 blocks. ~1 focused week per
-spec §13 (shorter than the loader-flavoured original draft because
-there are no bulk download / postcode-resolution paths to build).
-Blocks A, B, C can parallelise after Block 0's contract extensions
-land.
+**Estimated scope:** ~29 tasks across 6 blocks. ~1 focused week per
+spec §13. Blocks A, B, C can parallelise after Block 0's contract
+extensions land (Block 0 already shipped in PR #7).
 
 ---
 
 ## Prerequisites Tom needs to do before Block A
 
-- **Register for a Charity Commission API subscription key** at
-  <https://api.charitycommission.gov.uk/> — free, instant.
-  Store as `CHARITY_COMMISSION_API_KEY` in `soundings-ops` and add
-  to GitHub Actions Secrets. The public bulk download is anonymous;
-  the per-query API isn't.
+- **Already done — pre_warmer service added in Block 0.** Compose
+  service exists, no new infra needed for Block A.
+- **No registration required for Block A.** The CC bulk register
+  download is anonymous (no API key). `CHARITY_COMMISSION_API_KEY` is
+  in `.env` already but isn't used by the Phase 4 CC loader — it stays
+  reserved for future per-charity detail enrichment work.
 - **No registration for 360Giving GrantNav.** Public.
 - **No registration for Find That Charity.** Public.
-- **Confirm the pre-warmer fits the current Docker Compose budget.** A
-  new `pre_warmer` service is ~the same shape as `loader` — minimal
-  cost, but Tom should agree before we add it.
 
 ---
 
@@ -109,12 +119,13 @@ before Block A starts.
 
 | Decision | Rationale |
 |---|---|
-| **Every Phase 4 adapter is passthrough.** | API-first per the section above. CC API + 360G API + FTC API all support per-place queries; we don't need to mirror their registers. |
-| **`PassthroughAdapter` grows two optional methods** (`fetch_organisations`, `pre_warm_for_places`). | Avoids a parallel base class. Existing adapters inherit no-op defaults. Orchestrator's `find_organisations_in_place` fans out across adapters that override `fetch_organisations`. |
-| **A new `pre_warmer` Docker Compose service runs the cache-warming cron.** | Keeps user-facing latency low for aggregate indicators. Same image as `loader`, different entrypoint. Schedule is conservative — daily for orgs, weekly for grants. |
-| **Aggregate indicators use upstream `totalCount` / `totalReturned` fields where they exist.** | One API call, one number cached. CC's search API and 360G GrantNav both return totals in their pagination envelope. If a future upstream doesn't, the adapter falls back to a paged sample + extrapolation with a caveat. |
-| **No writes to `data.organisation` or `data.grant_record` in Phase 4.** | Those tables stay as v2 enrichment destinations. Removing them now would churn the migration history for no near-term gain. |
-| **`find_organisations_in_place` fans out across multiple passthrough adapters per call.** | E&W places query `charity_commission`; Scotland / NI route to `find_that_charity`; the response merges. Grant enrichment optionally calls `threesixtygiving` for the same place. Each fan-out leg has the same 10s soft budget as the existing orchestrator. |
+| **CC is loader-mode (monthly bulk pull); 360G + FTC stay passthrough.** | API-first wherever the upstream API supports our access pattern. Endpoint probing during pre-Block-A confirmed CC API v2 is detail-lookup-by-regNumber only — no search-by-area / search-by-postcode / list-with-filter. CC's official discovery surface IS the monthly bulk register download. Same pattern + cron-driven loader as Phase 1's IMD. 360G GrantNav has a real search API; FTC has detail + reconcile endpoints — both stay passthrough. |
+| **The bulk-download carve-out is permitted when:** (a) the publisher's API offers no discovery surface for our access pattern AND (b) the data is structurally slow-changing (monthly+ cadence). | Any future bulk exception needs both conditions documented in its plan. Most upstream sources will continue as passthrough by default. |
+| **`PassthroughAdapter` grows two optional methods** (`fetch_organisations`, `pre_warm_for_places`). | Already shipped in Block 0. Avoids a parallel base class. Existing adapters inherit no-op defaults. Orchestrator's `find_organisations_in_place` fans out across adapters that override `fetch_organisations` PLUS reads `data.organisation` for loader-mode sources like CC. |
+| **`pre_warmer` Docker Compose service runs the cache-warming cron.** | Already shipped in Block 0. Covers 360G aggregates in Block B. CC values land in `data.indicator_value` via the loader, no warming needed. |
+| **`data.organisation` is populated by the CC loader; `data.grant_record` stays empty.** | CC's only structural reason for bulk; 360G is passthrough so no grant rows. The Phase 3-era empty-table state holds for `data.grant_record` through Phase 4; v2 enrichment work can revisit. |
+| **Aggregate indicators are computed at the canonical place for each mode.** | Loader-mode CC: `civil_society.active_charities_*` aggregated at end of loader pass into `data.indicator_value`, same shape as MYE. Passthrough 360G: `civil_society.grants_in_last_12m_*` ride on GrantNav pagination `totalCount`, cached at LTLA granularity. |
+| **`find_organisations_in_place` fans out across mixed-mode sources per call.** | E&W places: SELECT from `data.organisation` for the CC slice (cheap), optionally enrich via 360G passthrough for `recent_grants`. Scotland / NI: route to `find_that_charity` passthrough. Each fan-out leg has the same 10s soft budget as the existing orchestrator. |
 | **Activity filter is accepted but ignored in v1.** | CC publishes activity codes that aren't ICNPO; mapping is judgement-heavy and lands in v2. API shape stays stable so v2 doesn't force a tool-spec change. |
 | **Phase 4 PR workflow matches Phase 3.** | One feature branch per block, squash-merged PRs into `main`. No direct commits to `main`. |
 
@@ -124,21 +135,19 @@ before Block A starts.
 
 Push back if any default is wrong.
 
-1. **What's the right pre-warmer cadence?** Plan default: daily for
-   active-charity counts, weekly for grant aggregates. Lower cadence
-   = staler cache; higher cadence = more upstream traffic. Daily is
-   well within polite API budgets at ~330 LTLAs.
-2. **Should `find_organisations_in_place` cap on the number of
-   passthrough fan-outs?** Plan default: yes, fan-out goes to at
-   most 2 adapters per call (one E&W or one Scotland/NI, plus
-   optional grants enrichment). Avoids unbounded latency stacking.
-3. **`grants_in_last_12m_*` semantics — beneficiary-based or
+1. **CC loader cron pattern.** Plan default: monthly on the 18th at
+   04:00 UTC (`0 4 18 * *`) — CC publishes mid-month, so the 18th
+   gives a few days' buffer.
+2. **360G pre-warmer cadence.** Plan default: weekly for grant
+   aggregates. ~330 LTLAs × one GrantNav query / week = polite.
+3. **Should `find_organisations_in_place` cap on the number of
+   fan-outs?** Plan default: yes — primary adapter (CC loader-SQL
+   for E&W, FTC passthrough for Scotland/NI) plus optional 360G
+   grant enrichment. At most 2 upstreams hit per call.
+4. **`grants_in_last_12m_*` semantics — beneficiary-based or
    recipient-address-based?** Plan default: beneficiary
-   (`recipientLocations` in 360G's payload). Note coverage gap — many
-   records lack beneficiary postcode; the figure undercounts. Caveat
-   it.
-4. **TTL for `civil_society.active_charities_count`?** Plan default:
-   24h. CC publishes daily; same-day staleness is acceptable.
+   (`recipientLocations` in 360G's payload). Coverage gap caveat —
+   many records lack beneficiary postcode; the figure undercounts.
 
 ---
 
@@ -213,103 +222,156 @@ PR title: `Phase 4 Block 0: passthrough base + pre_warmer scaffold`.
 
 ---
 
-## Block A — Charity Commission passthrough (Tasks 4–9)
+## Block A — Charity Commission loader (Tasks 4–10)
 
-### Task 4: `CharityCommissionClient`
+> Loader-mode by exception per the architectural-decisions table above:
+> CC API v2 is detail-lookup only with no search-by-area endpoint, and
+> the data is monthly-cadence — bulk download is the publisher's
+> official discovery surface. Same shape as Phase 1's IMD loader.
+
+### Task 4: `CharityCommissionBulkClient`
 
 **Files:**
 - Create: `server/soundings/adapters/charity_commission/__init__.py`
 - Create: `server/soundings/adapters/charity_commission/client.py`
 - Create: `server/tests/test_cc_client.py`
 
-Wraps the CC REST API at `https://api.charitycommission.gov.uk/`.
-Reads `CHARITY_COMMISSION_API_KEY` from env, forwards as
-`Ocp-Apim-Subscription-Key`. Methods we need:
+Downloads the latest bulk register ZIP from
+<https://register-of-charities.charitycommission.gov.uk/register/full-register-download>
+and streams the CSVs out without keeping the full archive in memory.
 
-- `search_charities(postcode_area: str, page: int = 1, page_size: int = 100)` —
-  returns the JSON with `totalReturned` + paginated rows.
-- `count_charities_in_area(postcode_area_prefix: str)` — calls search
-  with `page_size=1`, reads `totalReturned`. Cheap one-shot count.
-- `get_charity(reg_number: int)` — single charity detail.
+The register publishes ~6 CSVs; we need at minimum `charity` (the
+core entity table) + `charity_main_charity` (active flag + contact
+details). The client exposes `iter_active_charities()` yielding dicts
+with the merged columns we care about: `registration_number`, `name`,
+`postcode`, `status`, `activities_text`, `cc_classification`.
 
-Rate limit per public-tier guidance (~5 RPS). Mock-transport tests
-confirm headers / query string / pagination shape.
+`httpx.MockTransport` test seeds a fake ZIP via `zipfile.ZipFile` over
+`io.BytesIO`; asserts the iterator yields the expected merged rows.
 
-Commit: `feat(adapters): charity commission async client`.
+Anonymous — no API key. (`CHARITY_COMMISSION_API_KEY` stays reserved
+for future per-charity detail enrichment work; Phase 4 doesn't use it.)
 
-### Task 5: `CharityCommissionAdapter` (passthrough)
+Commit: `feat(adapters): charity commission bulk register client`.
 
-**Files:**
-- Create: `server/soundings/adapters/charity_commission/adapter.py`
-- Create: `server/tests/test_cc_adapter.py`
-
-`source_id = "charity_commission"`, `mode = "passthrough"`,
-`ttl=timedelta(hours=24)`.
-
-- `fetch_indicator(civil_society.active_charities_count, place_id)` →
-  resolve `place_id` → postcode area prefix (via `geography.place` +
-  cached `geography.postcode` lookups), call
-  `client.count_charities_in_area`, return `IndicatorValue`.
-- `fetch_indicator(civil_society.active_charities_per_10k, place_id)` →
-  call count above, divide by latest `population.total`, return.
-- `fetch_organisations(place_id, filters, limit)` → paginate
-  `client.search_charities` up to `limit`, materialise each row as
-  `OrganisationRef` with `source` stamped.
-
-Cache key shape: `f"cc:{indicator_or_orgs}:{place_id}"`. Adapter
-test mocks the client + asserts the count fan-out + organisation
-materialisation.
-
-Commit: `feat(adapters): CharityCommissionAdapter passthrough`.
-
-### Task 6: CC pre-warmer
+### Task 5: Postcode batch resolver
 
 **Files:**
-- Modify: `server/soundings/adapters/charity_commission/adapter.py`
-- Create: `server/tests/test_cc_pre_warm.py`
+- Create: `server/soundings/adapters/charity_commission/mapping.py`
+- Create: `server/tests/test_cc_mapping.py`
 
-Override `pre_warm_for_places(place_ids)` to fetch the count
-indicator for every supplied LTLA, populating `cache.source_cache`
-under the same keys `fetch_indicator` would read.
+`resolve_postcodes_to_places(postcodes_io_client, postcodes)` batches
+100 postcodes per `postcodes.io` POST request, returns
+`dict[postcode, place_id]` indexed by LTLA (`ltla24:E...`). Unknown
+postcodes return None and get counted in `notes`, not hard-error.
+Caches in `geography.postcode` on the way through so re-runs only
+look up novel postcodes (idempotent).
 
-Commit: `feat(adapters): CC pre_warm_for_places(ltlas) for count cache`.
+Commit: `feat(adapters): cc postcode batch resolution via postcodes.io`.
 
-### Task 7: Register CC adapter
+### Task 6: `CharityCommissionLoader` — write to `data.organisation`
 
 **Files:**
-- Modify: `server/soundings/app.py`
+- Create: `server/soundings/adapters/charity_commission/loader.py`
+- Create: `server/tests/test_cc_loader.py`
 
-Wire `CharityCommissionAdapter` into `AdapterRegistry`.
+`source_id = "charity_commission"`, `mode = "loader"`. `load()`:
 
-Commit: `feat(app): register charity_commission + civil_society indicators`.
+1. Stream every "active" row from `CharityCommissionBulkClient.iter_active_charities`.
+2. Batch-resolve postcodes via the Task 5 helper.
+3. Upsert into `data.organisation`:
+   - `id` = `"charity_commission:NNNNNN"` (CC reg number)
+   - `name` = charity name
+   - `classification` = ARRAY from CC activity codes
+   - `registered_address_place_id` = resolved LTLA (nullable)
+   - `source_id` = `charity_commission`
+   - `raw` = the full merged row as JSONB
+4. Also upsert a row into `data.organisation_operates_in` linking the
+   org to its registered LTLA — v1 "operates in" approximation.
 
-### Task 8: Live test for the CC adapter
+`on_conflict_do_update` so re-runs refresh `retrieved_at`. Removed /
+dissolved charities flagged via `raw->>'status'` rather than being
+deleted — keeps history for v2 enrichment without polluting the
+active aggregate.
+
+Integration test (mock client + real DB) seeds 10 charities across 3
+LTLAs, runs the loader, asserts row counts and that
+`organisation_operates_in` is symmetric with
+`registered_address_place_id`.
+
+Commit: `feat(adapters): CharityCommissionLoader populates data.organisation`.
+
+### Task 7: CC indicator aggregation — `civil_society.active_charities_*`
+
+**Files:**
+- Modify: `server/soundings/adapters/charity_commission/loader.py`
+- Create: `server/tests/test_cc_indicator_aggregation.py`
+
+End of `load()`, two aggregating UPSERTs to `data.indicator_value`:
+
+- `civil_society.active_charities_count` — count per `place_id` of
+  organisations where `source_id='charity_commission'` and
+  `raw->>'status' = 'Active'`.
+- `civil_society.active_charities_per_10k` — same count divided by
+  the latest `population.total` for that place × 10_000. Reads
+  population from the existing `data.indicator_value` row; skips
+  places without population (logged in `loader_run.notes`).
+
+Both rows stamped with the current `loader_run_id` so `cache_status`
+flows from the existing `LoaderAdapter.fetch_indicator` plumbing.
+
+Commit: `feat(adapters): CC loader emits civil_society indicator aggregates`.
+
+### Task 8: Register CC adapter
+
+**Files:**
+- Modify: `server/soundings/adapters/charity_commission/__init__.py`
+- Modify: `server/soundings/app.py` (`build_adapter_registry`)
+- Modify: `server/soundings/loader/run.py` (add to source registry)
+
+Re-export `CharityCommissionLoader` under the canonical
+`CharityCommissionAdapter` name (matches the MYE / IMD pattern), wire
+into `build_adapter_registry`. The loader daemon picks up the
+`sources.yaml` `refresh_cadence` already pinned for
+`charity_commission`.
+
+Commit: `feat(app): register charity_commission + civil_society aggregates`.
+
+### Task 9: Live test for the CC loader
 
 **Files:**
 - Create: `server/tests/live/test_cc_live.py`
 
-Marker `live` + `integration`. Skips cleanly without
-`CHARITY_COMMISSION_API_KEY`. With a key:
+Marker `live` + `integration`. Downloads the real bulk register
+(rate-limited — once per nightly run) and asserts:
 
-- `count_charities_in_area("TS18")` returns a plausible integer.
-- `fetch_organisations` for `ltla24:E06000004` returns ≥1 charity
-  with a non-empty name.
+- ≥100_000 active charities seed without error.
+- At least one charity resolves to `ltla24:E06000004` (Stockton).
+- `data.indicator_value` has `civil_society.active_charities_count`
+  for at least 5 distinct LTLAs.
 
-Commit: `test: cc live smoke for stockton`.
+A timeout caveat: if CC's bulk download is >60s slow, mark the test
+`xfail` rather than failing nightly — upstream flakiness shouldn't
+blank our CI. Also pipe `STATXPLORE_API_KEY` through nightly.yml at
+the same time (it's currently in the workflow's expected secrets but
+not the env block — see Phase 3 follow-up).
 
-### Task 9: Block A docs
+Commit: `test: cc live smoke + civil_society aggregation`.
+
+### Task 10: Block A docs
 
 **Files:**
 - Modify: `STATE.md`
 - Modify: `PLAN.md`
+- Modify: `.env.example` (fix the `DWP_STATXPLORE_KEY` → `STATXPLORE_API_KEY` name mismatch)
 
-Commit: `docs: block a — cc passthrough live`.
+Commit: `docs: block a — cc loader shipped, aggregation flowing`.
 
-PR title: `Phase 4 Block A: Charity Commission passthrough adapter`.
+PR title: `Phase 4 Block A: Charity Commission loader + civil_society indicators`.
 
 ---
 
-## Block B — 360Giving passthrough (Tasks 10–14)
+## Block B — 360Giving passthrough (Tasks 11–15)
 
 ### Task 10: `ThreeSixtyGivingClient`
 
@@ -387,7 +449,7 @@ PR title: `Phase 4 Block B: 360Giving passthrough + grant indicators`.
 
 ---
 
-## Block C — Find That Charity passthrough (Tasks 15–18)
+## Block C — Find That Charity passthrough (Tasks 16–19)
 
 ### Task 15: `FindThatCharityClient`
 
@@ -444,7 +506,7 @@ PR title: `Phase 4 Block C: Find That Charity passthrough`.
 
 ---
 
-## Block D — `find_organisations_in_place` tool (Tasks 19–24)
+## Block D — `find_organisations_in_place` tool (Tasks 20–25)
 
 ### Task 19: Tool spec + Pydantic
 
@@ -467,21 +529,29 @@ Commit: `feat(tools): find_organisations_in_place schema`.
 `find_organisations_in_place(place_id, activity_filter, funded_only,
 limit)`:
 
-1. Resolve `geography.place(id)` to fetch `country` + `type`.
-2. Pick a primary adapter:
-   - England / Wales → `charity_commission`
-   - Scotland / NI → `find_that_charity`
-3. Call `adapter.fetch_organisations(place_id, filters, limit)`.
-4. Optionally enrich each result with `threesixtygiving.recent_grants`
-   (only when `funded_only=true` or as a default top-3 summary).
-5. Return list + dedup-ed SourceRefs + any caveats from the adapters.
+1. Resolve `geography.place(id)` → fetch `country` + `type`.
+2. **Mixed-mode dispatch**:
+   - England / Wales → SELECT from `data.organisation` where
+     `registered_address_place_id = :pid` OR `id IN (SELECT
+     organisation_id FROM data.organisation_operates_in WHERE
+     place_id = :pid)`. Loader-mode CC populates this on a monthly
+     cron — `data.organisation` is the canonical surface for E&W.
+   - Scotland / NI → call `find_that_charity.fetch_organisations`
+     (passthrough, FTC adapter overrides the method per Block C).
+3. If `funded_only=true`, INNER JOIN to `data.grant_record` on
+   `recipient_org_id` (table is empty in Phase 4, so this returns []
+   until v2 — caveated in the response).
+4. Optionally enrich each result with
+   `threesixtygiving.recent_grants(place_id, limit=3)` so the
+   `recent_grants` field on `OrganisationRef` carries up to three
+   GBP grants — 360G is passthrough, cached.
+5. Return list + dedup-ed SourceRefs + any caveats from the
+   adapters. `partial=True` if any leg errors out.
 
-Returns partial=True if any adapter errors out, mirroring the
-existing `compare_places` orchestrator pattern.
-
-Test seeds catalogue + the cache.source_cache with two synthetic CC
-responses for two LTLAs; asserts the right adapter is picked + the
-grants enrichment fires when `funded_only=true`.
+Test seeds catalogue + `data.organisation` rows for an English LTLA
+(loader path) + cache.source_cache with an FTC payload for a Scottish
+place (passthrough path); asserts the right code path runs in each
+case + the grants enrichment fires.
 
 Commit: `feat(orchestrator): find_organisations_in_place`.
 
@@ -526,7 +596,7 @@ PR title: `Phase 4 Block D: find_organisations_in_place tool`.
 
 ---
 
-## Block E — UI surface for organisations (Tasks 25–27)
+## Block E — UI surface for organisations (Tasks 26–28)
 
 ### Task 25: `lib/api.ts` wrapper + types
 
@@ -569,7 +639,7 @@ PR title: `Phase 4 Block E: UI surface for organisations`.
 
 ---
 
-## Block F — Integration, e2e, tag (Tasks 28–31)
+## Block F — Integration, e2e, tag (Tasks 29–32)
 
 ### Task 28: Phase 4 e2e — server-side
 
@@ -587,9 +657,13 @@ Commit: `test: phase 4 e2e — find_organisations across CC + FTC`.
 **Files:**
 - Create: `docs/runbook-phase-4-smoke.md`
 
-Like the Phase 3 runbook. Notes the new `pre_warmer` service +
-how to seed its cache for the smoke (one-shot `python -m
-soundings.pre_warmer.run --once charity_commission`).
+Like the Phase 3 runbook. Notes:
+- `make seed-light` now also runs the CC loader (`--once
+  charity_commission`) — this is the heavy one (~5 min, ~50MB
+  download). For dev iteration, document a place-filtered subset
+  pull so seeding stays under 1 min.
+- For 360G aggregates: `python -m soundings.pre_warmer.run --once
+  threesixtygiving` warms the grant-sum cache for the seeded LTLAs.
 
 Commit: `docs(runbook): phase 4 browser smoke`.
 
@@ -601,7 +675,7 @@ Commit: `docs(runbook): phase 4 browser smoke`.
 
 Mark Phase 4 complete, list Phase 5 follow-ups.
 
-Commit: `docs: phase 4 complete — three passthrough adapters + find_organisations`.
+Commit: `docs: phase 4 complete — CC loader + 360G/FTC passthrough + find_organisations`.
 
 ### Task 31: Tag `v0.5.0-phase-4`
 
@@ -628,12 +702,15 @@ All green simultaneously:
       `civil_society.grants_in_last_12m_total`, and
       `civil_society.grants_in_last_12m_count` resolve to real values
       for at least the LTLAs covered by `make seed-light`.
-- [ ] Three new passthrough adapters live: `charity_commission`,
-      `threesixtygiving`, `find_that_charity`.
-- [ ] `pre_warmer` service running in compose, warming the cache for
-      civil-society indicators on a daily/weekly cron.
-- [ ] No new rows in `data.organisation` or `data.grant_record`
-      (Phase 4 doesn't touch them; v2 enrichment work will).
+- [ ] Three new adapters live: `charity_commission` (loader-mode,
+      monthly bulk pull), `threesixtygiving` + `find_that_charity`
+      (passthrough).
+- [ ] `pre_warmer` service running in compose, warming the 360G grant
+      aggregate cache on a weekly cron. CC counts come from the
+      loader's `data.indicator_value` writes, no warming needed.
+- [ ] `data.organisation` populated by the CC loader (~220k rows after
+      `make seed`). `data.grant_record` stays empty in Phase 4
+      (passthrough 360G doesn't write to it; v2 enrichment will).
 - [ ] `/place/[id]` renders an Organisations section for E&W places
       and degrades cleanly elsewhere.
 - [ ] Nightly live tests for all three new adapters green.
@@ -642,10 +719,19 @@ All green simultaneously:
 ## Out of scope
 
 - Phase 5+ work — separate plan documents.
-- `data.organisation` / `data.grant_record` population — v2 enrichment.
+- `data.grant_record` population — v2 enrichment (360G stays
+  passthrough in Phase 4; v2 might mirror grant detail for richer
+  joins).
 - ICNPO ↔ CC activity-code mapping — v2 task.
 - Operational-reach geography (`operates_in` beyond registered
   address) — v2 task using FTC's geo joins.
+- Per-charity CC API enrichment (`allcharitydetailsV2/{regNumber}`)
+  for richer detail beyond what the bulk register provides —
+  `CHARITY_COMMISSION_API_KEY` is parked for this future work.
 - Backfilling earlier Phase 1 loaders (MYE / Census / IMD) to
   passthrough — the API-first principle applies forward only; the
   existing loaders ship value and stay.
+- Daily CC delta sync via the `recentchanges` endpoint (option 2b
+  from the design discussion). Monthly cadence matches CC's
+  publishing cadence; near-real-time freshness isn't worth the extra
+  cron job for v1.

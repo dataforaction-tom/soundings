@@ -1,0 +1,269 @@
+"""CharityCommissionLoader — writes the monthly CC bulk register into
+`data.organisation` + `data.organisation_operates_in`.
+
+The bulk client streams active charities (status='Registered'); we
+batch-resolve their postcodes via the postcodes.io bulk endpoint
+(`charity_commission.mapping.resolve_postcodes_to_ltlas`), build
+organisation rows, and upsert in chunks. Idempotent: re-running
+against the same bulk pull updates `retrieved_at` but doesn't
+duplicate rows.
+
+Task 7 layers on top of this to write the
+`civil_society.active_charities_count` + `_per_10k` indicator
+aggregates at the end of each load.
+"""
+
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
+from sqlalchemy import text
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.ext.asyncio import AsyncEngine
+
+from soundings.adapters.base import LoaderAdapter, LoaderResult
+from soundings.adapters.charity_commission.client import CharityCommissionBulkClient
+from soundings.adapters.charity_commission.mapping import resolve_postcodes_to_ltlas
+from soundings.adapters.postcodes_io.adapter import PostcodesIoAdapter
+from soundings.db.models.data import Organisation, OrganisationOperatesIn
+
+SOURCE_ID = "charity_commission"
+ORG_INSERT_CHUNK = 1000
+POSTCODES_IO_TTL_HOURS = 720  # 30 days, matches sources.yaml
+
+
+class CharityCommissionLoader(LoaderAdapter):
+    source_id = SOURCE_ID
+
+    def __init__(
+        self,
+        engine: AsyncEngine,
+        *,
+        bulk_client: CharityCommissionBulkClient | None = None,
+        postcodes_io: PostcodesIoAdapter | None = None,
+    ) -> None:
+        super().__init__(engine)
+        self._bulk_client = bulk_client or CharityCommissionBulkClient()
+        self._postcodes_io = postcodes_io or PostcodesIoAdapter(
+            engine, ttl=timedelta(hours=POSTCODES_IO_TTL_HOURS)
+        )
+
+    async def load(self, run_id: str | None = None) -> LoaderResult:
+        # Pass 1: collect all rows + postcodes. ~50MB in memory at 220k
+        # rows — acceptable for v1. Future optimisation could two-pass
+        # the bulk download to avoid the in-memory list.
+        rows: list[dict[str, Any]] = []
+        async for charity in self._bulk_client.iter_active_charities():
+            rows.append(charity)
+
+        # Pass 2: batch-resolve postcodes (the resolver short-circuits
+        # any postcode already cached in geography.postcode, so monthly
+        # re-loads against a warm cache hit postcodes.io zero times).
+        postcodes = [r["postcode"] for r in rows if r.get("postcode")]
+        resolved = await resolve_postcodes_to_ltlas(self._postcodes_io, postcodes)
+
+        # Pass 3: materialise + chunked upsert.
+        retrieved_at = datetime.now(tz=UTC)
+        org_rows = self._build_org_rows(rows, resolved, retrieved_at)
+        operates_in_rows = self._build_operates_in_rows(org_rows)
+
+        await self._upsert_organisations(org_rows)
+        await self._upsert_operates_in(operates_in_rows)
+
+        # Phase 4 Task 7: end-of-load aggregates into data.indicator_value.
+        # Period = YYYY-MM (CC publishes monthly); UPSERT so re-runs in the
+        # same calendar month overwrite the latest count.
+        period = retrieved_at.strftime("%Y-%m")
+        aggregate_notes = await self._aggregate_indicators(period, retrieved_at)
+
+        unresolved = sum(1 for r in rows if not resolved.get(r.get("postcode", "")))
+        note_pieces: list[str] = []
+        if unresolved:
+            note_pieces.append(
+                f"{unresolved} charities with unresolved postcodes — "
+                "registered_address_place_id null"
+            )
+        if aggregate_notes:
+            note_pieces.append(aggregate_notes)
+        notes = "; ".join(note_pieces) if note_pieces else None
+        return LoaderResult(rows_written=len(org_rows), notes=notes)
+
+    async def _aggregate_indicators(self, period: str, retrieved_at: datetime) -> str | None:
+        """UPSERT `civil_society.active_charities_count` and
+        `civil_society.active_charities_per_10k` into data.indicator_value
+        for every LTLA that has fresh CC rows.
+
+        Restricts to organisations touched in THIS load
+        (retrieved_at >= the load's threshold, minus a 1-second buffer
+        for clock skew). Charities that fell out of the register
+        between loads don't carry forward into the new aggregate.
+
+        Per_10k joins to the latest `population.total` for each place;
+        LTLAs without a population row get the count but not the rate
+        — counted in the returned notes string.
+        """
+        threshold = retrieved_at - timedelta(seconds=1)
+        async with self._engine.begin() as conn:
+            # Count UPSERT — overwrites any previous monthly count.
+            await conn.execute(
+                text(
+                    "WITH counts AS ("
+                    "  SELECT registered_address_place_id AS place_id, "
+                    "         COUNT(*) AS cnt "
+                    "  FROM data.organisation "
+                    "  WHERE source_id = :sid "
+                    "    AND registered_address_place_id IS NOT NULL "
+                    "    AND retrieved_at >= :ts "
+                    "    AND raw->>'status' = 'Registered' "
+                    "  GROUP BY registered_address_place_id"
+                    ") "
+                    "INSERT INTO data.indicator_value "
+                    "(place_id, indicator_key, period, value, source_id, "
+                    " retrieved_at, caveats) "
+                    "SELECT place_id, 'civil_society.active_charities_count', "
+                    "       :period, cnt, :sid, :now, '[]'::jsonb "
+                    "FROM counts "
+                    "ON CONFLICT (place_id, indicator_key, period) "
+                    "DO UPDATE SET value = EXCLUDED.value, "
+                    "              retrieved_at = EXCLUDED.retrieved_at, "
+                    "              source_id = EXCLUDED.source_id"
+                ),
+                {
+                    "sid": self.source_id,
+                    "ts": threshold,
+                    "period": period,
+                    "now": retrieved_at,
+                },
+            )
+            # Per_10k UPSERT — needs population.total INNER JOIN, so any
+            # place without population is skipped silently here. The
+            # notes line below logs how many.
+            await conn.execute(
+                text(
+                    "WITH counts AS ("
+                    "  SELECT registered_address_place_id AS place_id, "
+                    "         COUNT(*) AS cnt "
+                    "  FROM data.organisation "
+                    "  WHERE source_id = :sid "
+                    "    AND registered_address_place_id IS NOT NULL "
+                    "    AND retrieved_at >= :ts "
+                    "    AND raw->>'status' = 'Registered' "
+                    "  GROUP BY registered_address_place_id"
+                    "), populations AS ("
+                    "  SELECT DISTINCT ON (place_id) place_id, value AS pop "
+                    "  FROM data.indicator_value "
+                    "  WHERE indicator_key = 'population.total' "
+                    "    AND value IS NOT NULL "
+                    "  ORDER BY place_id, period DESC"
+                    ") "
+                    "INSERT INTO data.indicator_value "
+                    "(place_id, indicator_key, period, value, source_id, "
+                    " retrieved_at, caveats) "
+                    "SELECT c.place_id, "
+                    "       'civil_society.active_charities_per_10k', "
+                    "       :period, c.cnt::numeric / p.pop * 10000.0, "
+                    "       :sid, :now, '[]'::jsonb "
+                    "FROM counts c "
+                    "INNER JOIN populations p ON p.place_id = c.place_id "
+                    "WHERE p.pop > 0 "
+                    "ON CONFLICT (place_id, indicator_key, period) "
+                    "DO UPDATE SET value = EXCLUDED.value, "
+                    "              retrieved_at = EXCLUDED.retrieved_at, "
+                    "              source_id = EXCLUDED.source_id"
+                ),
+                {
+                    "sid": self.source_id,
+                    "ts": threshold,
+                    "period": period,
+                    "now": retrieved_at,
+                },
+            )
+            # Count places we have a charity-count for but no per_10k —
+            # those are the missing-population places.
+            missing_pop_row = (
+                await conn.execute(
+                    text(
+                        "SELECT COUNT(*) AS n FROM ("
+                        "  SELECT registered_address_place_id AS place_id "
+                        "  FROM data.organisation "
+                        "  WHERE source_id = :sid "
+                        "    AND registered_address_place_id IS NOT NULL "
+                        "    AND retrieved_at >= :ts "
+                        "    AND raw->>'status' = 'Registered' "
+                        "  GROUP BY registered_address_place_id"
+                        ") c "
+                        "WHERE NOT EXISTS ("
+                        "  SELECT 1 FROM data.indicator_value iv "
+                        "  WHERE iv.place_id = c.place_id "
+                        "    AND iv.indicator_key = 'population.total'"
+                        ")"
+                    ),
+                    {"sid": self.source_id, "ts": threshold},
+                )
+            ).first()
+        missing_pop = int(missing_pop_row.n) if missing_pop_row else 0
+        if missing_pop:
+            return f"{missing_pop} LTLAs without population.total — per_10k skipped"
+        return None
+
+    @staticmethod
+    def _build_org_rows(
+        rows: list[dict[str, Any]],
+        resolved: dict[str, str | None],
+        retrieved_at: datetime,
+    ) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        for charity in rows:
+            postcode = charity.get("postcode") or ""
+            place_id = resolved.get(postcode)
+            org_id = f"charity_commission:{charity['registration_number']}"
+            out.append(
+                {
+                    "id": org_id,
+                    "name": charity["name"],
+                    "classification": charity.get("classification") or [],
+                    "registered_address_place_id": place_id,
+                    "source_id": SOURCE_ID,
+                    "retrieved_at": retrieved_at,
+                    "raw": charity,
+                }
+            )
+        return out
+
+    @staticmethod
+    def _build_operates_in_rows(org_rows: list[dict[str, Any]]) -> list[dict[str, str]]:
+        return [
+            {"organisation_id": row["id"], "place_id": row["registered_address_place_id"]}
+            for row in org_rows
+            if row["registered_address_place_id"] is not None
+        ]
+
+    async def _upsert_organisations(self, org_rows: list[dict[str, Any]]) -> None:
+        if not org_rows:
+            return
+        async with self._engine.begin() as conn:
+            for chunk in _chunked(org_rows, ORG_INSERT_CHUNK):
+                stmt = insert(Organisation).values(chunk)
+                stmt = stmt.on_conflict_do_update(
+                    index_elements=[Organisation.id],
+                    set_={
+                        "name": stmt.excluded.name,
+                        "classification": stmt.excluded.classification,
+                        "registered_address_place_id": stmt.excluded.registered_address_place_id,
+                        "retrieved_at": stmt.excluded.retrieved_at,
+                        "raw": stmt.excluded.raw,
+                    },
+                )
+                await conn.execute(stmt)
+
+    async def _upsert_operates_in(self, operates_in_rows: list[dict[str, str]]) -> None:
+        if not operates_in_rows:
+            return
+        async with self._engine.begin() as conn:
+            for chunk in _chunked(operates_in_rows, ORG_INSERT_CHUNK):
+                stmt = insert(OrganisationOperatesIn).values(chunk)
+                stmt = stmt.on_conflict_do_nothing()
+                await conn.execute(stmt)
+
+
+def _chunked(seq: list[Any], n: int) -> list[list[Any]]:
+    return [seq[i : i + n] for i in range(0, len(seq), n)]

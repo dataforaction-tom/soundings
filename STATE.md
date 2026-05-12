@@ -1,10 +1,12 @@
 # State
 
-> Last updated: 2026-05-12 (session 3)
-> Phase: **3 complete.** All 45 tasks across blocks A–J shipped via
-> PRs #1 (Blocks C-G adapters + compare_places), #2 (Block H get_trend),
-> #3 (Block I UI charts), and the present PR (Block J integration +
-> tag prep). `v0.4.0-phase-3` tag pending the manual browser smoke
+> Last updated: 2026-05-12 (session 4)
+> Phase: **4 in progress.** Phase 4 plan accepted (PR #6); Block 0
+> (PassthroughAdapter extensions + pre_warmer scaffold) shipped via
+> PR #7. **Block A — Charity Commission loader — is the current PR**:
+> bulk client, postcode batch resolver, loader, indicator aggregation,
+> registration, live test, and this doc refresh. Phase 3's
+> `v0.4.0-phase-3` tag is still pending the manual browser smoke
 > documented in `docs/runbook-phase-3-smoke.md`.
 
 ## System State Diagram
@@ -21,9 +23,10 @@ stateDiagram-v2
     Phase2Done --> Phase3Build: phase 3 plan accepted
     Phase3Build --> Phase3Done: blocks A–J complete, tag v0.4.0-phase-3
     Phase3Done --> Phase4Build: phase 4 plan accepted
-    Phase4Build --> [*]: not started
+    Phase4Build --> Phase4Done: blocks 0–F complete, tag v0.5.0-phase-4
+    Phase4Done --> [*]: not started
 
-    note right of Phase3Done: ← WE ARE HERE (browser smoke pending)
+    note right of Phase4Build: ← WE ARE HERE (Block A landing)
 ```
 
 ## Component Status
@@ -58,6 +61,14 @@ stateDiagram-v2
 | **Phase 3 server e2e (`compare_places` + `get_trend` + Fingertips cache)** | ✅ Phase 3 (Block J) | Seeds 3 LTLAs + a Fingertips life-expectancy cache row, asserts ranked compare + ordered three-point trend. |
 | **Browser smoke runbook** | ✅ Phase 3 (Block J) | `docs/runbook-phase-3-smoke.md` — gates the `v0.4.0-phase-3` tag. |
 | **`v0.4.0-phase-3` tag** | ⏳ Phase 3 (Block J) | Pending browser smoke pass. |
+| **`PassthroughAdapter` extensions + `pre_warmer` daemon** | ✅ Phase 4 (Block 0) | `fetch_organisations` + `pre_warm_for_places` optional methods; new compose service. |
+| **`OrganisationRef` + `GrantRef` contracts** | ✅ Phase 4 (Block 0) | Per design §4.6. |
+| **`CharityCommissionLoader` (loader-mode by carve-out)** | ✅ Phase 4 (Block A) | Bulk register pulled monthly. API-first principle's documented exception: CC API v2 is detail-lookup only, no search-by-area endpoint. Writes data.organisation + data.organisation_operates_in + civil_society.active_charities_* aggregates. |
+| **`ThreeSixtyGivingAdapter` (passthrough)** | ⏳ Phase 4 (Block B) | Not started. GrantNav has a real search API; will be passthrough with pre_warmer. |
+| **`FindThatCharityAdapter` (passthrough)** | ⏳ Phase 4 (Block C) | Not started. Cross-jurisdiction (Scotland/NI). |
+| **`find_organisations_in_place` tool** | ⏳ Phase 4 (Block D) | Not started. Mixed-mode dispatch: data.organisation SELECT for E&W, FTC passthrough for Scotland/NI, optional 360G grant enrichment. |
+| **UI Organisations section** | ⏳ Phase 4 (Block E) | Not started. |
+| **`v0.5.0-phase-4` tag** | ⏳ Phase 4 (Block F) | Not started. |
 
 Status markers: ⏳ Not started · 🔧 In progress · ✅ Done · 🚫 Blocked · ⚠️ Needs attention.
 
