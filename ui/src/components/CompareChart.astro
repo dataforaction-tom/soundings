@@ -2,14 +2,15 @@
 import "../lib/dom-polyfill";
 import { renderCompareBars } from "../lib/chart";
 import { prettyKey } from "../lib/indicator_display";
-import type { Comparison } from "../lib/types";
+import type { Comparison, ComparisonBasis } from "../lib/types";
 
 interface Props {
   comparison: Comparison;
+  basis?: ComparisonBasis;
 }
 
-const { comparison } = Astro.props;
-const svg = renderCompareBars(comparison);
+const { comparison, basis } = Astro.props;
+const svg = renderCompareBars(comparison, { basis });
 ---
 
 <section class="compare-chart">

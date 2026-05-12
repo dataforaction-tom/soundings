@@ -16,9 +16,13 @@ COPY server/pyproject.toml server/uv.lock /app/server/
 RUN cd /app/server && uv sync --frozen --no-dev --no-install-project
 
 COPY server/ /app/server/
+COPY catalogue/ /app/catalogue/
 RUN cd /app/server && uv sync --frozen --no-dev
 
 ENV PATH="/opt/venv/bin:$PATH"
+# spaCy NER model required by the sanitisation pipeline's
+# StripPersonalNamesViaNER rule, built into the lifespan startup.
+RUN python -m spacy download en_core_web_sm
 WORKDIR /app/server
 
 EXPOSE 8000
