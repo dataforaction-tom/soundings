@@ -1,8 +1,8 @@
 # Plan
 
-> Last updated: 2026-05-15 (session 5)
-> Status: **Phase 4 in progress.** Block C (Find That Charity) — Task 15
-> committed. Blocks C–F pending.
+> Last updated: 2026-05-17 (session 6)
+> Status: **Phase 4 in progress.** Block C (Find That Charity) — Tasks 15-18
+> complete. Blocks D–F pending.
 
 ## Objective
 
@@ -42,8 +42,8 @@ to `main`.
       pending browser smoke.
 - [x] Phase 4 — Adapters for Charity Commission (loader; bulk register),
       360Giving + Find That Charity (passthrough);
-      `find_organisations_in_place`. **Blocks 0, A, B, C (partial) landed**;
-      Blocks C (partial), D, E, F pending.
+      `find_organisations_in_place`. **Blocks 0, A, B, C landed**;
+      Blocks D, E, F pending.
 - [ ] Phase 5 — First monthly corpus release, doc pass.
 - [ ] Phase 6 — Public soft launch on the Mac mini.
 

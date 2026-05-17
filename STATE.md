@@ -1,11 +1,11 @@
 # State
 
-> Last updated: 2026-05-12 (session 4)
-> Phase: **4 in progress.** Plan + Block 0 + Block A all merged
-> (PRs #6, #7, #8). **Block B — 360Giving passthrough — is the
-> current PR**: client, adapter, pre_warmer override, registration,
-> live test. Phase 3's `v0.4.0-phase-3` tag is still pending the
-> manual browser smoke documented in `docs/runbook-phase-3-smoke.md`.
+> Last updated: 2026-05-17 (session 6)
+> Phase: **4 in progress.** Plan + Block 0 + Block A + Block B all merged
+> (PRs #6, #7, #8, #9). **Block C — Find That Charity passthrough — just
+> landed**; Block D (find_organisations_in_place tool) is next. Phase 3's
+> `v0.4.0-phase-3` tag is still pending the manual browser smoke in
+> `docs/runbook-phase-3-smoke.md`.
 
 ## System State Diagram
 
@@ -63,7 +63,7 @@ stateDiagram-v2
 | **`OrganisationRef` + `GrantRef` contracts** | ✅ Phase 4 (Block 0) | Per design §4.6. |
 | **`CharityCommissionLoader` (loader-mode by carve-out)** | ✅ Phase 4 (Block A) | Bulk register pulled monthly. API-first principle's documented exception: CC API v2 is detail-lookup only, no search-by-area endpoint. Writes data.organisation + data.organisation_operates_in + civil_society.active_charities_* aggregates. |
 | **`ThreeSixtyGivingAdapter` (passthrough)** | ✅ Phase 4 (Block B) | Composes place-level grant aggregates by fanning out across CC charities in data.organisation. Three-layer cache (per-org aggregate + per-org grants + per-place grants); latest_grant_date filter skips orgs with no recent activity. Pre-warmer override drives weekly cache warming. Live test verified against Oxfam. |
-| **`FindThatCharityAdapter` (passthrough)** | ⏳ Phase 4 (Block C) | Not started. Cross-jurisdiction (Scotland/NI). |
+|| **`FindThatCharityAdapter` (passthrough)** | ✅ Phase 4 (Block C) | Cross-jurisdiction lookup for Scotland/NI; fetch_organisations routes by place_id prefix. |
 | **`find_organisations_in_place` tool** | ⏳ Phase 4 (Block D) | Not started. Mixed-mode dispatch: data.organisation SELECT for E&W, FTC passthrough for Scotland/NI, optional 360G grant enrichment. |
 | **UI Organisations section** | ⏳ Phase 4 (Block E) | Not started. |
 | **`v0.5.0-phase-4` tag** | ⏳ Phase 4 (Block F) | Not started. |
