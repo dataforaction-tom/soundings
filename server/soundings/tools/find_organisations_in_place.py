@@ -50,3 +50,23 @@ def tool_spec() -> dict[str, object]:
         "input_schema": FindOrganisationsInPlaceInput.model_json_schema(),
         "output_schema": FindOrganisationsInPlaceOutput.model_json_schema(),
     }
+
+
+async def find_organisations_in_place(
+    input: FindOrganisationsInPlaceInput,
+    orchestrator,
+) -> FindOrganisationsInPlaceOutput:
+    """Tool handler - calls orchestrator method and wraps result."""
+    result = await orchestrator.find_organisations_in_place(
+        place_id=input.place_id,
+        activity_filter=input.activity_filter,
+        funded_only=input.funded_only,
+        limit=input.limit,
+        enrich_grants=True,
+    )
+    return FindOrganisationsInPlaceOutput(
+        organisations=result.organisations,
+        sources=result.sources,
+        caveats=result.caveats,
+        partial=result.partial,
+    )
