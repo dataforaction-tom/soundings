@@ -50,13 +50,13 @@ class FindThatCharityAdapter(PassthroughAdapter):
     ) -> list[OrganisationRef]:
         """Return organisations for a place via FTC.
 
-        Routes based on place country (resolved via geography.place):
+        Routes based on place country (derived from place_id prefix):
         - Scotland -> country=Scotland
         - NI -> country=Northern Ireland
         - England/Wales -> returns [] (E&W goes via CC loader)
         """
-        # Resolve place country from the geography table
-        country = await self._resolve_place_country(place_id)
+        # Resolve place country from place_id prefix (no DB round-trip needed)
+        country = self._country_from_place_id(place_id)
 
         if country == "Scotland":
             ftc_country = "Scotland"
@@ -93,27 +93,8 @@ class FindThatCharityAdapter(PassthroughAdapter):
             for r in results
         ]
 
-    async def _resolve_place_country(self, place_id: str) -> str | None:
-        """Look up the country for a place_id from geography.place."""
-        from sqlalchemy import text
-
-        async with self._engine.connect() as conn:
-            row = (
-                await conn.execute(
-                    text("SELECT p.name, p.type FROM geography.place p WHERE p.id = :pid"),
-                    {"pid": place_id},
-                )
-            ).first()
-
-        if row is None:
-            return None
-
-        # Row contains (name, type) but we only need the ID to determine country
-        # name, place_type = row
-
-        # Map place types to countries based on UK geography
-        # ltla24, utla24, region -> England (usually)
-        # Scotland/Northern Ireland specific IDs
+    def _country_from_place_id(self, place_id: str) -> str | None:
+        """Derive country from place_id prefix — no DB query needed."""
         if place_id.startswith("country:S"):
             return "Scotland"
         if place_id.startswith("country:NI"):
