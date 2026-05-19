@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from soundings.contracts.comparison import Comparison, ComparisonValue
 from soundings.contracts.indicator_value import IndicatorValue
+from soundings.contracts.organisation import GrantRef, OrganisationRef
 from soundings.contracts.source_ref import SourceRef
 from soundings.contracts.trend import Trend, TrendPoint
 from soundings.orchestration.errors import (
@@ -56,6 +57,22 @@ class CompareResult:
 @dataclass
 class GetTrendResult:
     trend: Trend | None
+    sources: list[SourceRef] = field(default_factory=list)
+    caveats: list[str] = field(default_factory=list)
+    partial: bool = False
+
+
+@dataclass
+class FindOrganisationsResult:
+    organisations: list[OrganisationRef] = field(default_factory=list)
+    sources: list[SourceRef] = field(default_factory=list)
+    caveats: list[str] = field(default_factory=list)
+    partial: bool = False
+
+
+@dataclass
+class _GrantsEnrichmentResult:
+    grants_by_org: dict[str, list[GrantRef]] = field(default_factory=dict)
     sources: list[SourceRef] = field(default_factory=list)
     caveats: list[str] = field(default_factory=list)
     partial: bool = False
@@ -523,6 +540,228 @@ class IndicatorOrchestrator:
             return []
         raw = row.caveats or []
         return [str(c) for c in raw]
+
+    # ----- find_organisations_in_place (Phase 4 Block D) -----
+
+    async def find_organisations_in_place(
+        self,
+        *,
+        place_id: str,
+        activity_filter: list[str] | None = None,
+        funded_only: bool = False,
+        limit: int = 50,
+        enrich_grants: bool = True,
+    ) -> FindOrganisationsResult:
+        """Find organisations in a place via mixed-mode dispatch.
+
+        - England/Wales: SELECT from data.organisation (CC loader)
+        - Scotland/NI: FTC passthrough adapter
+        - Optional 360G grant enrichment
+        """
+        # Resolve place country from place_id prefix
+        country = self._country_from_place_id(place_id)
+
+        all_sources: list[SourceRef] = []
+        all_caveats: list[str] = []
+        all_orgs: list[OrganisationRef] = []
+        partial = False
+
+        # Route based on country
+        if country in ("Scotland", "Northern Ireland"):
+            # Scotland/NI: use FTC passthrough
+            result = await self._find_via_ftc(place_id, limit)
+            all_orgs = result.organisations
+            all_sources.extend(result.sources)
+            all_caveats.extend(result.caveats)
+            partial = result.partial
+        else:
+            # England/Wales: use data.organisation (CC loader)
+            result = await self._find_via_cc_loader(place_id, activity_filter, limit)
+            all_orgs = result.organisations
+            all_sources.extend(result.sources)
+            all_caveats.extend(result.caveats)
+            partial = partial or result.partial
+
+        # funded_only: would require JOIN to data.grant_record (empty in Phase 4)
+        if funded_only:
+            all_caveats.append("funded_only=true ignored in v1: data.grant_record not populated")
+
+        # Optional 360G grant enrichment
+        if enrich_grants and all_orgs:
+            grants_result = await self._enrich_with_grants(place_id, all_orgs)
+            # Merge grants into orgs
+            for org in all_orgs:
+                org.recent_grants = grants_result.grants_by_org.get(org.id, [])
+            all_sources.extend(grants_result.sources)
+            all_caveats.extend(grants_result.caveats)
+            partial = partial or grants_result.partial
+
+        # Dedupe sources
+        seen = set[str]()
+        deduped = []
+        for s in all_sources:
+            if s.source_id not in seen:
+                seen.add(s.source_id)
+                deduped.append(s)
+
+        return FindOrganisationsResult(
+            organisations=all_orgs[:limit],
+            sources=deduped,
+            caveats=all_caveats,
+            partial=partial,
+        )
+
+    def _country_from_place_id(self, place_id: str) -> str | None:
+        """Derive country from place_id prefix."""
+        if place_id.startswith("country:S"):
+            return "Scotland"
+        if place_id.startswith("country:NI"):
+            return "Northern Ireland"
+        if place_id.startswith(("ltla24:S", "utla24:S")):
+            return "Scotland"
+        if place_id.startswith(("ltla24:N", "utla24:N")):
+            return "Northern Ireland"
+        return "England"
+
+    async def _find_via_cc_loader(
+        self, place_id: str, activity_filter: list[str] | None, limit: int
+    ) -> FindOrganisationsResult:
+        """SELECT from data.organisation for England/Wales."""
+        from datetime import UTC as TZ_UTC
+
+        from soundings.contracts.source_ref import SourceRef
+
+        async with self._engine.connect() as conn:
+            rows = await conn.execute(
+                text(
+                    """
+                    SELECT o.id, o.name, o.classification,
+                           o.registered_address_place_id, o.source_id, o.retrieved_at
+                    FROM data.organisation o
+                    LEFT JOIN data.organisation_operates_in oi
+                        ON oi.organisation_id = o.id
+                    WHERE o.registered_address_place_id = :pid
+                        OR oi.place_id = :pid
+                    LIMIT :limit
+                """
+                ),
+                {"pid": place_id, "limit": limit},
+            )
+
+        now = datetime.now(TZ_UTC)
+        orgs = []
+        source_ids = set[str]()
+
+        for row in rows:
+            source_id = row.source_id or "charity_commission"
+            source_ids.add(source_id)
+            orgs.append(
+                OrganisationRef(
+                    id=row.id,
+                    name=row.name,
+                    classification=list(row.classification or []),
+                    registered_address_place_id=row.registered_address_place_id,
+                    operates_in_place_ids=[],
+                    recent_grants=[],
+                    source=SourceRef(
+                        source_id=source_id,
+                        source_label=source_id,
+                        publisher="",
+                        licence="",
+                        retrieved_at=row.retrieved_at or now,
+                        cache_status="cached",
+                    ),
+                )
+            )
+
+        # Build source refs from the source_ids we collected
+        sources = [
+            SourceRef(
+                source_id=sid,
+                source_label=sid,
+                publisher="Charity Commission",
+                licence="open",
+                retrieved_at=now,
+                cache_status="cached",
+            )
+            for sid in source_ids
+        ]
+
+        return FindOrganisationsResult(
+            organisations=orgs,
+            sources=sources,
+            caveats=[],
+            partial=False,
+        )
+
+    async def _find_via_ftc(self, place_id: str, limit: int) -> FindOrganisationsResult:
+        """Use FTC passthrough adapter for Scotland/NI."""
+        try:
+            ftc_adapter = self._registry.adapter_for_source("find_that_charity")
+            orgs = await ftc_adapter.fetch_organisations(place_id=place_id, limit=limit)
+            sources = [orgs[0].source] if orgs else []
+            return FindOrganisationsResult(
+                organisations=orgs,
+                sources=sources,
+                caveats=[],
+                partial=False,
+            )
+        except Exception as e:
+            return FindOrganisationsResult(
+                organisations=[],
+                sources=[],
+                caveats=[f"FTC lookup failed: {e}"],
+                partial=True,
+            )
+
+    async def _enrich_with_grants(
+        self, place_id: str, orgs: list[OrganisationRef]
+    ) -> _GrantsEnrichmentResult:
+        """Enrich CC orgs with their own recent grants from 360G.
+
+        Per-org slice: each org gets its own grants (via
+        `ThreeSixtyGivingAdapter.recent_grants_for_org`), not place-wide.
+        Non-CC orgs (e.g. FTC results for Scotland/NI) are skipped.
+        """
+        del place_id  # per-org enrichment doesn't need it
+        cc_orgs = [org for org in orgs if org.id.startswith("charity_commission:")]
+        if not cc_orgs:
+            return _GrantsEnrichmentResult()
+
+        try:
+            adapter = self._registry.adapter_for_source("threesixtygiving")
+        except Exception as e:
+            return _GrantsEnrichmentResult(
+                caveats=[f"Grant enrichment failed: {e}"],
+                partial=True,
+            )
+
+        grants_by_org: dict[str, list[GrantRef]] = {}
+        first_source: SourceRef | None = None
+        per_org_failures = 0
+
+        for org in cc_orgs:
+            try:
+                org_grants = await adapter.recent_grants_for_org(org.id, limit=3)
+            except Exception:
+                per_org_failures += 1
+                continue
+            if org_grants:
+                grants_by_org[org.id] = org_grants
+                if first_source is None:
+                    first_source = org_grants[0].source
+
+        caveats: list[str] = []
+        if per_org_failures:
+            caveats.append(
+                f"360G grant lookup failed for {per_org_failures} of {len(cc_orgs)} organisations"
+            )
+        return _GrantsEnrichmentResult(
+            grants_by_org=grants_by_org,
+            sources=[first_source] if first_source is not None else [],
+            caveats=caveats,
+            partial=bool(per_org_failures),
+        )
 
 
 def _split_series_breaks(caveats: list[str]) -> tuple[list[str], list[str]]:

@@ -37,6 +37,12 @@ from soundings.tools.get_trend import (
     get_trend,
 )
 from soundings.tools.get_trend import tool_spec as get_trend_spec
+from soundings.tools.find_organisations_in_place import (
+    FindOrganisationsInPlaceInput,
+    FindOrganisationsInPlaceOutput,
+    find_organisations_in_place,
+)
+from soundings.tools.find_organisations_in_place import tool_spec as find_orgs_spec
 
 router = APIRouter(prefix="/v1/tools")
 
@@ -50,6 +56,7 @@ async def list_tools() -> dict[str, list[dict[str, object]]]:
             get_place_profile_spec(),
             compare_places_spec(),
             get_trend_spec(),
+            find_orgs_spec(),
         ]
     }
 
@@ -83,3 +90,12 @@ async def http_compare_places(input: ComparePlacesInput, request: Request) -> Co
 @router.post("/get_trend", response_model=GetTrendOutput)
 async def http_get_trend(input: GetTrendInput, request: Request) -> GetTrendOutput:
     return await get_trend(input, request.app.state.orchestrator)
+
+
+@router.post("/find_organisations_in_place", response_model=FindOrganisationsInPlaceOutput)
+async def http_find_organisations(
+    input: FindOrganisationsInPlaceInput, request: Request
+) -> FindOrganisationsInPlaceOutput:
+    return await find_organisations_in_place(
+        input, request.app.state.orchestrator
+    )

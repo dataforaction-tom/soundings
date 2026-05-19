@@ -106,8 +106,15 @@ class OnsCensus2021Loader(LoaderAdapter):
             if not geo_code:
                 continue
             value = o.get("obs_value", {}).get("value")
-            if value is not None and mapping.value_scale is not None:
-                value = value * mapping.value_scale
+            # Nomis returns small percentages as strings (e.g. "0.1") and large
+            # values as floats — coerce defensively before any arithmetic.
+            if value is not None:
+                try:
+                    value = float(value)
+                except (TypeError, ValueError):
+                    continue
+                if mapping.value_scale is not None:
+                    value = value * mapping.value_scale
             period = o.get("time", {}).get("description") or mapping.period or "2021"
             rows.append(
                 {
@@ -122,6 +129,14 @@ class OnsCensus2021Loader(LoaderAdapter):
                 }
             )
         if not rows:
+            return 0
+        # Some Census mappings (e.g. ethnic group, household composition) don't
+        # filter to a single cell, so Nomis returns one row per dimension value
+        # all colliding on the same (place_id, indicator_key, period). That
+        # signals an unverified mapping per HANDOFF — skip the whole batch
+        # rather than write a misleading value.
+        keys = [(r["place_id"], r["indicator_key"], r["period"]) for r in rows]
+        if len(set(keys)) < len(keys):
             return 0
         async with self._engine.begin() as conn:
             stmt = insert(IndicatorValue).values(rows)

@@ -18,6 +18,7 @@ from soundings.adapters.ons_mid_year_estimates.adapter import OnsMidYearEstimate
 from soundings.adapters.police_uk.adapter import PoliceUkAdapter
 from soundings.adapters.postcodes_io.adapter import PostcodesIoAdapter
 from soundings.adapters.threesixtygiving import ThreeSixtyGivingAdapter
+from soundings.adapters.find_that_charity import FindThatCharityAdapter
 from soundings.alerts import send_alert
 from soundings.capture.middleware import CaptureMiddleware
 from soundings.capture.rate_limit import FullConsentRateLimiter
@@ -62,6 +63,7 @@ def build_adapter_registry(engine: object) -> AdapterRegistry:
     registry.register("ons.aps", OnsApsAdapter)
     registry.register("charity_commission", CharityCommissionAdapter)
     registry.register("threesixtygiving", ThreeSixtyGivingAdapter)
+    registry.register("find_that_charity", FindThatCharityAdapter)
     return registry
 
 

@@ -1,10 +1,9 @@
 # Plan
 
-> Last updated: 2026-05-12 (session 3)
-> Status: **Phase 3 complete.** All 45 tasks across blocks A–J landed
-> via PRs #1, #2, #3, and the present PR. Awaiting `v0.4.0-phase-3`
-> tag once the manual browser smoke (`docs/runbook-phase-3-smoke.md`)
-> passes against a freshly seeded stack.
+> Last updated: 2026-05-19 (session 8)
+> Status: **Phase 4 complete pending browser smoke + tag.** All blocks
+> 0/A/B/C/D/E/F landed; `v0.5.0-phase-4` gated on the smoke in
+> `docs/runbook-phase-4-smoke.md`.
 
 ## Objective
 
@@ -42,10 +41,11 @@ to `main`.
       ONS APS; `compare_places` and `get_trend` tools; UI sparklines on
       `/place/[id]` and a new `/compare` page. Tag `v0.4.0-phase-3`
       pending browser smoke.
-- [ ] Phase 4 — Adapters for Charity Commission (loader; bulk register),
+- [x] Phase 4 — Adapters for Charity Commission (loader; bulk register),
       360Giving + Find That Charity (passthrough);
-      `find_organisations_in_place`. **Blocks 0, A, B landed**;
-      Blocks C–F pending.
+      `find_organisations_in_place`. **All blocks landed**;
+      `v0.5.0-phase-4` tag pending browser smoke
+      (`docs/runbook-phase-4-smoke.md`).
 - [ ] Phase 5 — First monthly corpus release, doc pass.
 - [ ] Phase 6 — Public soft launch on the Mac mini.
 

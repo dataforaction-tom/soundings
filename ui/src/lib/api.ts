@@ -12,6 +12,7 @@ import type {
   ConsentResponse,
   FeedbackResponse,
   FindPlaceResponse,
+  FindOrganisationsInPlaceResponse,
   GetIndicatorsResponse,
   GetTrendResponse,
   PlaceProfile,
@@ -163,5 +164,33 @@ export async function postFeedback(
     "/v1/capture/feedback",
     { question_record_id: questionRecordId, marked_useful: markedUseful },
     opts,
+  );
+}
+
+export async function findOrganisationsInPlace(
+  placeId: string,
+  opts: {
+    activityFilter?: string[];
+    fundedOnly?: boolean;
+    limit?: number;
+    cookieHeader?: string;
+  } = {},
+): Promise<FindOrganisationsInPlaceResponse> {
+  const body: Record<string, unknown> = {
+    place_id: placeId,
+  };
+  if (opts.activityFilter !== undefined) {
+    body.activity_filter = opts.activityFilter;
+  }
+  if (opts.fundedOnly !== undefined) {
+    body.funded_only = opts.fundedOnly;
+  }
+  if (opts.limit !== undefined) {
+    body.limit = opts.limit;
+  }
+  return postJSON<FindOrganisationsInPlaceResponse>(
+    "/v1/tools/find_organisations_in_place",
+    body,
+    { cookieHeader: opts.cookieHeader },
   );
 }
