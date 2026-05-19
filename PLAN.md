@@ -1,8 +1,9 @@
 # Plan
 
-> Last updated: 2026-05-17 (session 6)
-> Status: **Phase 4 in progress.** Block C (Find That Charity) — Tasks 15-18
-> complete. Blocks D–F pending.
+> Last updated: 2026-05-19 (session 8)
+> Status: **Phase 4 complete pending browser smoke + tag.** All blocks
+> 0/A/B/C/D/E/F landed; `v0.5.0-phase-4` gated on the smoke in
+> `docs/runbook-phase-4-smoke.md`.
 
 ## Objective
 
@@ -42,8 +43,9 @@ to `main`.
       pending browser smoke.
 - [x] Phase 4 — Adapters for Charity Commission (loader; bulk register),
       360Giving + Find That Charity (passthrough);
-      `find_organisations_in_place`. **Blocks 0, A, B, C, D landed**;
-      Blocks E, F pending.
+      `find_organisations_in_place`. **All blocks landed**;
+      `v0.5.0-phase-4` tag pending browser smoke
+      (`docs/runbook-phase-4-smoke.md`).
 - [ ] Phase 5 — First monthly corpus release, doc pass.
 - [ ] Phase 6 — Public soft launch on the Mac mini.
 
