@@ -30,8 +30,8 @@ IMD2025_BULK_URL = (
     "File_5_IoD2025_Scores_for_the_Indices_of_Deprivation.xlsx"
 )
 IMD2019_BULK_URL = (
-    "https://assets.publishing.service.gov.uk/government/uploads/system/"
-    "uploads/attachment_data/file/833970/File_2_-_IoD2019_Domains_of_Deprivation.xlsx"
+    "https://assets.publishing.service.gov.uk/media/5d8b3ade40f0b60999a23330/"
+    "File_2_-_IoD2019_Domains_of_Deprivation.xlsx"
 )
 
 
