@@ -27,7 +27,10 @@ BOUNDARY_LAYERS: dict[str, OgpLayer] = {
         place_type="lsoa21",
         code_field="LSOA21CD",
         name_field="LSOA21NM",
-        service_name="Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW_BSC",
+        # ONS appends a version suffix (`_V4` at the time of this pin); update
+        # in lockstep with `docs/adr/0001-geography-data-sources.md` when ONS
+        # publishes a new revision and the old URL 400s.
+        service_name="Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW_BSC_V4",
     ),
     "msoa21": OgpLayer(
         place_type="msoa21",

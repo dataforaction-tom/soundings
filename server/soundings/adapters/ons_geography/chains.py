@@ -8,13 +8,13 @@ from soundings.adapters.ons_geography.hierarchy_loader import LookupChain
 
 OGP_LOOKUP_HOST = "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services"
 
-# Postcode → OA → LSOA → MSOA → LAD lookup, Feb 2025 edition.
-# We use the OA-free chain: LSOA → MSOA → LTLA. (unverified service name)
+# LSOA21 → LTLA24 lookup. ONS publishes per-vintage variants
+# (LSOA21_WD24_LAD24_EW_LU at the time of this pin); the legacy
+# PCD-prefixed combined lookup no longer resolves.
 LSOA_MSOA_LTLA = LookupChain(
-    url=f"{OGP_LOOKUP_HOST}/PCD_OA21_LSOA21_MSOA21_LAD_FEB25_UK_LU/FeatureServer/0",
+    url=f"{OGP_LOOKUP_HOST}/LSOA21_WD24_LAD24_EW_LU/FeatureServer/0",
     levels=[
         ("lsoa21", "LSOA21CD"),
-        ("msoa21", "MSOA21CD"),
         ("ltla24", "LAD24CD"),
     ],
 )
