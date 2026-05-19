@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from soundings.contracts.comparison import Comparison, ComparisonValue
 from soundings.contracts.indicator_value import IndicatorValue
-from soundings.contracts.organisation import OrganisationRef
+from soundings.contracts.organisation import GrantRef, OrganisationRef
 from soundings.contracts.source_ref import SourceRef
 from soundings.contracts.trend import Trend, TrendPoint
 from soundings.orchestration.errors import (
@@ -65,6 +65,14 @@ class GetTrendResult:
 @dataclass
 class FindOrganisationsResult:
     organisations: list[OrganisationRef] = field(default_factory=list)
+    sources: list[SourceRef] = field(default_factory=list)
+    caveats: list[str] = field(default_factory=list)
+    partial: bool = False
+
+
+@dataclass
+class _GrantsEnrichmentResult:
+    grants_by_org: dict[str, list[GrantRef]] = field(default_factory=dict)
     sources: list[SourceRef] = field(default_factory=list)
     caveats: list[str] = field(default_factory=list)
     partial: bool = False
@@ -576,9 +584,7 @@ class IndicatorOrchestrator:
 
         # funded_only: would require JOIN to data.grant_record (empty in Phase 4)
         if funded_only:
-            all_caveats.append(
-                "funded_only=true ignored in v1: data.grant_record not populated"
-            )
+            all_caveats.append("funded_only=true ignored in v1: data.grant_record not populated")
 
         # Optional 360G grant enrichment
         if enrich_grants and all_orgs:
@@ -621,8 +627,9 @@ class IndicatorOrchestrator:
         self, place_id: str, activity_filter: list[str] | None, limit: int
     ) -> FindOrganisationsResult:
         """SELECT from data.organisation for England/Wales."""
-        from soundings.contracts.source_ref import SourceRef
         from datetime import UTC as TZ_UTC
+
+        from soundings.contracts.source_ref import SourceRef
 
         async with self._engine.connect() as conn:
             rows = await conn.execute(
@@ -662,20 +669,23 @@ class IndicatorOrchestrator:
                         publisher="",
                         licence="",
                         retrieved_at=row.retrieved_at or now,
-                        cache_status="loader",
+                        cache_status="cached",
                     ),
                 )
             )
 
         # Build source refs from the source_ids we collected
-        sources = [SourceRef(
-            source_id=sid,
-            source_label=sid,
-            publisher="Charity Commission",
-            licence="open",
-            retrieved_at=now,
-            cache_status="loader",
-        ) for sid in source_ids]
+        sources = [
+            SourceRef(
+                source_id=sid,
+                source_label=sid,
+                publisher="Charity Commission",
+                licence="open",
+                retrieved_at=now,
+                cache_status="cached",
+            )
+            for sid in source_ids
+        ]
 
         return FindOrganisationsResult(
             organisations=orgs,
@@ -687,10 +697,9 @@ class IndicatorOrchestrator:
     async def _find_via_ftc(self, place_id: str, limit: int) -> FindOrganisationsResult:
         """Use FTC passthrough adapter for Scotland/NI."""
         try:
-            ftc_adapter = await self._registry.get_adapter("find_that_charity")
+            ftc_adapter = self._registry.adapter_for_source("find_that_charity")
             orgs = await ftc_adapter.fetch_organisations(place_id=place_id, limit=limit)
-            # Extract source from first org if available
-            sources = [org.source] if orgs else []
+            sources = [orgs[0].source] if orgs else []
             return FindOrganisationsResult(
                 organisations=orgs,
                 sources=sources,
@@ -707,75 +716,52 @@ class IndicatorOrchestrator:
 
     async def _enrich_with_grants(
         self, place_id: str, orgs: list[OrganisationRef]
-    ) -> "_GrantsEnrichmentResult":
-        """Enrich orgs with recent grants from 360G."""
-        from dataclasses import dataclass, field
-        from soundings.contracts.organisation import GrantRef
-        from soundings.contracts.source_ref import SourceRef
+    ) -> _GrantsEnrichmentResult:
+        """Enrich CC orgs with their own recent grants from 360G.
 
-        @dataclass
-        class _GrantsEnrichmentResult:
-            grants_by_org: dict[str, list[GrantRef]] = field(default_factory=dict)
-            sources: list[SourceRef] = field(default_factory=list)
-            caveats: list[str] = field(default_factory=list)
-            partial: bool = False
+        Per-org slice: each org gets its own grants (via
+        `ThreeSixtyGivingAdapter.recent_grants_for_org`), not place-wide.
+        Non-CC orgs (e.g. FTC results for Scotland/NI) are skipped.
+        """
+        del place_id  # per-org enrichment doesn't need it
+        cc_orgs = [org for org in orgs if org.id.startswith("charity_commission:")]
+        if not cc_orgs:
+            return _GrantsEnrichmentResult()
 
         try:
-            org_ids_for_360g = [
-                # Convert CC IDs like "charity_commission:12345" to "GB-CHC-12345"
-                org.id.replace("charity_commission:", "GB-CHC-")
-                for org in orgs
-                if org.id.startswith("charity_commission:")
-            ]
-            if not org_ids_for_360g:
-                return _GrantsEnrichmentResult()
-
-            # Get 360G adapter
-            adapter = await self._registry.get_adapter("threesixtygiving")
-            grants_by_org: dict[str, list[GrantRef]] = {}
-
-            for org_id in org_ids_for_360g:
-                try:
-                    raw_grants = await adapter.recent_grants(place_id, limit=3)
-                    grants_by_org[org_id.replace("GB-CHC-", "charity_commission:")] = [
-                        GrantRef(
-                            funder=g.get("fundingOrganization", [{}])[0].get("name", "Unknown"),
-                            amount=float(g.get("amountAwarded", 0)),
-                            currency=g.get("currency", "GBP"),
-                            date=g.get("awardDate", ""),
-                            purpose=g.get("title"),
-                            source=SourceRef(
-                                source_id="threesixtygiving",
-                                source_label="360Giving",
-                                publisher="360Giving",
-                                licence="CC-BY-4.0",
-                                retrieved_at=datetime.now(),
-                                cache_status="passthrough",
-                            ),
-                        )
-                        for g in raw_grants
-                    ]
-                except Exception:
-                    pass  # Skip orgs where grants fetch fails
-
-            return _GrantsEnrichmentResult(
-                grants_by_org=grants_by_org,
-                sources=[SourceRef(
-                    source_id="threesixtygiving",
-                    source_label="360Giving",
-                    publisher="360Giving",
-                    licence="CC-BY-4.0",
-                    retrieved_at=datetime.now(),
-                    cache_status="passthrough",
-                )],
-                caveats=[],
-                partial=False,
-            )
+            adapter = self._registry.adapter_for_source("threesixtygiving")
         except Exception as e:
             return _GrantsEnrichmentResult(
                 caveats=[f"Grant enrichment failed: {e}"],
                 partial=True,
             )
+
+        grants_by_org: dict[str, list[GrantRef]] = {}
+        first_source: SourceRef | None = None
+        per_org_failures = 0
+
+        for org in cc_orgs:
+            try:
+                org_grants = await adapter.recent_grants_for_org(org.id, limit=3)
+            except Exception:
+                per_org_failures += 1
+                continue
+            if org_grants:
+                grants_by_org[org.id] = org_grants
+                if first_source is None:
+                    first_source = org_grants[0].source
+
+        caveats: list[str] = []
+        if per_org_failures:
+            caveats.append(
+                f"360G grant lookup failed for {per_org_failures} of {len(cc_orgs)} organisations"
+            )
+        return _GrantsEnrichmentResult(
+            grants_by_org=grants_by_org,
+            sources=[first_source] if first_source is not None else [],
+            caveats=caveats,
+            partial=bool(per_org_failures),
+        )
 
 
 def _split_series_breaks(caveats: list[str]) -> tuple[list[str], list[str]]:
