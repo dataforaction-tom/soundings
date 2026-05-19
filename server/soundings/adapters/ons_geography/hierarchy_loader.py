@@ -77,14 +77,20 @@ class OnsGeographyHierarchyLoader(LoaderAdapter):
             }
             response = await client.get(f"{chain.url}/query", params=params)
             response.raise_for_status()
-            features = response.json().get("features", [])
+            payload = response.json()
+            features = payload.get("features", [])
             if not features:
                 return
             for f in features:
                 yield f.get("attributes", {})
-            if len(features) < PAGE_SIZE:
+            # ArcGIS caps server-side at maxRecordCount (often 1000), so
+            # `len(features) < PAGE_SIZE` falsely signals end-of-stream.
+            # Trust `exceededTransferLimit` instead; if absent, fall back to
+            # the page-fill heuristic.
+            exceeded = payload.get("exceededTransferLimit")
+            if exceeded is False or (exceeded is None and len(features) < PAGE_SIZE):
                 return
-            offset += PAGE_SIZE
+            offset += len(features)
 
     @staticmethod
     def _row_to_edges(row: dict[str, Any], chain: LookupChain) -> set[tuple[str, str]]:
@@ -109,12 +115,17 @@ class OnsGeographyHierarchyLoader(LoaderAdapter):
         if not edges:
             return
         rows = [{"child_id": c, "parent_id": p} for c, p in edges]
+        # Postgres caps a query at ~65k bind parameters; with 2 params per row
+        # that's ~32k rows per INSERT. Batch to stay well under.
+        batch_size = 10_000
         async with self._engine.begin() as conn:
-            stmt = (
-                insert(PlaceHierarchy)
-                .values(rows)
-                .on_conflict_do_nothing(
-                    index_elements=[PlaceHierarchy.child_id, PlaceHierarchy.parent_id]
+            for i in range(0, len(rows), batch_size):
+                batch = rows[i : i + batch_size]
+                stmt = (
+                    insert(PlaceHierarchy)
+                    .values(batch)
+                    .on_conflict_do_nothing(
+                        index_elements=[PlaceHierarchy.child_id, PlaceHierarchy.parent_id]
+                    )
                 )
-            )
-            await conn.execute(stmt)
+                await conn.execute(stmt)
