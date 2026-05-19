@@ -15,7 +15,8 @@ multiple regulators). Only implements `fetch_organisations`:
 - England/Wales → returns [] (E&W goes via CC loader)
 """
 
-from datetime import timedelta
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -38,9 +39,11 @@ class FindThatCharityAdapter(PassthroughAdapter):
         ttl: timedelta = DEFAULT_TTL,
         ftc_client: FindThatCharityClient | None = None,
         http_client: httpx.AsyncClient | None = None,
+        now: Callable[[], datetime] = lambda: datetime.now(tz=UTC),
     ) -> None:
         super().__init__(engine, ttl=ttl, http_client=http_client)
         self._ftc = ftc_client or FindThatCharityClient(http_client=http_client)
+        self._now = now
 
     async def fetch_organisations(
         self,
