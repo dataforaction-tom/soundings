@@ -132,6 +132,7 @@ async def _seed_peers_with_values(
     engine = get_engine()
     async with engine.begin() as conn:
         await conn.execute(text("DELETE FROM data.indicator_value"))
+        await conn.execute(text("DELETE FROM data.trend_point"))
         await conn.execute(text("DELETE FROM geography.postcode"))
         await conn.execute(text("DELETE FROM geography.place_hierarchy"))
         await conn.execute(text("DELETE FROM geography.place"))
@@ -265,6 +266,7 @@ async def test_basis_rate_divides_value_by_population() -> None:
     engine = get_engine()
     async with engine.begin() as conn:
         await conn.execute(text("DELETE FROM data.indicator_value"))
+        await conn.execute(text("DELETE FROM data.trend_point"))
         await conn.execute(text("DELETE FROM geography.postcode"))
         await conn.execute(text("DELETE FROM geography.place_hierarchy"))
         await conn.execute(text("DELETE FROM geography.place"))
@@ -326,6 +328,7 @@ async def test_passthrough_budget_exceeded_adds_caveat_and_uses_caller_slice() -
     engine = get_engine()
     async with engine.begin() as conn:
         await conn.execute(text("DELETE FROM data.indicator_value"))
+        await conn.execute(text("DELETE FROM data.trend_point"))
         await conn.execute(text("DELETE FROM geography.postcode"))
         await conn.execute(text("DELETE FROM geography.place_hierarchy"))
         await conn.execute(text("DELETE FROM geography.place"))
