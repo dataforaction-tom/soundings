@@ -14,6 +14,7 @@ async def _seed_two_lsoas_in_one_ltla() -> None:
     now = datetime.now(tz=UTC)
     async with engine.begin() as conn:
         await conn.execute(text("DELETE FROM data.indicator_value"))
+        await conn.execute(text("DELETE FROM data.trend_point"))
         await conn.execute(text("DELETE FROM geography.postcode"))
         await conn.execute(text("DELETE FROM geography.place_hierarchy"))
         await conn.execute(text("DELETE FROM geography.place"))
@@ -78,3 +79,46 @@ async def test_population_weighted_aggregation_writes_ltla_row() -> None:
         ).first()
     assert row is not None
     assert float(row.value) == 24.0
+
+
+async def _seed_two_periods_in_one_ltla() -> None:
+    """Like _seed_two_lsoas_in_one_ltla but adds a matching IMD 2019 series so
+    we can verify the aggregation step writes both periods to trend_point."""
+    engine = get_engine()
+    now = datetime.now(tz=UTC)
+    await _seed_two_lsoas_in_one_ltla()
+    async with engine.begin() as conn:
+        # IMD 2019 scores: 40 and 20. Weighted avg = (40*2000 + 20*1000) / 3000 = 33.33...
+        await conn.execute(
+            text(
+                "INSERT INTO data.indicator_value "
+                "(place_id, indicator_key, period, value, source_id, retrieved_at, caveats) "
+                "VALUES "
+                "('lsoa21:E01012018', 'deprivation.imd.score', '2019', 40, 'mhclg.imd2019', :ret, '[]'::jsonb), "
+                "('lsoa21:E01012019', 'deprivation.imd.score', '2019', 20, 'mhclg.imd2019', :ret, '[]'::jsonb)"
+            ),
+            {"ret": now},
+        )
+
+
+async def test_aggregation_writes_ltla_trend_points_per_period() -> None:
+    engine = get_engine()
+    await _seed_two_periods_in_one_ltla()
+
+    await aggregate_imd_to_ltla(engine, source_id="mhclg.imd2025")
+    await aggregate_imd_to_ltla(engine, source_id="mhclg.imd2019")
+
+    async with engine.connect() as conn:
+        rows = (
+            await conn.execute(
+                text(
+                    "SELECT period, value FROM data.trend_point "
+                    "WHERE place_id = 'ltla24:E06000004' "
+                    "AND indicator_key = 'deprivation.imd.score' "
+                    "ORDER BY period"
+                )
+            )
+        ).all()
+    by_period = {r.period: float(r.value) for r in rows}
+    assert by_period["2019"] == pytest.approx((40 * 2000 + 20 * 1000) / 3000)
+    assert by_period["2025"] == 24.0

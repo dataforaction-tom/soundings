@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from soundings.adapters.base import LoaderAdapter, LoaderResult
 from soundings.adapters.mhclg_imd2025.parser import parse_imd_xlsx
-from soundings.db.models.data import IndicatorValue
+from soundings.db.models.data import IndicatorValue, TrendPoint
 
 # URLs and periods pinned in ADR-0002.
 # IMD 2025 splits raw scores into File 5; deciles/ranks live in File 2.
@@ -120,6 +120,38 @@ class MhclgImd2025Loader(LoaderAdapter):
                     },
                 )
                 await conn.execute(stmt)
+
+        # Mirror LSOA-level rows into data.trend_point so get_trend can serve
+        # cross-edition trends (2019 + 2025) once both loaders have run.
+        trend_records = [
+            {
+                "place_id": r["place_id"],
+                "indicator_key": r["indicator_key"],
+                "period": r["period"],
+                "value": r["value"],
+                "revised": False,
+                "source_id": r["source_id"],
+                "retrieved_at": r["retrieved_at"],
+            }
+            for r in records
+        ]
+        async with self._engine.begin() as conn:
+            for start in range(0, len(trend_records), self._INSERT_BATCH_SIZE):
+                batch = trend_records[start : start + self._INSERT_BATCH_SIZE]
+                tstmt = insert(TrendPoint).values(batch)
+                tstmt = tstmt.on_conflict_do_update(
+                    index_elements=[
+                        TrendPoint.place_id,
+                        TrendPoint.indicator_key,
+                        TrendPoint.period,
+                    ],
+                    set_={
+                        "value": tstmt.excluded.value,
+                        "retrieved_at": tstmt.excluded.retrieved_at,
+                        "source_id": tstmt.excluded.source_id,
+                    },
+                )
+                await conn.execute(tstmt)
         return LoaderResult(rows_written=len(records))
 
 

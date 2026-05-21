@@ -55,11 +55,45 @@ AGGREGATE_SQL = text(
 )
 
 
+# Mirror the LTLA aggregate into data.trend_point so get_trend can serve a
+# cross-edition trend (2019 + 2025 once both aggregations have run). Reads
+# from the indicator_value rows the previous statement just wrote — keeps
+# the population-weighting logic in one place.
+AGGREGATE_TREND_SQL = text(
+    """
+    INSERT INTO data.trend_point (
+        place_id, indicator_key, period, value,
+        revised, source_id, retrieved_at
+    )
+    SELECT
+        place_id,
+        indicator_key,
+        period,
+        value,
+        false AS revised,
+        source_id,
+        retrieved_at
+    FROM data.indicator_value
+    WHERE source_id = :source_id
+      AND indicator_key = ANY(:indicator_keys)
+      AND place_id LIKE 'ltla24:%'
+    ON CONFLICT (place_id, indicator_key, period) DO UPDATE SET
+        value = EXCLUDED.value,
+        retrieved_at = EXCLUDED.retrieved_at,
+        source_id = EXCLUDED.source_id
+    """
+)
+
+
 async def aggregate_imd_to_ltla(engine: AsyncEngine, source_id: str = "mhclg.imd2025") -> int:
     """Returns the number of LTLA rows inserted/updated."""
     async with engine.begin() as conn:
         result = await conn.execute(
             AGGREGATE_SQL,
+            {"indicator_keys": list(IMD_INDICATOR_KEYS), "source_id": source_id},
+        )
+        await conn.execute(
+            AGGREGATE_TREND_SQL,
             {"indicator_keys": list(IMD_INDICATOR_KEYS), "source_id": source_id},
         )
     return result.rowcount or 0

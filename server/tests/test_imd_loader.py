@@ -6,7 +6,7 @@ from sqlalchemy import select, text
 
 from soundings.adapters.mhclg_imd2025.loader import MhclgImd2025Loader
 from soundings.db.engine import get_engine
-from soundings.db.models.data import IndicatorValue
+from soundings.db.models.data import IndicatorValue, TrendPoint
 
 pytestmark = pytest.mark.integration
 
@@ -17,6 +17,7 @@ async def _seed_environment() -> None:
     engine = get_engine()
     async with engine.begin() as conn:
         await conn.execute(text("DELETE FROM data.indicator_value"))
+        await conn.execute(text("DELETE FROM data.trend_point"))
         await conn.execute(text("DELETE FROM geography.postcode"))
         await conn.execute(text("DELETE FROM geography.place_hierarchy"))
         await conn.execute(text("DELETE FROM geography.place"))
@@ -58,3 +59,29 @@ async def test_imd_loader_writes_lsoa_indicator_rows() -> None:
     by_place = {r.place_id: float(r.value) for r in rows}
     assert by_place["lsoa21:E01012018"] == 35.5
     assert by_place["lsoa21:E01000001"] == 5.4
+
+
+async def test_imd_loader_also_writes_trend_points() -> None:
+    engine = get_engine()
+    await _seed_environment()
+    blob = FIXTURE.read_bytes()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=blob)
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as http:
+        loader = MhclgImd2025Loader(engine, http_client=http)
+        await loader.load()
+
+    async with engine.connect() as conn:
+        rows = (
+            await conn.execute(
+                select(TrendPoint.place_id, TrendPoint.period, TrendPoint.value)
+                .where(TrendPoint.indicator_key == "deprivation.imd.score")
+                .order_by(TrendPoint.place_id)
+            )
+        ).all()
+    by_place = {r.place_id: (r.period, float(r.value)) for r in rows}
+    assert by_place["lsoa21:E01012018"] == ("2025", 35.5)
+    assert by_place["lsoa21:E01000001"] == ("2025", 5.4)
