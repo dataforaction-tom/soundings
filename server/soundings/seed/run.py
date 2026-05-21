@@ -1,11 +1,16 @@
-"""CLI: `python -m soundings.seed.run --full | --light`.
+"""CLI: `python -m soundings.seed.run --full | --light | --refresh-trends`.
 
 Wraps the ons.geography loaders (places, hierarchy, geometries, code change)
 and writes a `data.loader_run` row per loader. Intended to be run inside the
-docker compose `server` container via `make seed` / `make seed-light`.
+docker compose `server` container via `make seed` / `make seed-light` /
+`make refresh-trends`.
 
 `--light` skips the heaviest layers (LSOA + MSOA) so a Mac mini dev box can
 get a usable spine in ~5 minutes for testing.
+
+`--refresh-trends` re-runs only the loaders that write `data.trend_point`
+rows (MYE + both IMD editions and their LTLA aggregations). Useful for
+refreshing sparkline data without touching the geography spine or Census.
 """
 
 import argparse
@@ -134,13 +139,46 @@ async def _seed(*, full: bool) -> None:
     print(f"[seed] imd2019_aggregation: {agg2019} LTLA rows")
 
 
+async def _refresh_trends() -> None:
+    """Re-run only the loaders that write `data.trend_point` rows.
+
+    Assumes the geography spine and Census data are already in place. Order
+    matches `_seed`: MYE first so the IMD LTLA aggregation has population
+    weights to use. MYE runs for every place currently in `geography.place`
+    — passing `--light` to the initial seed determines that scope, not this
+    refresh.
+    """
+    engine = get_engine()
+
+    mye = OnsMidYearEstimatesLoader(engine)
+    await _run_loader(engine, "ons.mid_year_estimates", "mye", mye.load())
+
+    imd2025 = MhclgImd2025Loader(engine)
+    await _run_loader(engine, "mhclg.imd2025", "imd2025", imd2025.load())
+    agg2025 = await aggregate_imd_to_ltla(engine, source_id="mhclg.imd2025")
+    print(f"[seed] imd2025_aggregation: {agg2025} LTLA rows")
+
+    imd2019 = MhclgImd2019Loader(engine)
+    await _run_loader(engine, "mhclg.imd2019", "imd2019", imd2019.load())
+    agg2019 = await aggregate_imd_to_ltla(engine, source_id="mhclg.imd2019")
+    print(f"[seed] imd2019_aggregation: {agg2019} LTLA rows")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="soundings-seed")
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--full", action="store_true")
     mode.add_argument("--light", action="store_true")
+    mode.add_argument(
+        "--refresh-trends",
+        action="store_true",
+        help="Re-run only the trend-writing loaders (MYE + both IMD editions).",
+    )
     args = parser.parse_args(argv)
-    asyncio.run(_seed(full=args.full))
+    if args.refresh_trends:
+        asyncio.run(_refresh_trends())
+    else:
+        asyncio.run(_seed(full=args.full))
     return 0
 
 

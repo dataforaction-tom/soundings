@@ -1,4 +1,4 @@
-.PHONY: help install install-spacy lint type test test-integration test-live migrate seed seed-light up down logs decrypt-env publish-corpus
+.PHONY: help install install-spacy lint type test test-integration test-live migrate seed seed-light refresh-trends up down logs decrypt-env publish-corpus
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## ' Makefile | awk 'BEGIN{FS=":.*?## "} {printf "  %-18s %s\n", $$1, $$2}'
@@ -41,6 +41,9 @@ seed:  ## Full geography + catalogue seed (~1 hour)
 
 seed-light:  ## Dev seed (single LTLA, ~5 min)
 	docker compose -f infra/docker-compose.yml --project-directory . exec server python -m soundings.seed.run --light
+
+refresh-trends:  ## Re-run MYE + IMD loaders so data.trend_point is populated for sparklines
+	docker compose -f infra/docker-compose.yml --project-directory . exec server python -m soundings.seed.run --refresh-trends
 
 decrypt-env:  ## Decrypt .env from soundings-ops (placeholder until soundings-ops exists)
 	@echo "TODO: implement once soundings-ops repo exists"
