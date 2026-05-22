@@ -15,6 +15,7 @@ async def test_lifespan_loads_catalogue_into_postgres() -> None:
     engine = get_engine()
     async with engine.begin() as conn:
         await conn.execute(text("DELETE FROM cache.source_cache"))
+        await conn.execute(text("DELETE FROM data.trend_point"))
         await conn.execute(text("DELETE FROM data.indicator_value"))
         await conn.execute(text("DELETE FROM data.loader_run"))
         await conn.execute(text("DELETE FROM catalogue.indicator"))

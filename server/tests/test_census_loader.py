@@ -13,6 +13,7 @@ pytestmark = pytest.mark.integration
 async def _seed_environment() -> None:
     engine = get_engine()
     async with engine.begin() as conn:
+        await conn.execute(text("DELETE FROM data.trend_point"))
         await conn.execute(text("DELETE FROM data.indicator_value"))
         await conn.execute(text("DELETE FROM geography.postcode"))
         await conn.execute(text("DELETE FROM geography.place_hierarchy"))
@@ -69,6 +70,7 @@ async def test_census_loader_writes_indicator_value_rows() -> None:
 async def test_census_loader_skips_scottish_geographies() -> None:
     engine = get_engine()
     async with engine.begin() as conn:
+        await conn.execute(text("DELETE FROM data.trend_point"))
         await conn.execute(text("DELETE FROM data.indicator_value"))
         await conn.execute(text("DELETE FROM geography.postcode"))
         await conn.execute(text("DELETE FROM geography.place_hierarchy"))

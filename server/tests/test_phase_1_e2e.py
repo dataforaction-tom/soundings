@@ -25,6 +25,7 @@ async def _seed() -> None:
     engine = get_engine()
     now = datetime.now(tz=UTC)
     async with engine.begin() as conn:
+        await conn.execute(text("DELETE FROM data.trend_point"))
         await conn.execute(text("DELETE FROM data.indicator_value"))
         await conn.execute(text("DELETE FROM data.loader_run"))
         await conn.execute(text("DELETE FROM geography.postcode"))

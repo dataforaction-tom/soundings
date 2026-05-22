@@ -61,6 +61,7 @@ async def test_phase_2_e2e_capture_sanitisation_publication(tmp_path: Path) -> N
     async with engine.begin() as conn:
         await conn.execute(text("DELETE FROM corpus.raw_record"))
         await conn.execute(text("DELETE FROM corpus.question_record"))
+        await conn.execute(text("DELETE FROM data.trend_point"))
         await conn.execute(text("DELETE FROM data.indicator_value"))
         await conn.execute(text("DELETE FROM geography.postcode"))
         await conn.execute(text("DELETE FROM geography.place_hierarchy"))
