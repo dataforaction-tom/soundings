@@ -101,6 +101,72 @@ async def _seed_two_periods_in_one_ltla() -> None:
         )
 
 
+async def _seed_two_lsoas_no_mye() -> None:
+    """Like _seed_two_lsoas_in_one_ltla but skips MYE — exercises the
+    unweighted-average fallback path the aggregation takes when LSOA-level
+    population data is missing (the MYE mapping doesn't cover LSOA21)."""
+    engine = get_engine()
+    now = datetime.now(tz=UTC)
+    async with engine.begin() as conn:
+        await conn.execute(text("DELETE FROM data.indicator_value"))
+        await conn.execute(text("DELETE FROM data.trend_point"))
+        await conn.execute(text("DELETE FROM geography.postcode"))
+        await conn.execute(text("DELETE FROM geography.place_hierarchy"))
+        await conn.execute(text("DELETE FROM geography.place"))
+        for place_id, place_type, code, name in [
+            ("lsoa21:E01012018", "lsoa21", "E01012018", "Stockton 010A"),
+            ("lsoa21:E01012019", "lsoa21", "E01012019", "Stockton 010B"),
+            ("ltla24:E06000004", "ltla24", "E06000004", "Stockton-on-Tees"),
+        ]:
+            await conn.execute(
+                text("INSERT INTO geography.place (id, type, code, name) VALUES (:id, :t, :c, :n)"),
+                {"id": place_id, "t": place_type, "c": code, "n": name},
+            )
+        for child, parent in [
+            ("lsoa21:E01012018", "ltla24:E06000004"),
+            ("lsoa21:E01012019", "ltla24:E06000004"),
+        ]:
+            await conn.execute(
+                text("INSERT INTO geography.place_hierarchy (child_id, parent_id) VALUES (:c, :p)"),
+                {"c": child, "p": parent},
+            )
+        # IMD scores only (no MYE pop), so the aggregation falls back to an
+        # unweighted mean. Expected = (30 + 12) / 2 = 21.
+        await conn.execute(
+            text(
+                "INSERT INTO data.indicator_value "
+                "(place_id, indicator_key, period, value, source_id, retrieved_at, caveats) "
+                "VALUES "
+                "('lsoa21:E01012018', 'deprivation.imd.score', '2025', 30, 'mhclg.imd2025', :ret, '[]'::jsonb), "
+                "('lsoa21:E01012019', 'deprivation.imd.score', '2025', 12, 'mhclg.imd2025', :ret, '[]'::jsonb)"
+            ),
+            {"ret": now},
+        )
+
+
+async def test_aggregation_falls_back_to_unweighted_when_mye_missing() -> None:
+    engine = get_engine()
+    await _seed_two_lsoas_no_mye()
+
+    aggregated = await aggregate_imd_to_ltla(engine)
+    assert aggregated >= 1
+
+    async with engine.connect() as conn:
+        row = (
+            await conn.execute(
+                text(
+                    "SELECT value, caveats FROM data.indicator_value "
+                    "WHERE place_id = 'ltla24:E06000004' "
+                    "AND indicator_key = 'deprivation.imd.score' "
+                    "AND source_id = 'mhclg.imd2025'"
+                )
+            )
+        ).first()
+    assert row is not None
+    assert float(row.value) == 21.0
+    assert row.caveats == ["IMD aggregated to LTLA via unweighted average."]
+
+
 async def test_aggregation_writes_ltla_trend_points_per_period() -> None:
     engine = get_engine()
     await _seed_two_periods_in_one_ltla()

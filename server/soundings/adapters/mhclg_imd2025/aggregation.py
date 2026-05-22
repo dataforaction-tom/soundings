@@ -31,14 +31,18 @@ AGGREGATE_SQL = text(
         ph.parent_id AS place_id,
         imd.indicator_key,
         imd.period,
-        SUM(imd.value * pop.value) / NULLIF(SUM(pop.value), 0) AS value,
+        SUM(imd.value * COALESCE(pop.value, 1.0))
+            / NULLIF(SUM(COALESCE(pop.value, 1.0)), 0) AS value,
         CAST(:source_id AS VARCHAR) AS source_id,
         now() AS retrieved_at,
         NULL AS loader_run_id,
-        '["IMD aggregated to LTLA via population-weighted average using MYE."]'::jsonb AS caveats
+        CASE WHEN BOOL_OR(pop.value IS NOT NULL)
+             THEN '["IMD aggregated to LTLA via population-weighted average using MYE."]'::jsonb
+             ELSE '["IMD aggregated to LTLA via unweighted average."]'::jsonb
+        END AS caveats
     FROM data.indicator_value imd
     JOIN geography.place_hierarchy ph ON ph.child_id = imd.place_id
-    JOIN data.indicator_value pop
+    LEFT JOIN data.indicator_value pop
         ON pop.place_id = imd.place_id
         AND pop.indicator_key = 'population.total'
         AND pop.source_id = 'ons.mid_year_estimates'
