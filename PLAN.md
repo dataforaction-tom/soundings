@@ -1,10 +1,11 @@
 # Plan
 
-> Last updated: 2026-05-12 (session 3)
-> Status: **Phase 3 complete.** All 45 tasks across blocks A–J landed
-> via PRs #1, #2, #3, and the present PR. Awaiting `v0.4.0-phase-3`
-> tag once the manual browser smoke (`docs/runbook-phase-3-smoke.md`)
-> passes against a freshly seeded stack.
+> Last updated: 2026-05-22 (session 5)
+> Status: **Phase 4 in progress.** Blocks 0 + A + B merged. Branch
+> `mye-trend-writes` adds loader trend_point writes (closing the Phase 3
+> follow-up bullet); Block C (FindThatCharity) is next. Awaiting
+> `v0.4.0-phase-3` tag once the manual browser smoke
+> (`docs/runbook-phase-3-smoke.md`) passes against a freshly seeded stack.
 
 ## Objective
 

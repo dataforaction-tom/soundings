@@ -1,11 +1,14 @@
 # State
 
-> Last updated: 2026-05-12 (session 4)
-> Phase: **4 in progress.** Plan + Block 0 + Block A all merged
-> (PRs #6, #7, #8). **Block B — 360Giving passthrough — is the
-> current PR**: client, adapter, pre_warmer override, registration,
-> live test. Phase 3's `v0.4.0-phase-3` tag is still pending the
-> manual browser smoke documented in `docs/runbook-phase-3-smoke.md`.
+> Last updated: 2026-05-22 (session 5)
+> Phase: **4 in progress.** Blocks 0 + A + B merged. Branch
+> `mye-trend-writes` closes the Phase 3 trend_point follow-up:
+> MYE and IMD loaders now write `data.trend_point` per period, the
+> IoD 2019↔2025 series break is flagged as a caveat, and
+> `make refresh-trends` backfills from existing indicator_value rows.
+> Next: Block C — FindThatCharity passthrough. Phase 3's
+> `v0.4.0-phase-3` tag is still pending the manual browser smoke
+> documented in `docs/runbook-phase-3-smoke.md`.
 
 ## System State Diagram
 
@@ -105,11 +108,12 @@ flowchart LR
 
 ## Known follow-ups (Phase 4 and beyond)
 
-- **`data.trend_point` not yet populated by loader-mode adapters**: the
-  table exists and `get_trend` reads from it, but MYE / Census / IMD
-  loaders don't write to it yet — passthrough adapters provide the only
-  populated trends in Phase 3 prod. Phase 4 should wire trend writes
-  during the loader pass.
+- **`data.trend_point` loader-writes** — MYE and IMD loaders now write
+  trend_point rows per period; `make refresh-trends` backfills from
+  existing indicator_value rows. IMD trend caveats flag the
+  IoD 2019↔2025 series break. Census loader doesn't yet — Census 2021
+  is a single point so there's no trend to surface until Census 2031,
+  but the wiring is the same pattern when needed.
 - **Production sanitisation pipeline missing rules**: app.py lifespan
   composes only StripDirectIdentifiers + NormaliseAskerPurpose +
   ValidateConsentLevel. The other three rules exist + are tested but not
