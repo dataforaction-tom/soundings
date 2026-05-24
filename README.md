@@ -8,7 +8,9 @@ See [`docs/`](./docs/) for the full v1–v3 specs and design docs.
 
 ## Status
 
-Phase 0 of v1 — repo and geography spine. See [`docs/plans/2026-05-05-soundings-v1-design.md`](./docs/plans/2026-05-05-soundings-v1-design.md) for the implementation design and [`docs/plans/2026-05-05-soundings-v1-phase-0-plan.md`](./docs/plans/2026-05-05-soundings-v1-phase-0-plan.md) for the current build plan.
+**Phase 5 of v1** — First monthly corpus release + documentation pass underway.
+
+Phase 0–4 complete: geography spine, population/education/health/crime/civil society indicators, `compare_places` + `get_trend` + `find_organisations_in_place` tools, MCP + HTTP transports, UI with sparklines.
 
 ## Quick start (dev)
 

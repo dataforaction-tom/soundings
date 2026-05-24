@@ -1,65 +1,59 @@
-# Project: [Name]
+# Project: Soundings
 
-[One-line description of what this is and what it does]
+An open insight commons for understanding UK places. Single MCP server wrapping UK open data (population, health, crime, civil society) behind question-shaped tools, with every consented question logged to a public corpus.
 
 ## Architecture
 
-- `src/` — [what lives here]
-- `public/` — [static assets, etc.]
-- `lib/` — [shared utilities]
-- [Add key directories as they emerge]
+- `server/` — FastAPI + MCP server, Python 3.12
+- `ui/` — Astro 4, server-rendered
+- `infra/` — Docker Compose (Postgres + PostGIS 16)
+- `catalogue/` — indicators.yaml + sources.yaml
 
 ## Commands
 
-- `npm run dev` — start development server
-- `npm test` — run tests
-- `npm run build` — production build
-- `npm run lint` — check for issues
+- `make up` — Start dev stack
+- `make migrate` — Apply DB migrations
+- `make seed` — Full seed (~15 min)
+- `make seed-light` — Light seed (~5 min, single LTLA)
+- `make test` — Run Python tests
+- `make publish-corpus` — Generate monthly corpus release
 
 ## Standards
 
-- [Framework-specific conventions]
-- [Testing expectations — e.g. "write tests for all new functions"]
-- [Naming conventions]
+- Conventional commits (`feat`, `fix`, `test`, `docs`, `chore`)
+- TDD: failing test → minimum implementation → green → commit
+- One feature branch per block, squash-merged PRs
+- All tests must pass before merging
 
 ## Verification
 
-Claude should verify its own work. For this project:
-- Run `npm run build` after structural changes to confirm nothing breaks
-- Run `npm run lint` before considering any task complete
-- If tests exist, run `npm test` after changes to tested code
-- [Add project-specific verification steps as they emerge]
+- Run `make test` before considering any task complete
+- Run `make up && make seed-light` for local smoke test
+- Check lint with pre-commit hooks
 
 ## Working Rules
 
-- Always check for existing patterns before creating new ones
-- Prefer small, incremental changes over big rewrites
-- If a task will take more than ~50 lines of changes, use plan mode first
+- Check for existing patterns before creating new ones
+- Prefer small, incremental changes
+- If a task will take >50 lines, use plan mode first
 - Don't add dependencies without asking
 - Don't refactor code that wasn't part of the task
-- Don't create files without explaining what and why
 
 ## State & Progress
 
-> Updated: [date]
-> Current focus: [what we're working on]
-> Status: [where things stand]
+> Updated: 2026-05-24
+> Phase: **5 in progress** — first monthly corpus release + doc pass
+> Status: Phase 0–4 shipped, Phase 5 running
 
-See PLAN.md for task tracking, STATE.md for system state, HANDOFF.md for session notes.
+See PLAN.md for task tracking, STATE.md for system state.
 
 ## Known Issues
 
-- [Things that are broken or incomplete]
-- [Workarounds currently in place]
+- Geography chain tests updated for ONS LSOA→LTLA lookup (no MSOA layer)
+- Some live tests depend on API keys (Stat-Xplore)
 
 ## Lessons Learned
 
-Things Claude has got wrong on this project — don't repeat these:
-
-- [Add mistakes as they happen — this is the highest-leverage section]
-
-<!--
-Keep this file concise. ~150 instructions max before Claude starts ignoring things.
-If Claude already does something correctly without being told, don't add it here.
-Focus on: things Claude gets wrong, patterns it can't infer, commands it needs.
--->
+- ONS simplified LSOA→LTLA lookup: no MSOA intermediate (2024)
+- CC bulk register is the only discovery surface (API v2 is detail-only)
+- 360G GrantNav has no per-org search — cache warming required
