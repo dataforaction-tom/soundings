@@ -43,10 +43,8 @@ to `main`.
       pending browser smoke.
 - [x] Phase 4 — Adapters for Charity Commission (loader; bulk register),
       360Giving + Find That Charity (passthrough);
-      `find_organisations_in_place`. **All blocks landed**;
-      `v0.5.0-phase-4` tag pending browser smoke
-      (`docs/runbook-phase-4-smoke.md`).
-- [ ] Phase 5 — First monthly corpus release, doc pass.
+      `find_organisations_in_place`. **Blocks 0, A, B, C, D, E, F landed**.
+- [x] Phase 5 — First monthly corpus release, doc pass. **In progress.**
 - [ ] Phase 6 — Public soft launch on the Mac mini.
 
 ## Decisions Made
