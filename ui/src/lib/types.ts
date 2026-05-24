@@ -129,3 +129,32 @@ export interface ConsentResponse {
 export interface FeedbackResponse {
   ok: true;
 }
+
+// find_organisations_in_place (spec §4.6 / Phase 4 Block D) ------------------------
+
+export interface GrantRef {
+  funder: string;
+  amount: number;
+  currency: string;
+  date: string;
+  purpose: string | null;
+  source: SourceRef;
+}
+
+export interface OrganisationRef {
+  id: string;
+  name: string;
+  classification: string[];
+  registered_address_place_id: string | null;
+  operates_in_place_ids: string[];
+  recent_grants: GrantRef[];
+  source: SourceRef;
+  methodology_note: string | null;
+}
+
+export interface FindOrganisationsInPlaceResponse {
+  organisations: OrganisationRef[];
+  sources: SourceRef[];
+  caveats: string[];
+  partial: boolean;
+}

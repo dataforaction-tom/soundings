@@ -1,0 +1,141 @@
+---
+import type { OrganisationRef, GrantRef } from "../lib/types";
+
+interface Props {
+  organisation: OrganisationRef;
+}
+
+const { organisation } = Astro.props;
+
+function formatAmount(amount: number): string {
+  return new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency: "GBP",
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+function formatDate(dateStr: string): string {
+  try {
+    return new Date(dateStr).toLocaleDateString("en-GB", {
+      year: "numeric",
+      month: "short",
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
+const topGrants = organisation.recent_grants.slice(0, 3);
+---
+
+<article class="organisation-card">
+  <header>
+    <h4>{organisation.name}</h4>
+    <span class="source-label">{organisation.source.source_label}</span>
+  </header>
+
+  {organisation.classification.length > 0 && (
+    <div class="classifications">
+      {organisation.classification.map((c) => (
+        <span class="tag">{c}</span>
+      ))}
+    </div>
+  )}
+
+  {topGrants.length > 0 && (
+    <div class="grants">
+      <h5>Recent grants</h5>
+      <ul>
+        {topGrants.map((grant: GrantRef) => (
+          <li>
+            <span class="funder">{grant.funder}</span>
+            <span class="amount">{formatAmount(grant.amount)}</span>
+            <span class="date">{formatDate(grant.date)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )}
+
+  {organisation.methodology_note && (
+    <p class="note">{organisation.methodology_note}</p>
+  )}
+</article>
+
+<style>
+  .organisation-card {
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    background: #fff;
+  }
+  .organisation-card header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.5rem;
+  }
+  .organisation-card h4 {
+    margin: 0;
+    font-size: 0.9375rem;
+    font-weight: 600;
+  }
+  .source-label {
+    font-size: 0.6875rem;
+    color: #666;
+  }
+  .classifications {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-top: 0.5rem;
+  }
+  .tag {
+    font-size: 0.6875rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    background: #e8f0f8;
+    color: #2c5282;
+  }
+  .grants {
+    margin-top: 0.75rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #eee;
+  }
+  .grants h5 {
+    margin: 0 0 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #555;
+  }
+  .grants ul {
+    margin: 0;
+    padding-left: 0;
+    list-style: none;
+  }
+  .grants li {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+    padding: 0.25rem 0;
+  }
+  .funder {
+    color: #333;
+  }
+  .amount {
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+  }
+  .date {
+    color: #666;
+    font-size: 0.75rem;
+  }
+  .note {
+    margin: 0.5rem 0 0;
+    font-size: 0.75rem;
+    color: #666;
+    font-style: italic;
+  }
+</style>

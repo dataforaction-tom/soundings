@@ -126,6 +126,29 @@ class ThreeSixtyGivingAdapter(PassthroughAdapter):
             for g in grants_sorted[:limit]
         ]
 
+    async def recent_grants_for_org(self, org_id: str, *, limit: int = 3) -> list[GrantRef]:
+        """Per-org slice of the same fan-out, for `find_organisations_in_place`.
+
+        Accepts either a CC-prefixed id (`charity_commission:1234`) or a 360G
+        org id (`GB-CHC-1234`); converts as needed. Returns the org's most
+        recent grants from `_cached_org_grants`.
+        """
+        tsg_org_id = _cc_to_tsg_org_id(org_id)
+        grants = await self._cached_org_grants(tsg_org_id)
+        grants_sorted = sorted(grants, key=lambda g: g["date"], reverse=True)
+        source_ref = await self._build_source_ref(retrieved_at=self._now(), cache_status="cached")
+        return [
+            GrantRef(
+                funder=g["funder"],
+                amount=g["amount"],
+                currency="GBP",
+                date=g["date"],
+                purpose=g.get("purpose"),
+                source=source_ref,
+            )
+            for g in grants_sorted[:limit]
+        ]
+
     # ----- Core fan-out ---------------------------------------------------
 
     async def _fetch_grants_for_place(self, place_id: str) -> list[dict[str, Any]]:

@@ -1,0 +1,98 @@
+---
+import OrganisationCard from "./OrganisationCard.astro";
+import SourceCitations from "./SourceCitations.astro";
+import { findOrganisationsInPlace } from "../lib/api";
+import type { OrganisationRef, SourceRef } from "../lib/types";
+
+interface Props {
+  placeId: string;
+  cookieHeader?: string;
+}
+
+const { placeId, cookieHeader } = Astro.props;
+
+// Skip non-England/Wales places - they won't have CC data
+// FTC handles Scotland/NI but we'll silently skip for now if empty
+const isEnglandOrWales = placeId.startsWith("ltla24:E") || placeId.startsWith("ltla24:W");
+
+let organisations: OrganisationRef[] = [];
+let sources: SourceRef[] = [];
+let caveats: string[] = [];
+let partial = false;
+let error = null;
+
+if (isEnglandOrWales) {
+  try {
+    const response = await findOrganisationsInPlace(placeId, {
+      limit: 10,
+      cookieHeader,
+    });
+    organisations = response.organisations;
+    sources = response.sources;
+    caveats = response.caveats;
+    partial = response.partial;
+  } catch (err) {
+    // Silently fail - organisations section is non-critical
+    error = err instanceof Error ? err.message : String(err);
+  }
+}
+
+const showSection = organisations.length > 0;
+---
+
+{showSection && (
+  <section class="organisations-section">
+    <h3>Organisations</h3>
+    <p class="intro">
+      {organisations.length} organisation{organisations.length === 1 ? "" : "s"}
+      {partial && " (partial results)"}
+      {" "}found in this area from Charity Commission data.
+    </p>
+
+    <div class="org-grid">
+      {organisations.map((org) => (
+        <OrganisationCard organisation={org} />
+      ))}
+    </div>
+
+    {caveats.length > 0 && (
+      <ul class="caveats">
+        {caveats.map((c) => <li>{c}</li>)}
+      </ul>
+    )}
+
+    {sources.length > 0 && <SourceCitations sources={sources} />}
+  </section>
+)}
+
+<style>
+  .organisations-section {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #e0e0e0;
+  }
+  .organisations-section h3 {
+    margin: 0 0 0.5rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+  }
+  .intro {
+    margin: 0 0 1rem;
+    color: #555;
+    font-size: 0.875rem;
+  }
+  .org-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+  }
+  .caveats {
+    margin: 1rem 0 0;
+    padding-left: 1.25rem;
+    font-size: 0.8125rem;
+    color: #666;
+  }
+  .caveats li {
+    margin: 0.25rem 0;
+  }
+</style>

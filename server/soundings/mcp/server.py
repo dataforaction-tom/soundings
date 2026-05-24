@@ -13,6 +13,7 @@ from mcp.server.fastmcp import FastMCP
 
 from soundings.tools.compare_places import ComparePlacesInput, compare_places
 from soundings.tools.find_place import FindPlaceInput, find_place
+from soundings.tools.find_organisations_in_place import FindOrganisationsInPlaceInput, find_organisations_in_place
 from soundings.tools.get_indicators import GetIndicatorsInput, get_indicators
 from soundings.tools.get_place_profile import GetPlaceProfileInput, get_place_profile
 from soundings.tools.get_trend import GetTrendInput, get_trend
@@ -110,6 +111,26 @@ def build_mcp_server(state: Any | None = None) -> FastMCP:
                 indicator=indicator,
                 period_from=period_from,
                 period_to=period_to,
+            ),
+            state.orchestrator,
+        )
+        return result.model_dump(mode="json")
+
+    @mcp.tool(name="find_organisations_in_place")
+    async def _find_organisations_in_place(
+        place_id: str,
+        activity_filter: list[str] | None = None,
+        funded_only: bool = False,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        if state is None:
+            raise RuntimeError("MCP find_organisations_in_place invoked without app state")
+        result = await find_organisations_in_place(
+            FindOrganisationsInPlaceInput(
+                place_id=place_id,
+                activity_filter=activity_filter,
+                funded_only=funded_only,
+                limit=limit,
             ),
             state.orchestrator,
         )

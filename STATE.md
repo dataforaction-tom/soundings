@@ -1,14 +1,9 @@
 # State
 
-> Last updated: 2026-05-22 (session 5)
-> Phase: **4 in progress.** Blocks 0 + A + B merged. Branch
-> `mye-trend-writes` closes the Phase 3 trend_point follow-up:
-> MYE and IMD loaders now write `data.trend_point` per period, the
-> IoD 2019↔2025 series break is flagged as a caveat, and
-> `make refresh-trends` backfills from existing indicator_value rows.
-> Next: Block C — FindThatCharity passthrough. Phase 3's
-> `v0.4.0-phase-3` tag is still pending the manual browser smoke
-> documented in `docs/runbook-phase-3-smoke.md`.
+> Last updated: 2026-05-19 (session 8)
+> Status: **Phase 4 complete pending browser smoke + tag.** All blocks
+> 0/A/B/C/D/E/F landed; the `v0.5.0-phase-4` tag is gated on the smoke
+> in `docs/runbook-phase-4-smoke.md`.
 
 ## System State Diagram
 
@@ -27,7 +22,7 @@ stateDiagram-v2
     Phase4Build --> Phase4Done: blocks 0–F complete, tag v0.5.0-phase-4
     Phase4Done --> [*]: not started
 
-    note right of Phase4Build: ← WE ARE HERE (Block A landing)
+    note right of Phase4Done: ← WE ARE HERE (browser smoke pending)
 ```
 
 ## Component Status
@@ -66,10 +61,11 @@ stateDiagram-v2
 | **`OrganisationRef` + `GrantRef` contracts** | ✅ Phase 4 (Block 0) | Per design §4.6. |
 | **`CharityCommissionLoader` (loader-mode by carve-out)** | ✅ Phase 4 (Block A) | Bulk register pulled monthly. API-first principle's documented exception: CC API v2 is detail-lookup only, no search-by-area endpoint. Writes data.organisation + data.organisation_operates_in + civil_society.active_charities_* aggregates. |
 | **`ThreeSixtyGivingAdapter` (passthrough)** | ✅ Phase 4 (Block B) | Composes place-level grant aggregates by fanning out across CC charities in data.organisation. Three-layer cache (per-org aggregate + per-org grants + per-place grants); latest_grant_date filter skips orgs with no recent activity. Pre-warmer override drives weekly cache warming. Live test verified against Oxfam. |
-| **`FindThatCharityAdapter` (passthrough)** | ⏳ Phase 4 (Block C) | Not started. Cross-jurisdiction (Scotland/NI). |
-| **`find_organisations_in_place` tool** | ⏳ Phase 4 (Block D) | Not started. Mixed-mode dispatch: data.organisation SELECT for E&W, FTC passthrough for Scotland/NI, optional 360G grant enrichment. |
-| **UI Organisations section** | ⏳ Phase 4 (Block E) | Not started. |
-| **`v0.5.0-phase-4` tag** | ⏳ Phase 4 (Block F) | Not started. |
+|| **`FindThatCharityAdapter` (passthrough)** | ✅ Phase 4 (Block C) | Cross-jurisdiction lookup for Scotland/NI; fetch_organisations routes by place_id prefix. |
+| **`find_organisations_in_place` tool** | ✅ Phase 4 (Block D) | HTTP route + MCP registration. Mixed-mode dispatch. Regression unit tests in `test_orchestrator_find_organisations.py`. |
+| **UI Organisations section** | ✅ Phase 4 (Block E) | `OrganisationCard` + `OrganisationsSection` SSR-mounted on `/place/[id]`. Gated on E&W place_ids; FTC path exposed via the HTTP tool but not yet from the UI. `/about` mentions civil-society context. |
+| **Phase 4 server-side e2e** | ✅ Phase 4 (Block F) | `test_phase_4_e2e.py` covers both CC + FTC dispatch via HTTP. Runs against `soundings_test` DB (see `make test-db-create`). |
+| **`v0.5.0-phase-4` tag** | ⏳ Phase 4 (Block F) | Pending browser smoke from `docs/runbook-phase-4-smoke.md`. |
 
 Status markers: ⏳ Not started · 🔧 In progress · ✅ Done · 🚫 Blocked · ⚠️ Needs attention.
 
@@ -108,12 +104,11 @@ flowchart LR
 
 ## Known follow-ups (Phase 4 and beyond)
 
-- **`data.trend_point` loader-writes** — MYE and IMD loaders now write
-  trend_point rows per period; `make refresh-trends` backfills from
-  existing indicator_value rows. IMD trend caveats flag the
-  IoD 2019↔2025 series break. Census loader doesn't yet — Census 2021
-  is a single point so there's no trend to surface until Census 2031,
-  but the wiring is the same pattern when needed.
+- **`data.trend_point` not yet populated by loader-mode adapters**: the
+  table exists and `get_trend` reads from it, but MYE / Census / IMD
+  loaders don't write to it yet — passthrough adapters provide the only
+  populated trends in Phase 3 prod. Phase 4 should wire trend writes
+  during the loader pass.
 - **Production sanitisation pipeline missing rules**: app.py lifespan
   composes only StripDirectIdentifiers + NormaliseAskerPurpose +
   ValidateConsentLevel. The other three rules exist + are tested but not
