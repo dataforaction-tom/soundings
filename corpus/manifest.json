@@ -1,0 +1,18 @@
+{
+  "catalogue_version": "8f9dd77b3dd5e7639ae915d100c420d0d348fe7b0d7f9d23326b6edaeda27ba0",
+  "files": [
+    {
+      "name": "corpus-2026-04.csv.gz",
+      "sha256": "2c879570f241550b08aa7da11936bf25723124286c38a28b6f471dd413498590",
+      "size_bytes": 148
+    },
+    {
+      "name": "corpus-2026-04.jsonl.gz",
+      "sha256": "bf694de80e0ba2ed5751faf2adb92e5d66ccc4448a5eeec6d965bc0256c10aca",
+      "size_bytes": 41
+    }
+  ],
+  "generator_git_sha": "f25557a4eaaa10dd932813387341b767475fdae6",
+  "period": "2026-04",
+  "sanitisation_rules_version": "v1"
+}
