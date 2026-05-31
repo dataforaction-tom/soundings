@@ -114,15 +114,32 @@ const sources: SourceRef[] = profile
   )}
 
   <style>
+    .place-header {
+      margin-bottom: var(--space-xl);
+      padding-bottom: var(--space-lg);
+      border-bottom: 1px solid var(--color-border);
+    }
     .place-header h2 {
-      margin-bottom: 0.25rem;
+      margin: 0 0 var(--space-xs) 0;
+      font-size: var(--font-size-2xl);
     }
     .place-type {
-      color: #555;
-      margin-top: 0;
+      color: var(--color-muted);
+      margin: 0;
+      font-size: var(--font-size-sm);
+    }
+    .place-type code {
+      font-family: var(--font-sans);
+      font-size: var(--font-size-xs);
+      background: var(--color-bg);
+      padding: var(--space-xs) var(--space-sm);
+      border-radius: var(--radius-sm);
     }
     .error {
-      color: #a00;
+      background: #fee2e2;
+      color: #991b1b;
+      padding: var(--space-lg);
+      border-radius: var(--radius);
     }
   </style>
 </Base>

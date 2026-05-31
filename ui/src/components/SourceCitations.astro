@@ -34,35 +34,49 @@ const unique = dedupeSources(sources);
 
 <style>
   .source-citations {
-    margin: 1.5rem 0;
-    font-size: 0.875rem;
+    margin: var(--space-xl) 0;
+    padding-top: var(--space-lg);
+    border-top: 1px solid var(--color-border-light);
+    font-size: var(--font-size-sm);
+  }
+  .source-citations h3 {
+    font-size: var(--font-size-base);
+    margin-bottom: var(--space-md);
   }
   .source-citations ul {
     list-style: none;
     padding: 0;
+    margin: 0;
   }
   .source-citations li {
-    padding: 0.25rem 0;
+    padding: var(--space-sm) 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    align-items: center;
   }
   .publisher,
   .retrieved {
-    color: #555;
+    color: var(--color-muted);
   }
   .cache-status {
     display: inline-block;
-    margin: 0 0.5rem;
-    padding: 0.05rem 0.4rem;
-    border-radius: 4px;
-    font-size: 0.75rem;
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
     text-transform: uppercase;
+    letter-spacing: 0.05em;
   }
   .cache-live {
-    background: #cfe;
+    background: #dcfce7;
+    color: #166534;
   }
   .cache-cached {
-    background: #ece;
+    background: #fef3c7;
+    color: #92400e;
   }
   .cache-stale {
-    background: #fdd;
+    background: #fee2e2;
+    color: #991b1b;
   }
 </style>

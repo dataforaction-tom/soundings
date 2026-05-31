@@ -109,13 +109,18 @@ export function renderCompareBars(
     marginRight: 12,
     marginBottom: 36,
     marginLeft: 60,
+    style: {
+      background: "transparent",
+      fontSize: "12px",
+      fontFamily: "system-ui, sans-serif",
+    },
     x: { label: null, tickRotate: -25 },
     y: { grid: true, label: comparison.unit, nice: true },
     marks: [
       Plot.barY(bars, {
         x: "place_id",
         y: "value",
-        fill: "#2a5bd7",
+        fill: "#4a7c59",
       }),
       Plot.text(bars, {
         x: "place_id",
@@ -123,7 +128,7 @@ export function renderCompareBars(
         text: "label",
         dy: -8,
         fontSize: 11,
-        fill: "#333",
+        fill: "#2d2d2d",
       }),
     ],
   });
@@ -149,11 +154,16 @@ export function renderSparkline(
     marginRight: 4,
     marginBottom: 18,
     marginLeft: 28,
+    style: {
+      background: "transparent",
+      fontSize: "10px",
+      fontFamily: "system-ui, sans-serif",
+    },
     x: { type: "point", label: null, tickFormat: (d: unknown) => String(d) },
     y: { grid: false, label: null, nice: true },
     marks: [
-      Plot.line(chartPoints, { x: "period", y: "value", strokeWidth: 1.5 }),
-      Plot.dot(chartPoints, { x: "period", y: "value", r: 2.5, fill: "currentColor" }),
+      Plot.line(chartPoints, { x: "period", y: "value", strokeWidth: 1.5, stroke: "#4a7c59" }),
+      Plot.dot(chartPoints, { x: "period", y: "value", r: 2.5, fill: "#4a7c59" }),
     ],
   });
   // linkedom and the browser both expose outerHTML on SVG elements.

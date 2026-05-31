@@ -1,5 +1,6 @@
 ---
 import ConsentBanner from "../components/ConsentBanner.astro";
+import "../styles/global.css";
 
 interface Props {
   title?: string;
@@ -14,30 +15,13 @@ const { title = "Soundings" } = Astro.props;
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
-    <style>
-      body {
-        font-family: system-ui, sans-serif;
-        max-width: 56rem;
-        margin: 2rem auto;
-        padding: 0 1rem;
-        line-height: 1.5;
-      }
-      header a {
-        text-decoration: none;
-        color: inherit;
-      }
-      footer {
-        margin-top: 4rem;
-        padding-top: 1rem;
-        border-top: 1px solid #ddd;
-        font-size: 0.875rem;
-        color: #555;
-      }
-    </style>
   </head>
   <body>
     <header>
-      <h1><a href="/">Soundings</a></h1>
+      <div class="header-inner">
+        <h1><a href="/">Soundings</a></h1>
+        <p class="tagline">Data for local decision-making</p>
+      </div>
     </header>
     <ConsentBanner />
     <main>
@@ -48,3 +32,56 @@ const { title = "Soundings" } = Astro.props;
     </footer>
   </body>
 </html>
+
+<style>
+  body {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    padding: var(--space-xl) var(--space-md);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    margin-bottom: var(--space-xl);
+  }
+
+  .header-inner {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  header h1 {
+    margin: 0;
+    font-size: var(--font-size-3xl);
+  }
+
+  header h1 a {
+    color: var(--color-primary);
+    text-decoration: none;
+  }
+
+  header h1 a:hover {
+    color: var(--color-accent);
+  }
+
+  .tagline {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: var(--font-size-lg);
+  }
+
+  main {
+    flex: 1;
+  }
+
+  footer {
+    margin-top: var(--space-3xl);
+    padding-top: var(--space-lg);
+    border-top: 1px solid var(--color-border);
+    font-size: var(--font-size-sm);
+    color: var(--color-muted);
+  }
+</style>
