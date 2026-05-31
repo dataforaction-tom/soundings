@@ -72,7 +72,8 @@ Apply Good Ship branding to Soundings — transform the functional, minimal UI i
   - Improve card grid layout
   - Add subtle separators between sections
 
-- [ ] **About Page (about.astro)** — pending
+- [x] **About Page (about.astro)** — lead intro, sectioned headers with accent
+  underline, inline-code styling, consent/link list rhythm
 
 ## File Changes
 
