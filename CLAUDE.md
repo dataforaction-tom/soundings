@@ -42,10 +42,22 @@ An open insight commons for understanding UK places. Single MCP server wrapping 
 ## State & Progress
 
 > Updated: 2026-05-24
-> Phase: **5 in progress** — first monthly corpus release + doc pass
-> Status: Phase 0–4 shipped, Phase 5 running
+> Phase: **5 complete**, Phase 6 — new data sources (in planning)
+> Status: Design system shipped, new viz implemented, planning Phase 6 data expansion
 
 See PLAN.md for task tracking, STATE.md for system state.
+
+## Phase 6: New Data Sources (Planning)
+
+A detailed plan exists at `docs/plans/2026-05-24-phase-6-data-sources-plan.md` covering:
+
+| Priority | Sources | New Domains |
+|----------|---------|-------------|
+| 1 | Ofcom, Ofsted, BEIS EPC, DEFRA Air | Digital, Environment |
+| 2 | CQC, Land Registry, DfT Road Safety | Housing (extended), Safety |
+| 3 | NHS Digital, VOA, Companies House | Economy (expanded) |
+
+Expected: 50+ new indicators across 4 new domains.
 
 ## Known Issues
 

@@ -1,7 +1,7 @@
 # State
 
-> Last updated: 2026-05-24
-> Status: **Phase 5 in progress.** First monthly corpus release + doc pass underway.
+> Last updated: 2026-05-25
+> Status: **Phase 5 complete.** Phase 6 — new data sources (planning underway).
 
 ## System State Diagram
 
@@ -20,9 +20,12 @@ stateDiagram-v2
     Phase4Build --> Phase4Done: blocks 0–F complete, tag v0.5.0-phase-4
     Phase4Done --> Phase5Build: phase 5 plan accepted
     Phase5Build --> Phase5Done: corpus release + doc pass
-    Phase5Done --> [*]: not started
+    Phase5Done --> Phase6Build: phase 6 plan accepted
+    Phase6Build --> Phase6DataSources: URL validation + priority sources
+    Phase6DataSources --> Phase6Done: 50+ new indicators across 4 new domains
+    Phase6Done --> [*]: not started
 
-    note right of Phase5Build: ← WE ARE HERE
+    note right of Phase6Build: ← WE ARE HERE
 ```
 
 ## Component Status
@@ -65,9 +68,12 @@ stateDiagram-v2
 | **`find_organisations_in_place` tool** | ✅ Phase 4 (Block D) | HTTP route + MCP registration. Mixed-mode dispatch. Regression unit tests in `test_orchestrator_find_organisations.py`. |
 | **UI Organisations section** | ✅ Phase 4 (Block E) | `OrganisationCard` + `OrganisationsSection` SSR-mounted on `/place/[id]`. Gated on E&W place_ids; FTC path exposed via the HTTP tool but not yet from the UI. `/about` mentions civil-society context. |
 | **Phase 4 server-side e2e** | ✅ Phase 4 (Block F) | `test_phase_4_e2e.py` covers both CC + FTC dispatch via HTTP. Runs against `soundings_test` DB (see `make test-db-create`). |
-| **`v0.5.0-phase-4` tag** | ✅ Phase 4 | Delivered with Phase 4 merge. |
+|| **`v0.5.0-phase-4` tag** | ✅ Phase 4 | Delivered with Phase 4 merge. |
+|| **Phase 5 — First monthly corpus release** | ✅ Phase 5 | Published 2026-05-24; see `docs/corpus/`. |
+|| **Phase 5 — Doc pass** | ✅ Phase 5 | DRIs, error messages, inline docs reviewed. |
+|| **Phase 6 — New data sources** | 🔧 Planning | URL validation complete; priority: Ofcom, Ofsted, BEIS EPC, DEFRA Air, CQC, Land Registry, DfT. 50+ new indicators across 4 new domains (digital, environment, housing-extended, safety). |
 
-Status markers: ⏳ Not started · 🔧 In progress · ✅ Done · 🚫 Blocked · ⚠️ Needs attention.
+Status markers
 
 ## Data Flow (Phase 3)
 

@@ -1,9 +1,7 @@
 # Plan
 
-> Last updated: 2026-05-19 (session 8)
-> Status: **Phase 4 complete pending browser smoke + tag.** All blocks
-> 0/A/B/C/D/E/F landed; `v0.5.0-phase-4` gated on the smoke in
-> `docs/runbook-phase-4-smoke.md`.
+> Last updated: 2026-05-25
+> Status: **Phase 5 complete.** Phase 6 — new data sources (planning underway).
 
 ## Objective
 
@@ -44,8 +42,35 @@ to `main`.
 - [x] Phase 4 — Adapters for Charity Commission (loader; bulk register),
       360Giving + Find That Charity (passthrough);
       `find_organisations_in_place`. **Blocks 0, A, B, C, D, E, F landed**.
-- [x] Phase 5 — First monthly corpus release, doc pass. **In progress.**
-- [ ] Phase 6 — Public soft launch on the Mac mini.
+- [x] Phase 5 — First monthly corpus release, doc pass. **Complete.**
+- [x] UI Design — Apply Good Ship branding, new design system. **Complete.**
+- [ ] Phase 6 — New data sources. **Planning underway.**
+
+## Phase 6: Data Source Expansion
+
+See `docs/plans/2026-05-24-phase-6-data-sources-plan.md` for detailed plan.
+
+**Goal:** Expand beyond 8 core domains with high-value neighbourhood data.
+
+**Priority sources (URL validation complete):**
+|| # | Source | New Domain | Indicators | Status |
+||---|--------|------------|------------|--------|
+|| 1 | Ofcom Connected Nations | Digital | 6 | ⚠️ Redirects |
+|| 2 | Ofsted | Education | 4 | ⚠️ Changed |
+|| 3 | BEIS Energy Performance | Housing (EPC) | 8 | ✅ Works |
+|| 4 | DEFRA Air Quality | Environment | 6 | ✅ API key needed |
+|| 5 | CQC Care Quality | Health | 4 | ✅ Works |
+|| 6 | Land Registry | Housing | 8 | ✅ Works |
+|| 7 | DfT Road Safety | Safety | 5 | ✅ Works |
+
+**UK-wide deprivation (additional):**
+|| Source | Coverage | Status |
+||--------|----------|--------|
+|| Scottish IMD | Scotland | ✅ Works (2020v2) |
+|| Welsh IMD 2025 | Wales | ⚠️ ODS 404s |
+|| NI Deprivation | N. Ireland | ✅ Works |
+
+**Target:** 50+ new indicators across 4 new domains (digital, environment, housing-extended, safety)
 
 ## Decisions Made
 
@@ -68,6 +93,7 @@ to `main`.
 | Police.uk methodology caveat asserted verbatim by adapter test | Centroid-proximate aggregation undercounts large or dispersed LTLAs; a refactor that drops the caveat would silently degrade provenance, so the test pins the exact string. | 2026-05-12 |
 | UI uses `linkedom` for SSR DOM polyfill | `@observablehq/plot` calls `document.createElement` internally; Node SSR has no native `document`. linkedom is lighter than jsdom and ships a spec-shaped DOM that Plot is happy with. | 2026-05-12 |
 | Phase 3 Block E onwards lands as squash-merged PRs | First three phases shipped as direct commits to `main`. From PR #1 onwards each block of Phase 3 is a feature branch + squashed PR — matches the global "always work on a branch" rule. | 2026-05-12 |
+| Phase 6 data source validation approach | URL validation first, then TDD implementation per adapter. Priority ordered by API stability: EPC/Land Registry → DEFRA → CQC → DfT. | 2026-05-24 |
 
 ## Open Questions
 
