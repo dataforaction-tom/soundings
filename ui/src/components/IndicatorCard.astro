@@ -1,7 +1,7 @@
 ---
 import IndicatorChart from "./IndicatorChart.astro";
 import type { IndicatorValue, TrendPoint } from "../lib/types";
-import { formatValue, prettyKey } from "../lib/indicator_display";
+import { formatValue, prettyKey, formatContext, formatDirection } from "../lib/indicator_display";
 
 interface Props {
   indicator: IndicatorValue;
@@ -10,6 +10,13 @@ interface Props {
 
 const { indicator, trend } = Astro.props;
 const hasTrend = trend !== undefined && trend.length >= 2;
+const benchmark = indicator.benchmark_percentile;
+const higherIs = indicator.higher_is ?? null;
+const direction = formatDirection(higherIs);
+// "good" if a high percentile is desirable; "bad" otherwise. Only set
+// when the catalogue's higher_is has an opinion (better/worse).
+const directionTone =
+  higherIs === "better" ? "good" : higherIs === "worse" ? "bad" : "";
 ---
 
 <article class="indicator-card">
@@ -19,13 +26,26 @@ const hasTrend = trend !== undefined && trend.length >= 2;
       {indicator.source.cache_status}
     </span>
   </header>
-  <p class="value">
-    <span class="number">{formatValue(indicator.value)}</span>
-    {indicator.unit && <span class="unit">{indicator.unit}</span>}
-  </p>
-  <p class="period">
-    {indicator.period} · <span class="source-label">{indicator.source.source_label}</span>
-  </p>
+  <div class="value-row">
+    <p class="value">
+      <span class="number">{formatValue(indicator.value)}</span>
+      {indicator.unit && <span class="unit">{indicator.unit}</span>}
+    </p>
+    {benchmark !== null && benchmark !== undefined && (
+      <div class="benchmark" title="Percentile against peer places of the same type">
+        <span class="context">{formatContext(benchmark, "percentile")}</span>
+        {direction && <span class={`direction ${directionTone}`}>{direction}</span>}
+      </div>
+    )}
+  </div>
+  <div class="meta-row">
+    <p class="period">
+      {indicator.period} · <span class="source-label">{indicator.source.source_label}</span>
+    </p>
+    <span class={`confidence-badge ${indicator.confidence}`} title="Data confidence level">
+      {indicator.confidence}
+    </span>
+  </div>
   {hasTrend && (
     <IndicatorChart points={trend!} />
   )}
@@ -38,52 +58,132 @@ const hasTrend = trend !== undefined && trend.length >= 2;
 
 <style>
   .indicator-card {
-    border: 1px solid #e0e0e0;
-    border-radius: 6px;
-    padding: 0.75rem 1rem;
-    background: #fff;
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius);
+    padding: var(--space-lg);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 0.15s ease;
+  }
+  .indicator-card:hover {
+    box-shadow: var(--shadow);
   }
   .indicator-card header {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
+    gap: var(--space-sm);
   }
   .indicator-card h4 {
     margin: 0;
-    font-size: 0.9375rem;
-    font-weight: 600;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-primary);
+  }
+  .value-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--space-md);
+    margin-top: var(--space-md);
   }
   .value {
-    margin: 0.5rem 0 0;
-    font-size: 1.5rem;
-    font-weight: 500;
+    margin: 0;
+    font-size: var(--font-size-2xl);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
   }
   .number {
     font-variant-numeric: tabular-nums;
   }
   .unit {
-    font-size: 0.875rem;
-    color: #555;
-    margin-left: 0.25rem;
+    font-size: var(--font-size-sm);
+    color: var(--color-muted);
+    margin-left: var(--space-xs);
+  }
+  .benchmark {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--color-bg);
+    border-radius: var(--radius);
+  }
+  .benchmark .context {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-primary);
+    font-variant-numeric: tabular-nums;
+  }
+  .benchmark .direction {
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+  }
+  .benchmark .direction.good {
+    color: #166534;
+  }
+  .benchmark .direction.bad {
+    color: #991b1b;
+  }
+  .meta-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-top: var(--space-xs);
   }
   .period {
-    margin: 0.25rem 0 0;
-    color: #666;
-    font-size: 0.8125rem;
+    margin: 0;
+    color: var(--color-muted);
+    font-size: var(--font-size-sm);
+  }
+  .source-label {
+    color: var(--color-text-light);
+  }
+  .confidence-badge {
+    font-size: var(--font-size-xs);
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-sm);
+    text-transform: capitalize;
+    letter-spacing: 0.02em;
+  }
+  .confidence-badge.official {
+    background: #dcfce7;
+    color: #166534;
+  }
+  .confidence-badge.experimental {
+    background: #fef3c7;
+    color: #92400e;
+  }
+  .confidence-badge.modelled {
+    background: #e0e7ff;
+    color: #3730a3;
   }
   .caveats {
-    font-size: 0.8125rem;
-    color: #555;
-    margin: 0.5rem 0 0;
-    padding-left: 1rem;
+    font-size: var(--font-size-sm);
+    color: var(--color-muted);
+    margin: var(--space-md) 0 0;
+    padding-left: var(--space-md);
   }
   .cache-status {
-    font-size: 0.6875rem;
-    padding: 0.05rem 0.4rem;
-    border-radius: 4px;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-sm);
     text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
   }
-  .cache-live { background: #cfe; }
-  .cache-cached { background: #ece; }
-  .cache-stale { background: #fdd; }
+  .cache-live {
+    background: #dcfce7;
+    color: #166534;
+  }
+  .cache-cached {
+    background: #fef3c7;
+    color: #92400e;
+  }
+  .cache-stale {
+    background: #fee2e2;
+    color: #991b1b;
+  }
 </style>

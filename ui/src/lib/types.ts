@@ -38,6 +38,13 @@ export interface IndicatorValue {
   methodology_note?: string | null;
   caveats: string[];
   confidence: Confidence;
+  // Directionality from catalogue.indicator.higher_is — drives the UI's
+  // good/bad framing on the benchmark badge.
+  higher_is?: "better" | "worse" | "neutral" | null;
+  // Percentile of this value against peer places of the same type,
+  // excluding self. Populated when the indicator's peer universe is
+  // loaded in data.indicator_value.
+  benchmark_percentile?: number | null;
 }
 
 export interface PlaceMatch {
