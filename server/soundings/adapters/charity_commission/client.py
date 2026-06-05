@@ -30,6 +30,7 @@ TXT is iterated line-by-line, not slurped into memory all at once.
 
 import csv
 import io
+import math
 import zipfile
 from collections.abc import AsyncIterator
 from typing import Any
@@ -115,16 +116,21 @@ def _activities_to_classification(raw: str) -> list[str]:
 def _coerce_float(raw: str | None) -> float | None:
     """CC bulk leaves `latest_income` blank for charities that haven't
     filed an annual return. Treat blank + non-numeric as None rather
-    than 0.0, so downstream aggregates can exclude them cleanly."""
+    than 0.0, so downstream aggregates can exclude them cleanly. NaN
+    and Inf strings parse as floats but break SQL aggregates, so
+    coerce them to None too."""
     if raw is None:
         return None
     cleaned = raw.strip()
     if not cleaned:
         return None
     try:
-        return float(cleaned)
+        value = float(cleaned)
     except ValueError:
         return None
+    if not math.isfinite(value):
+        return None
+    return value
 
 
 def _blank_to_none(raw: str | None) -> str | None:
