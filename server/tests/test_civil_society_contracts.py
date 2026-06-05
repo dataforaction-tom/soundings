@@ -1,5 +1,7 @@
 """Contract round-trip + invariants for CivilSocietyProfile."""
 
+from datetime import UTC, datetime
+
 import pytest
 
 from soundings.contracts.civil_society import (
@@ -15,7 +17,7 @@ def _src() -> SourceRef:
         source_id="charity_commission",
         source_label="Charity Commission for England and Wales",
         publisher="Charity Commission",
-        retrieved_at="2026-06-02T10:00:00Z",
+        retrieved_at=datetime.now(tz=UTC),
         cache_status="cached",
         licence="https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/",
     )
