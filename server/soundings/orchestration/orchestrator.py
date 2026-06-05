@@ -14,6 +14,11 @@ from typing import Any, Literal
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from soundings.contracts.civil_society import (
+    CivilSocietyProfile,
+    IncomeBucket,
+    RegistrationCohort,
+)
 from soundings.contracts.comparison import Comparison, ComparisonValue
 from soundings.contracts.indicator_value import IndicatorValue
 from soundings.contracts.organisation import GrantRef, OrganisationRef
@@ -79,6 +84,17 @@ class _GrantsEnrichmentResult:
 
 
 SERIES_BREAK_PREFIX = "series_break:"
+
+# Fixed income brackets for the civil society profile. Picked to match
+# the breakpoints reported in the CC sector overview (Annual Report on
+# the Register). `upper=None` is the open-ended top bracket.
+INCOME_BUCKETS: list[tuple[str, float, float | None]] = [
+    ("<10k", 0.0, 10_000.0),
+    ("10k-100k", 10_000.0, 100_000.0),
+    ("100k-1m", 100_000.0, 1_000_000.0),
+    ("1m-10m", 1_000_000.0, 10_000_000.0),
+    ("10m+", 10_000_000.0, None),
+]
 
 
 class IndicatorOrchestrator:
@@ -761,6 +777,148 @@ class IndicatorOrchestrator:
             sources=[first_source] if first_source is not None else [],
             caveats=caveats,
             partial=bool(per_org_failures),
+        )
+
+    # ----- compute_civil_society_profile (Phase 5 / civil society slice) -----
+
+    async def compute_civil_society_profile(self, place_id: str) -> CivilSocietyProfile:
+        """Aggregate `data.organisation` rows operating in `place_id`
+        into a civil society profile. Pure SQL — no upstream calls."""
+        retrieved = datetime.now(tz=UTC)
+        async with self._engine.connect() as conn:
+            totals_row = (
+                await conn.execute(
+                    text(
+                        "SELECT COUNT(*) AS total, "
+                        "       COUNT((o.raw->>'latest_income')::numeric) AS with_income "
+                        "FROM data.organisation_operates_in oi "
+                        "JOIN data.organisation o ON o.id = oi.organisation_id "
+                        "WHERE oi.place_id = :pid"
+                    ),
+                    {"pid": place_id},
+                )
+            ).first()
+            total = int(totals_row.total) if totals_row else 0
+            with_income = int(totals_row.with_income) if totals_row else 0
+
+            stats_row = (
+                await conn.execute(
+                    text(
+                        "SELECT AVG((o.raw->>'latest_income')::numeric) AS mean, "
+                        "       percentile_cont(0.5) WITHIN GROUP ("
+                        "         ORDER BY (o.raw->>'latest_income')::numeric"
+                        "       ) AS median "
+                        "FROM data.organisation_operates_in oi "
+                        "JOIN data.organisation o ON o.id = oi.organisation_id "
+                        "WHERE oi.place_id = :pid "
+                        "  AND (o.raw->>'latest_income') IS NOT NULL"
+                    ),
+                    {"pid": place_id},
+                )
+            ).first()
+            mean_income = (
+                float(stats_row.mean) if stats_row and stats_row.mean is not None else None
+            )
+            median_income = (
+                float(stats_row.median) if stats_row and stats_row.median is not None else None
+            )
+
+            # One COUNT per bucket via a single query. Build bucket clauses
+            # inline (safe — labels/bounds are code-controlled).
+            bucket_selects = []
+            for idx, (_label, lower, upper) in enumerate(INCOME_BUCKETS):
+                if upper is None:
+                    cond = f"(o.raw->>'latest_income')::numeric >= {lower}"
+                else:
+                    cond = (
+                        f"(o.raw->>'latest_income')::numeric >= {lower} "
+                        f"AND (o.raw->>'latest_income')::numeric < {upper}"
+                    )
+                bucket_selects.append(f"COUNT(*) FILTER (WHERE {cond}) AS b{idx}")
+            # Values are code-controlled (INCOME_BUCKETS constants), not user input.
+            bucket_sql = (
+                f"SELECT {', '.join(bucket_selects)} "  # noqa: S608
+                "FROM data.organisation_operates_in oi "
+                "JOIN data.organisation o ON o.id = oi.organisation_id "
+                "WHERE oi.place_id = :pid "
+                "  AND (o.raw->>'latest_income') IS NOT NULL"
+            )
+            buckets_row = (await conn.execute(text(bucket_sql), {"pid": place_id})).first()
+            income_buckets = [
+                IncomeBucket(
+                    label=label,
+                    lower=lower,
+                    upper=upper,
+                    count=int(getattr(buckets_row, f"b{idx}", 0) or 0),
+                )
+                for idx, (label, lower, upper) in enumerate(INCOME_BUCKETS)
+            ]
+
+            cohort_rows = (
+                await conn.execute(
+                    text(
+                        "WITH regs AS ( "
+                        "  SELECT EXTRACT(YEAR FROM "
+                        "           (o.raw->>'date_of_registration')::date)::int AS y, "
+                        "         COUNT(*) AS n "
+                        "  FROM data.organisation_operates_in oi "
+                        "  JOIN data.organisation o ON o.id = oi.organisation_id "
+                        "  WHERE oi.place_id = :pid "
+                        "    AND (o.raw->>'date_of_registration') IS NOT NULL "
+                        "  GROUP BY 1 "
+                        "), rems AS ( "
+                        "  SELECT EXTRACT(YEAR FROM (o.raw->>'date_of_removal')::date)::int AS y, "
+                        "         COUNT(*) AS n "
+                        "  FROM data.organisation_operates_in oi "
+                        "  JOIN data.organisation o ON o.id = oi.organisation_id "
+                        "  WHERE oi.place_id = :pid "
+                        "    AND (o.raw->>'date_of_removal') IS NOT NULL "
+                        "  GROUP BY 1 "
+                        ") "
+                        "SELECT COALESCE(regs.y, rems.y) AS year, "
+                        "       COALESCE(regs.n, 0) AS registered, "
+                        "       COALESCE(rems.n, 0) AS removed "
+                        "FROM regs FULL OUTER JOIN rems ON regs.y = rems.y "
+                        "ORDER BY year"
+                    ),
+                    {"pid": place_id},
+                )
+            ).all()
+            cohort = [
+                RegistrationCohort(
+                    year=int(r.year),
+                    registered=int(r.registered),
+                    removed=int(r.removed),
+                    net=int(r.registered) - int(r.removed),
+                )
+                for r in cohort_rows
+            ]
+
+        caveats: list[str] = []
+        if total > 0 and with_income < total:
+            missing = total - with_income
+            caveats.append(
+                f"{missing} of {total} charities have no income on the latest CC return."
+            )
+        source = SourceRef(
+            source_id="charity_commission",
+            source_label="Charity Commission for England and Wales",
+            publisher="Charity Commission",
+            licence="OGL-UK-3.0",
+            retrieved_at=retrieved,
+            cache_status="cached",
+        )
+        return CivilSocietyProfile(
+            place_id=place_id,
+            total_organisations=total,
+            with_reported_income=with_income,
+            median_income=median_income,
+            mean_income=mean_income,
+            income_buckets=income_buckets,
+            registration_cohort=cohort,
+            sources=[source],
+            caveats=caveats,
+            partial=False,
         )
 
 
