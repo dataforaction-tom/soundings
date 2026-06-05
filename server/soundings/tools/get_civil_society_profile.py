@@ -1,0 +1,48 @@
+"""get_civil_society_profile tool — aggregate civil society profile for a place.
+
+Returns total active charities, income distribution + median/mean,
+and a registration-cohort series. Backed by `data.organisation` +
+`data.organisation_operates_in` populated by the CC bulk loader.
+"""
+
+from typing import Any
+
+from pydantic import BaseModel, Field
+
+from soundings.contracts.civil_society import CivilSocietyProfile
+
+
+class GetCivilSocietyProfileInput(BaseModel):
+    place_id: str = Field(
+        description=(
+            "Canonical geography place ID (e.g. ltla24:E06000047). The"
+            " profile is computed from charities whose registered address"
+            " resolves to this place via `data.organisation_operates_in`."
+        )
+    )
+
+
+TOOL_NAME = "get_civil_society_profile"
+TOOL_DESCRIPTION = (
+    "Aggregate civil society profile for a UK place — total registered "
+    "charities, annual-income distribution (with median + mean), and a "
+    "year-by-year registration cohort series. Coverage: England + Wales "
+    "(via the Charity Commission bulk register)."
+)
+
+
+def tool_spec() -> dict[str, object]:
+    return {
+        "name": TOOL_NAME,
+        "description": TOOL_DESCRIPTION,
+        "input_schema": GetCivilSocietyProfileInput.model_json_schema(),
+        "output_schema": CivilSocietyProfile.model_json_schema(),
+    }
+
+
+async def get_civil_society_profile(
+    input: GetCivilSocietyProfileInput,
+    orchestrator: Any,
+) -> CivilSocietyProfile:
+    """Tool handler — delegates to the orchestrator method."""
+    return await orchestrator.compute_civil_society_profile(place_id=input.place_id)
