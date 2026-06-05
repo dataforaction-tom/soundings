@@ -91,6 +91,9 @@ class CharityCommissionBulkClient:
                         "classification": _activities_to_classification(
                             row.get("charity_activities", "")
                         ),
+                        "latest_income": _coerce_float(row.get("latest_income")),
+                        "date_of_registration": _blank_to_none(row.get("date_of_registration")),
+                        "date_of_removal": _blank_to_none(row.get("date_of_removal")),
                     }
         finally:
             if self._owns_client:
@@ -107,3 +110,25 @@ def _activities_to_classification(raw: str) -> list[str]:
     if not cleaned:
         return []
     return [cleaned]
+
+
+def _coerce_float(raw: str | None) -> float | None:
+    """CC bulk leaves `latest_income` blank for charities that haven't
+    filed an annual return. Treat blank + non-numeric as None rather
+    than 0.0, so downstream aggregates can exclude them cleanly."""
+    if raw is None:
+        return None
+    cleaned = raw.strip()
+    if not cleaned:
+        return None
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
+
+def _blank_to_none(raw: str | None) -> str | None:
+    if raw is None:
+        return None
+    cleaned = raw.strip()
+    return cleaned or None
