@@ -118,7 +118,9 @@ def _coerce_float(raw: str | None) -> float | None:
     filed an annual return. Treat blank + non-numeric as None rather
     than 0.0, so downstream aggregates can exclude them cleanly. NaN
     and Inf strings parse as floats but break SQL aggregates, so
-    coerce them to None too."""
+    coerce them to None too. Negative values are CC data anomalies
+    (gross income should never be negative) — also coerce to None
+    so aggregates aren't biased."""
     if raw is None:
         return None
     cleaned = raw.strip()
@@ -129,6 +131,8 @@ def _coerce_float(raw: str | None) -> float | None:
     except ValueError:
         return None
     if not math.isfinite(value):
+        return None
+    if value < 0:
         return None
     return value
 
