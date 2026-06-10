@@ -19,13 +19,12 @@ async def _seed_minimum() -> None:
     engine = get_engine()
     now = datetime.now(tz=UTC)
     async with engine.begin() as conn:
-        # Scope cleanup to the test-owned place only, avoiding FK violations
-        # on indicator_value rows left by other tests / seed runs.
-        await conn.execute(
-            text("DELETE FROM data.organisation_operates_in WHERE place_id = 'ltla24:H01'")
-        )
-        await conn.execute(text("DELETE FROM data.organisation WHERE id = 'h1'"))
-        await conn.execute(text("DELETE FROM geography.place WHERE id = 'ltla24:H01'"))
+        await conn.execute(text("DELETE FROM data.indicator_value"))
+        await conn.execute(text("DELETE FROM data.trend_point"))
+        await conn.execute(text("DELETE FROM data.organisation_operates_in"))
+        await conn.execute(text("DELETE FROM data.organisation"))
+        await conn.execute(text("DELETE FROM geography.postcode"))
+        await conn.execute(text("DELETE FROM geography.place"))
         await conn.execute(
             text(
                 "INSERT INTO geography.place (id, type, code, name) "
