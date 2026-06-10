@@ -93,7 +93,7 @@ async def _seed_cc_and_360g() -> None:
         )
 
         # Seed 360G grants for one of the charities
-        grant_cache_key = f"360g:grants:123456"
+        grant_cache_key = "360g:grants:123456"
         grant_records = [
             {
                 "identifier": "GR-001",
@@ -148,7 +148,7 @@ async def _call_mcp(place_id: str) -> dict:
         },
     )
     # FastMCP returns a list of text artifacts; we need the first one as JSON
-    if hasattr(result, 'model_dump'):
+    if hasattr(result, "model_dump"):
         result = result.model_dump()
     return result
 
@@ -206,6 +206,6 @@ async def test_find_organisations_identical_via_both_transports() -> None:
     mcp_orgs = sorted(mcp_result.get("organisations", []), key=lambda x: x.get("id", ""))
 
     assert len(http_orgs) == len(mcp_orgs)
-    for http_org, mcp_org in zip(http_orgs, mcp_orgs):
+    for http_org, mcp_org in zip(http_orgs, mcp_orgs, strict=True):
         assert http_org.get("id") == mcp_org.get("id")
         assert http_org.get("name") == mcp_org.get("name")

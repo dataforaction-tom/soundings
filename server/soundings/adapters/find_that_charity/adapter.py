@@ -111,6 +111,6 @@ class FindThatCharityAdapter(PassthroughAdapter):
         # We can't always know if it's Wales, but FTC handles both
         return "England"
 
-    async def _call_upstream(self, client: httpx.AsyncClient, cache_key: str):
+    async def _call_upstream(self, client: httpx.AsyncClient, cache_key: str) -> None:
         """Not used — indicators are not published by this adapter."""
         raise NotImplementedError("FindThatCharityAdapter does not publish indicators")

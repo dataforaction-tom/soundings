@@ -45,4 +45,7 @@ async def get_civil_society_profile(
     orchestrator: Any,
 ) -> CivilSocietyProfile:
     """Tool handler — delegates to the orchestrator method."""
-    return await orchestrator.compute_civil_society_profile(place_id=input.place_id)
+    result: CivilSocietyProfile = await orchestrator.compute_civil_society_profile(
+        place_id=input.place_id
+    )
+    return result

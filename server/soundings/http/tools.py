@@ -7,18 +7,32 @@ implementations are also registered with the MCP server at `/mcp`.
 
 from fastapi import APIRouter, Request
 
+from soundings.contracts.civil_society import CivilSocietyProfile
 from soundings.tools.compare_places import (
     ComparePlacesInput,
     ComparePlacesOutput,
     compare_places,
 )
 from soundings.tools.compare_places import tool_spec as compare_places_spec
+from soundings.tools.find_organisations_in_place import (
+    FindOrganisationsInPlaceInput,
+    FindOrganisationsInPlaceOutput,
+    find_organisations_in_place,
+)
+from soundings.tools.find_organisations_in_place import tool_spec as find_orgs_spec
 from soundings.tools.find_place import (
     FindPlaceInput,
     FindPlaceOutput,
     find_place,
 )
 from soundings.tools.find_place import tool_spec as find_place_spec
+from soundings.tools.get_civil_society_profile import (
+    GetCivilSocietyProfileInput,
+    get_civil_society_profile,
+)
+from soundings.tools.get_civil_society_profile import (
+    tool_spec as get_civil_society_profile_spec,
+)
 from soundings.tools.get_indicators import (
     GetIndicatorsInput,
     GetIndicatorsOutput,
@@ -37,12 +51,6 @@ from soundings.tools.get_trend import (
     get_trend,
 )
 from soundings.tools.get_trend import tool_spec as get_trend_spec
-from soundings.tools.find_organisations_in_place import (
-    FindOrganisationsInPlaceInput,
-    FindOrganisationsInPlaceOutput,
-    find_organisations_in_place,
-)
-from soundings.tools.find_organisations_in_place import tool_spec as find_orgs_spec
 
 router = APIRouter(prefix="/v1/tools")
 
@@ -57,6 +65,7 @@ async def list_tools() -> dict[str, list[dict[str, object]]]:
             compare_places_spec(),
             get_trend_spec(),
             find_orgs_spec(),
+            get_civil_society_profile_spec(),
         ]
     }
 
@@ -96,6 +105,12 @@ async def http_get_trend(input: GetTrendInput, request: Request) -> GetTrendOutp
 async def http_find_organisations(
     input: FindOrganisationsInPlaceInput, request: Request
 ) -> FindOrganisationsInPlaceOutput:
-    return await find_organisations_in_place(
-        input, request.app.state.orchestrator
-    )
+    return await find_organisations_in_place(input, request.app.state.orchestrator)
+
+
+@router.post("/get_civil_society_profile", response_model=CivilSocietyProfile)
+async def http_get_civil_society_profile(
+    input: GetCivilSocietyProfileInput,
+    request: Request,
+) -> CivilSocietyProfile:
+    return await get_civil_society_profile(input, request.app.state.orchestrator)

@@ -1,12 +1,10 @@
 """Tests for find_organisations_in_place tool spec."""
 
-import pytest
-
 from soundings.tools.find_organisations_in_place import (
+    TOOL_DESCRIPTION,
+    TOOL_NAME,
     FindOrganisationsInPlaceInput,
     FindOrganisationsInPlaceOutput,
-    TOOL_NAME,
-    TOOL_DESCRIPTION,
     tool_spec,
 )
 

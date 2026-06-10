@@ -6,9 +6,11 @@ Per spec §4.6. Mixed-mode dispatch:
 - Optional 360G grant enrichment for recent grants.
 """
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
-from soundings.contracts.organisation import GrantRef, OrganisationRef
+from soundings.contracts.organisation import OrganisationRef
 from soundings.contracts.source_ref import SourceRef
 
 
@@ -20,7 +22,9 @@ class FindOrganisationsInPlaceInput(BaseModel):
     )
     funded_only: bool = Field(
         default=False,
-        description="Only return organisations that have received grants (requires data.grant_record)",
+        description=(
+            "Only return organisations that have received grants (requires data.grant_record)"
+        ),
     )
     limit: int = Field(
         default=50,
@@ -54,7 +58,7 @@ def tool_spec() -> dict[str, object]:
 
 async def find_organisations_in_place(
     input: FindOrganisationsInPlaceInput,
-    orchestrator,
+    orchestrator: Any,
 ) -> FindOrganisationsInPlaceOutput:
     """Tool handler - calls orchestrator method and wraps result."""
     result = await orchestrator.find_organisations_in_place(

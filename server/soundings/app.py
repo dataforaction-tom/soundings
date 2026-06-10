@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from soundings.adapters.charity_commission import CharityCommissionAdapter
 from soundings.adapters.dfe_explore.adapter import DfeExploreAdapter
 from soundings.adapters.dwp_statxplore.adapter import DwpStatXploreAdapter
+from soundings.adapters.find_that_charity import FindThatCharityAdapter
 from soundings.adapters.mhclg_imd2025.adapter import MhclgImd2019Adapter, MhclgImd2025Adapter
 from soundings.adapters.ohid_fingertips.adapter import OhidFingertipsAdapter
 from soundings.adapters.ons_aps.adapter import OnsApsAdapter
@@ -18,7 +19,6 @@ from soundings.adapters.ons_mid_year_estimates.adapter import OnsMidYearEstimate
 from soundings.adapters.police_uk.adapter import PoliceUkAdapter
 from soundings.adapters.postcodes_io.adapter import PostcodesIoAdapter
 from soundings.adapters.threesixtygiving import ThreeSixtyGivingAdapter
-from soundings.adapters.find_that_charity import FindThatCharityAdapter
 from soundings.alerts import send_alert
 from soundings.capture.middleware import CaptureMiddleware
 from soundings.capture.rate_limit import FullConsentRateLimiter
