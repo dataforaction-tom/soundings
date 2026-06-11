@@ -44,6 +44,7 @@ to `main`.
       `find_organisations_in_place`. **Blocks 0, A, B, C, D, E, F landed**.
 - [x] Phase 5 — First monthly corpus release, doc pass. **Complete.**
 - [x] UI Design — Apply Good Ship branding, new design system. **Complete.**
+- [x] Phase 6 — Civil society profile slice (`get_civil_society_profile` tool + panel). Follow-ups: funder rollup, map, ask interface.
 - [ ] Phase 6 — New data sources. **Planning underway.**
 
 ## Phase 6: Data Source Expansion
