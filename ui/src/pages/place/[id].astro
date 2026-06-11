@@ -1,7 +1,7 @@
 ---
 import Base from "../../layouts/Base.astro";
 import DomainSection from "../../components/DomainSection.astro";
-import OrganisationsSection from "../../components/OrganisationsSection.astro";
+import CivilSocietyPanel from "../../components/CivilSocietyPanel.astro";
 import SourceCitations from "../../components/SourceCitations.astro";
 import DataPanel from "../../components/DataPanel.astro";
 import { getPlaceProfile, getTrend } from "../../lib/api";
@@ -109,7 +109,7 @@ const sources: SourceRef[] = profile
         response={profile}
       />
 
-      <OrganisationsSection placeId={profile.place.id} cookieHeader={cookieHeader} />
+      <CivilSocietyPanel placeId={profile.place.id} cookieHeader={cookieHeader} />
     </>
   )}
 
