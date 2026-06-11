@@ -1,0 +1,30 @@
+---
+import "../lib/dom-polyfill";
+import { renderIncomeBuckets } from "../lib/chart";
+import type { IncomeBucket } from "../lib/types";
+
+interface Props {
+  buckets: IncomeBucket[];
+  caption?: string;
+}
+
+const { buckets, caption } = Astro.props;
+const svg = renderIncomeBuckets(buckets);
+---
+
+{svg && (
+  <figure class="chart-figure">
+    <div class="chart" set:html={svg} aria-hidden="true" />
+    {caption && <figcaption>{caption}</figcaption>}
+  </figure>
+)}
+
+<style>
+  .chart-figure { margin: 0; color: #2a5bd7; }
+  .chart-figure .chart svg { width: 100%; height: auto; }
+  .chart-figure figcaption {
+    font-size: 0.75rem;
+    color: #666;
+    margin-top: 0.25rem;
+  }
+</style>
