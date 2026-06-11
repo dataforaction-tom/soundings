@@ -31,14 +31,18 @@ AGGREGATE_SQL = text(
         ph.parent_id AS place_id,
         imd.indicator_key,
         imd.period,
-        SUM(imd.value * pop.value) / NULLIF(SUM(pop.value), 0) AS value,
+        SUM(imd.value * COALESCE(pop.value, 1.0))
+            / NULLIF(SUM(COALESCE(pop.value, 1.0)), 0) AS value,
         CAST(:source_id AS VARCHAR) AS source_id,
         now() AS retrieved_at,
         NULL AS loader_run_id,
-        '["IMD aggregated to LTLA via population-weighted average using MYE."]'::jsonb AS caveats
+        CASE WHEN BOOL_OR(pop.value IS NOT NULL)
+             THEN '["IMD aggregated to LTLA via population-weighted average using MYE."]'::jsonb
+             ELSE '["IMD aggregated to LTLA via unweighted average."]'::jsonb
+        END AS caveats
     FROM data.indicator_value imd
     JOIN geography.place_hierarchy ph ON ph.child_id = imd.place_id
-    JOIN data.indicator_value pop
+    LEFT JOIN data.indicator_value pop
         ON pop.place_id = imd.place_id
         AND pop.indicator_key = 'population.total'
         AND pop.source_id = 'ons.mid_year_estimates'
@@ -55,11 +59,45 @@ AGGREGATE_SQL = text(
 )
 
 
+# Mirror the LTLA aggregate into data.trend_point so get_trend can serve a
+# cross-edition trend (2019 + 2025 once both aggregations have run). Reads
+# from the indicator_value rows the previous statement just wrote — keeps
+# the population-weighting logic in one place.
+AGGREGATE_TREND_SQL = text(
+    """
+    INSERT INTO data.trend_point (
+        place_id, indicator_key, period, value,
+        revised, source_id, retrieved_at
+    )
+    SELECT
+        place_id,
+        indicator_key,
+        period,
+        value,
+        false AS revised,
+        source_id,
+        retrieved_at
+    FROM data.indicator_value
+    WHERE source_id = :source_id
+      AND indicator_key = ANY(:indicator_keys)
+      AND place_id LIKE 'ltla24:%'
+    ON CONFLICT (place_id, indicator_key, period) DO UPDATE SET
+        value = EXCLUDED.value,
+        retrieved_at = EXCLUDED.retrieved_at,
+        source_id = EXCLUDED.source_id
+    """
+)
+
+
 async def aggregate_imd_to_ltla(engine: AsyncEngine, source_id: str = "mhclg.imd2025") -> int:
     """Returns the number of LTLA rows inserted/updated."""
     async with engine.begin() as conn:
         result = await conn.execute(
             AGGREGATE_SQL,
+            {"indicator_keys": list(IMD_INDICATOR_KEYS), "source_id": source_id},
+        )
+        await conn.execute(
+            AGGREGATE_TREND_SQL,
             {"indicator_keys": list(IMD_INDICATOR_KEYS), "source_id": source_id},
         )
     return result.rowcount or 0

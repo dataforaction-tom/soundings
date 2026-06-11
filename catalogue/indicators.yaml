@@ -249,7 +249,7 @@ indicators:
     refresh_cadence: "every 5-7 years"
     caveats:
       - "Scores are relative to the English national distribution; not directly comparable across UK nations."
-      - "IoD 2025 uses different datasets and methodology to IoD 2019. Cross-year comparisons require care."
+      - "series_break: IoD 2025 changes datasets and methodology versus IoD 2019. Direct comparison across editions is not recommended."
     related_keys:
       - "deprivation.imd.decile"
       - "deprivation.imd.income_score"
@@ -266,6 +266,7 @@ indicators:
     refresh_cadence: "every 5-7 years"
     caveats:
       - "Decile is a ranking, not a measure of magnitude. A neighbourhood in decile 1 in two consecutive releases may have changed substantially."
+      - "series_break: IoD 2025 changes datasets and methodology versus IoD 2019. Direct comparison across editions is not recommended."
 
   - key: deprivation.imd.income_score
     label: "IMD 2025 Income Deprivation domain score"
@@ -275,6 +276,8 @@ indicators:
     source_id: "mhclg.imd2025"
     available_at: ["lsoa21", "ltla24"]
     refresh_cadence: "every 5-7 years"
+    caveats:
+      - "series_break: IoD 2025 changes datasets and methodology versus IoD 2019. Direct comparison across editions is not recommended."
 
   - key: deprivation.imd.employment_score
     label: "IMD 2025 Employment Deprivation domain score"
@@ -284,6 +287,8 @@ indicators:
     source_id: "mhclg.imd2025"
     available_at: ["lsoa21", "ltla24"]
     refresh_cadence: "every 5-7 years"
+    caveats:
+      - "series_break: IoD 2025 changes datasets and methodology versus IoD 2019. Direct comparison across editions is not recommended."
 
   - key: deprivation.imd.health_score
     label: "IMD 2025 Health Deprivation and Disability domain score"
@@ -293,6 +298,8 @@ indicators:
     source_id: "mhclg.imd2025"
     available_at: ["lsoa21", "ltla24"]
     refresh_cadence: "every 5-7 years"
+    caveats:
+      - "series_break: IoD 2025 changes datasets and methodology versus IoD 2019. Direct comparison across editions is not recommended."
 
   - key: deprivation.imd.education_score
     label: "IMD 2025 Education, Skills and Training domain score"
@@ -302,6 +309,8 @@ indicators:
     source_id: "mhclg.imd2025"
     available_at: ["lsoa21", "ltla24"]
     refresh_cadence: "every 5-7 years"
+    caveats:
+      - "series_break: IoD 2025 changes datasets and methodology versus IoD 2019. Direct comparison across editions is not recommended."
 
   - key: deprivation.idaci
     label: "Income Deprivation Affecting Children Index (IDACI) 2025"
@@ -311,6 +320,8 @@ indicators:
     source_id: "mhclg.imd2025"
     available_at: ["lsoa21", "ltla24"]
     refresh_cadence: "every 5-7 years"
+    caveats:
+      - "series_break: IoD 2025 changes datasets and methodology versus IoD 2019. Direct comparison across editions is not recommended."
 
   - key: deprivation.idaopi
     label: "Income Deprivation Affecting Older People Index (IDAOPI) 2025"
@@ -320,6 +331,8 @@ indicators:
     source_id: "mhclg.imd2025"
     available_at: ["lsoa21", "ltla24"]
     refresh_cadence: "every 5-7 years"
+    caveats:
+      - "series_break: IoD 2025 changes datasets and methodology versus IoD 2019. Direct comparison across editions is not recommended."
 
   - key: deprivation.child_poverty_ahc
     label: "Children in low-income families (after housing costs)"

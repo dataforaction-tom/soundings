@@ -46,13 +46,113 @@ async def get_place_profile(
         place_id=input.place_id,
         period=None,
     )
+    enriched = await _enrich(engine, input.place_id, result.values)
     return GetPlaceProfileOutput(
         place=header,
-        indicators=result.values,
+        indicators=enriched,
         sources=result.sources,
         caveats=result.caveats,
         partial=result.partial,
     )
+
+
+async def _enrich(
+    engine: AsyncEngine,
+    place_id: str,
+    indicators: list[IndicatorValue],
+) -> list[IndicatorValue]:
+    """Attach `higher_is` (from catalogue) and `benchmark_percentile`
+    (vs same-type peers, excluding self) to each indicator.
+
+    Two queries total, regardless of how many indicators are in the
+    profile: one against `catalogue.indicator`, one against
+    `data.indicator_value`. Returns new IndicatorValue instances; does
+    not mutate the input.
+    """
+    if not indicators:
+        return []
+
+    keys = [ind.indicator for ind in indicators]
+    directions = await _lookup_higher_is(engine, keys)
+    keys_with_values = [(ind.indicator, ind.value) for ind in indicators if ind.value is not None]
+    percentiles = await _compute_percentiles(engine, place_id, keys_with_values)
+
+    return [
+        ind.model_copy(
+            update={
+                "higher_is": directions.get(ind.indicator),
+                "benchmark_percentile": percentiles.get(ind.indicator),
+            }
+        )
+        for ind in indicators
+    ]
+
+
+async def _lookup_higher_is(
+    engine: AsyncEngine,
+    indicator_keys: list[str],
+) -> dict[str, str | None]:
+    async with engine.connect() as conn:
+        rows = (
+            await conn.execute(
+                text("SELECT key, higher_is FROM catalogue.indicator WHERE key = ANY(:keys)"),
+                {"keys": indicator_keys},
+            )
+        ).all()
+    return {r.key: r.higher_is for r in rows}
+
+
+async def _compute_percentiles(
+    engine: AsyncEngine,
+    place_id: str,
+    keys_with_values: list[tuple[str, float]],
+) -> dict[str, float]:
+    """Single batched query: peer-type-filtered, self-excluded percentile
+    for every (indicator, value) pair.
+
+    Indicators with zero peers in `data.indicator_value` (passthrough-only
+    sources, or peer universes that haven't been loaded yet) are omitted
+    from the result.
+    """
+    if not keys_with_values:
+        return {}
+
+    keys = [k for k, _ in keys_with_values]
+    values = [v for _, v in keys_with_values]
+    async with engine.connect() as conn:
+        rows = (
+            await conn.execute(
+                text(
+                    """
+                    WITH queried AS (
+                        SELECT * FROM unnest(:keys ::text[], :vals ::float8[])
+                            AS t(indicator_key, value)
+                    ),
+                    ptype AS (
+                        SELECT type FROM geography.place WHERE id = :place_id
+                    ),
+                    peers AS (
+                        SELECT iv.indicator_key, iv.value
+                        FROM data.indicator_value iv
+                        JOIN geography.place p ON p.id = iv.place_id
+                        WHERE iv.place_id <> :place_id
+                          AND iv.indicator_key = ANY(:keys)
+                          AND iv.value IS NOT NULL
+                          AND p.type = (SELECT type FROM ptype)
+                    )
+                    SELECT
+                        q.indicator_key,
+                        COUNT(p.value) FILTER (WHERE p.value < q.value) AS below,
+                        COUNT(p.value) AS total
+                    FROM queried q
+                    LEFT JOIN peers p ON p.indicator_key = q.indicator_key
+                    GROUP BY q.indicator_key
+                    """
+                ),
+                {"keys": keys, "vals": values, "place_id": place_id},
+            )
+        ).all()
+    return {r.indicator_key: (r.below / r.total) * 100 for r in rows if r.total and r.total > 0}
 
 
 async def _resolve_place_header(engine: AsyncEngine, place_id: str) -> PlaceHeader:

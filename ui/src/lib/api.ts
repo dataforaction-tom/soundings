@@ -1,17 +1,23 @@
 // Thin HTTP client wrapping the Soundings /v1 surface.
 //
-// Reads `SOUNDINGS_API_BASE` from `import.meta.env` so the same code runs
-// against Docker Compose (http://server:8000) and local dev
-// (http://localhost:8000). `credentials: "include"` makes the session +
-// consent cookies round-trip on UI ↔ API calls.
+// Reads `SOUNDINGS_API_BASE` from `process.env` at request time (rather
+// than `import.meta.env`, which Vite resolves at build time and would
+// freeze the value into the bundle). With the @astrojs/node adapter,
+// every SSR fetch runs in Node, so `process.env` reflects the compose
+// `environment:` block — http://server:8000 in Docker, falling back to
+// http://localhost:8000 for `npm run dev`.
+// `credentials: "include"` makes the session + consent cookies
+// round-trip on UI ↔ API calls.
 
 import type {
+  CivilSocietyProfile,
   ComparePlacesResponse,
   ComparisonBasis,
   ConsentLevel,
   ConsentResponse,
   FeedbackResponse,
   FindPlaceResponse,
+  FindOrganisationsInPlaceResponse,
   GetIndicatorsResponse,
   GetTrendResponse,
   PlaceProfile,
@@ -20,7 +26,8 @@ import type {
 const DEFAULT_BASE = "http://localhost:8000";
 
 export function apiBase(): string {
-  const fromEnv = import.meta.env.SOUNDINGS_API_BASE;
+  const fromEnv =
+    typeof process !== "undefined" ? process.env.SOUNDINGS_API_BASE : undefined;
   return fromEnv && fromEnv.length > 0 ? fromEnv : DEFAULT_BASE;
 }
 
@@ -163,5 +170,44 @@ export async function postFeedback(
     "/v1/capture/feedback",
     { question_record_id: questionRecordId, marked_useful: markedUseful },
     opts,
+  );
+}
+
+export async function findOrganisationsInPlace(
+  placeId: string,
+  opts: {
+    activityFilter?: string[];
+    fundedOnly?: boolean;
+    limit?: number;
+    cookieHeader?: string;
+  } = {},
+): Promise<FindOrganisationsInPlaceResponse> {
+  const body: Record<string, unknown> = {
+    place_id: placeId,
+  };
+  if (opts.activityFilter !== undefined) {
+    body.activity_filter = opts.activityFilter;
+  }
+  if (opts.fundedOnly !== undefined) {
+    body.funded_only = opts.fundedOnly;
+  }
+  if (opts.limit !== undefined) {
+    body.limit = opts.limit;
+  }
+  return postJSON<FindOrganisationsInPlaceResponse>(
+    "/v1/tools/find_organisations_in_place",
+    body,
+    { cookieHeader: opts.cookieHeader },
+  );
+}
+
+export async function getCivilSocietyProfile(
+  placeId: string,
+  opts: { cookieHeader?: string } = {},
+): Promise<CivilSocietyProfile> {
+  return postJSON<CivilSocietyProfile>(
+    "/v1/tools/get_civil_society_profile",
+    { place_id: placeId },
+    { cookieHeader: opts.cookieHeader },
   );
 }

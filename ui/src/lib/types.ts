@@ -38,6 +38,13 @@ export interface IndicatorValue {
   methodology_note?: string | null;
   caveats: string[];
   confidence: Confidence;
+  // Directionality from catalogue.indicator.higher_is — drives the UI's
+  // good/bad framing on the benchmark badge.
+  higher_is?: "better" | "worse" | "neutral" | null;
+  // Percentile of this value against peer places of the same type,
+  // excluding self. Populated when the indicator's peer universe is
+  // loaded in data.indicator_value.
+  benchmark_percentile?: number | null;
 }
 
 export interface PlaceMatch {
@@ -128,4 +135,62 @@ export interface ConsentResponse {
 
 export interface FeedbackResponse {
   ok: true;
+}
+
+// find_organisations_in_place (spec §4.6 / Phase 4 Block D) ------------------------
+
+export interface GrantRef {
+  funder: string;
+  amount: number;
+  currency: string;
+  date: string;
+  purpose: string | null;
+  source: SourceRef;
+}
+
+export interface OrganisationRef {
+  id: string;
+  name: string;
+  classification: string[];
+  registered_address_place_id: string | null;
+  operates_in_place_ids: string[];
+  recent_grants: GrantRef[];
+  source: SourceRef;
+  methodology_note: string | null;
+}
+
+export interface FindOrganisationsInPlaceResponse {
+  organisations: OrganisationRef[];
+  sources: SourceRef[];
+  caveats: string[];
+  partial: boolean;
+}
+
+// get_civil_society_profile (spec §5.1 / Phase 5 Block E) ----------------------
+
+export interface IncomeBucket {
+  label: string;
+  lower: number;
+  upper: number | null;
+  count: number;
+}
+
+export interface RegistrationCohort {
+  year: number;
+  registered: number;
+  removed: number;
+  net: number;
+}
+
+export interface CivilSocietyProfile {
+  place_id: string;
+  total_organisations: number;
+  with_reported_income: number;
+  median_income: number | null;
+  mean_income: number | null;
+  income_buckets: IncomeBucket[];
+  registration_cohort: RegistrationCohort[];
+  sources: SourceRef[];
+  caveats: string[];
+  partial: boolean;
 }

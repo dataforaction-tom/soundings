@@ -4,7 +4,11 @@ FROM node:20-alpine AS build
 
 WORKDIR /app
 COPY ui/package.json ui/package-lock.json ./
-RUN npm ci --omit=optional
+# Don't omit optional deps: Rollup's platform-specific native binary
+# (`@rollup/rollup-linux-arm64-musl` on Alpine arm64) is an optional dep,
+# but Vite/Astro need it at build time.
+# https://github.com/npm/cli/issues/4828
+RUN npm ci
 
 COPY ui/ ./
 RUN npm run build

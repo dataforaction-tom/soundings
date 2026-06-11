@@ -15,6 +15,7 @@ async def _seed_one_row(value: float = 200000) -> None:
     now = datetime.now(tz=UTC)
     async with engine.begin() as conn:
         await conn.execute(text("DELETE FROM data.indicator_value"))
+        await conn.execute(text("DELETE FROM data.trend_point"))
         await conn.execute(text("DELETE FROM data.loader_run"))
         await conn.execute(text("DELETE FROM geography.postcode"))
         await conn.execute(text("DELETE FROM geography.place_hierarchy"))

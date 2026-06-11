@@ -26,6 +26,7 @@ pytestmark = [pytest.mark.live, pytest.mark.integration]
 async def test_dfe_adapter_returns_plausible_fsm_share() -> None:
     engine = get_engine()
     async with engine.begin() as conn:
+        await conn.execute(text("DELETE FROM data.trend_point"))
         await conn.execute(text("DELETE FROM data.indicator_value"))
         await conn.execute(text("DELETE FROM cache.source_cache"))
         await conn.execute(text("DELETE FROM geography.postcode"))

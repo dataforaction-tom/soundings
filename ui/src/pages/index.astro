@@ -30,15 +30,15 @@ if (query) {
 ---
 
 <Base title="Soundings">
-  <p>Ask a question about a place — postcode, council, region.</p>
-  <form method="get" action="/">
+  <p class="intro">Ask a question about a place — postcode, council, region.</p>
+  <form class="search-form" method="get" action="/">
     <label>
       <span>What do you want to know about a place?</span>
       <input
         type="text"
         name="q"
         value={query}
-        placeholder="Stockton-on-Tees, TS18 1AB, north Tyneside…"
+        placeholder="Stockton-on-Tees, TS18 1AB, North Tyneside…"
         autofocus
         required
       />
@@ -79,48 +79,76 @@ if (query) {
   )}
 
   <style>
-    form {
+    .intro {
+      font-size: var(--font-size-lg);
+      color: var(--color-text-light);
+      margin-bottom: var(--space-xl);
+    }
+    .search-form {
       display: flex;
-      gap: 0.5rem;
+      gap: var(--space-md);
       align-items: end;
-      margin: 1rem 0;
+      margin-bottom: var(--space-xl);
     }
-    form label {
+    .search-form label {
       flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
     }
-    form span {
-      display: block;
-      font-weight: 600;
-      margin-bottom: 0.25rem;
+    .search-form label span {
+      font-weight: var(--font-weight-medium);
+      color: var(--color-primary);
     }
-    input[type="text"] {
-      width: 100%;
-      padding: 0.5rem;
-      font-size: 1rem;
+    .search-form input[type="text"] {
+      padding: var(--space-md);
+      font-size: var(--font-size-lg);
+    }
+    .search-form button {
+      padding: var(--space-md) var(--space-xl);
+      height: fit-content;
     }
     .match-list {
       list-style: none;
       padding: 0;
+      margin: 0;
     }
     .match-list li {
-      padding: 0.5rem 0;
-      border-bottom: 1px solid #eee;
+      padding: var(--space-md) 0;
+      border-bottom: 1px solid var(--color-border-light);
+    }
+    .match-list li:last-child {
+      border-bottom: none;
+    }
+    .match-list a {
+      display: block;
+      padding: var(--space-sm) 0;
+    }
+    .match-list strong {
+      font-size: var(--font-size-lg);
     }
     .match-type {
-      color: #666;
+      color: var(--color-muted);
       font-variant: small-caps;
     }
     .parents {
-      color: #666;
-      font-size: 0.875rem;
-      margin-left: 0.5rem;
+      color: var(--color-muted);
+      font-size: var(--font-size-sm);
+      margin-left: var(--space-sm);
     }
     .no-match,
     .error {
-      margin: 1rem 0;
+      margin: var(--space-md) 0;
+      padding: var(--space-lg);
+      border-radius: var(--radius);
     }
     .error {
-      color: #a00;
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    .no-match {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
     }
   </style>
 </Base>

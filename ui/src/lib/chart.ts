@@ -6,7 +6,7 @@ import "./dom-polyfill";
 
 import * as Plot from "@observablehq/plot";
 
-import type { Comparison, ComparisonBasis, ComparisonValue, TrendPoint } from "./types";
+import type { Comparison, ComparisonBasis, ComparisonValue, IncomeBucket, RegistrationCohort, TrendPoint } from "./types";
 
 interface SparklineOptions {
   width?: number;
@@ -109,13 +109,18 @@ export function renderCompareBars(
     marginRight: 12,
     marginBottom: 36,
     marginLeft: 60,
+    style: {
+      background: "transparent",
+      fontSize: "12px",
+      fontFamily: "system-ui, sans-serif",
+    },
     x: { label: null, tickRotate: -25 },
     y: { grid: true, label: comparison.unit, nice: true },
     marks: [
       Plot.barY(bars, {
         x: "place_id",
         y: "value",
-        fill: "#2a5bd7",
+        fill: "#4a7c59",
       }),
       Plot.text(bars, {
         x: "place_id",
@@ -123,7 +128,7 @@ export function renderCompareBars(
         text: "label",
         dy: -8,
         fontSize: 11,
-        fill: "#333",
+        fill: "#2d2d2d",
       }),
     ],
   });
@@ -149,13 +154,74 @@ export function renderSparkline(
     marginRight: 4,
     marginBottom: 18,
     marginLeft: 28,
+    style: {
+      background: "transparent",
+      fontSize: "10px",
+      fontFamily: "system-ui, sans-serif",
+    },
     x: { type: "point", label: null, tickFormat: (d: unknown) => String(d) },
     y: { grid: false, label: null, nice: true },
     marks: [
-      Plot.line(chartPoints, { x: "period", y: "value", strokeWidth: 1.5 }),
-      Plot.dot(chartPoints, { x: "period", y: "value", r: 2.5, fill: "currentColor" }),
+      Plot.line(chartPoints, { x: "period", y: "value", strokeWidth: 1.5, stroke: "#4a7c59" }),
+      Plot.dot(chartPoints, { x: "period", y: "value", r: 2.5, fill: "#4a7c59" }),
     ],
   });
   // linkedom and the browser both expose outerHTML on SVG elements.
+  return (node as unknown as { outerHTML: string }).outerHTML;
+}
+
+export function renderIncomeBuckets(
+  buckets: IncomeBucket[],
+  opts: { width?: number; height?: number } = {},
+): string {
+  if (buckets.length === 0) return "";
+  const width = opts.width ?? 480;
+  const height = opts.height ?? 200;
+  const node = Plot.plot({
+    width,
+    height,
+    marginTop: 16,
+    marginRight: 12,
+    marginBottom: 36,
+    marginLeft: 48,
+    x: { label: "Annual income band", tickRotate: -15 },
+    y: { grid: true, label: "Charities", nice: true },
+    marks: [
+      Plot.barY(buckets, { x: "label", y: "count", fill: "#4a7c59" }),
+      Plot.text(buckets, {
+        x: "label",
+        y: "count",
+        text: (d: IncomeBucket) => String(d.count),
+        dy: -6,
+        fontSize: 11,
+        fill: "#333",
+      }),
+    ],
+  });
+  return (node as unknown as { outerHTML: string }).outerHTML;
+}
+
+export function renderRegistrationTrend(
+  cohort: RegistrationCohort[],
+  opts: { width?: number; height?: number } = {},
+): string {
+  if (cohort.length === 0) return "";
+  const width = opts.width ?? 480;
+  const height = opts.height ?? 180;
+  const node = Plot.plot({
+    width,
+    height,
+    marginTop: 16,
+    marginRight: 12,
+    marginBottom: 32,
+    marginLeft: 40,
+    x: { label: null, tickFormat: (d: unknown) => String(d) },
+    y: { grid: true, label: "Net new charities", nice: true },
+    marks: [
+      Plot.ruleY([0]),
+      Plot.lineY(cohort, { x: "year", y: "net", stroke: "#4a7c59", strokeWidth: 1.5 }),
+      Plot.dot(cohort, { x: "year", y: "net", r: 2.5, fill: "#4a7c59" }),
+    ],
+  });
   return (node as unknown as { outerHTML: string }).outerHTML;
 }

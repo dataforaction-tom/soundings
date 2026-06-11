@@ -30,6 +30,7 @@ async def _seed_place(place_id: str, place_type: str, code: str, name: str) -> N
     engine = get_engine()
     async with engine.begin() as conn:
         await conn.execute(text("DELETE FROM data.indicator_value"))
+        await conn.execute(text("DELETE FROM data.trend_point"))
         await conn.execute(text("DELETE FROM geography.place_hierarchy"))
         await conn.execute(text("DELETE FROM geography.postcode"))
         await conn.execute(text("DELETE FROM geography.place"))

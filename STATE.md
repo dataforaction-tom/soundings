@@ -1,11 +1,7 @@
 # State
 
-> Last updated: 2026-05-12 (session 4)
-> Phase: **4 in progress.** Plan + Block 0 + Block A all merged
-> (PRs #6, #7, #8). **Block B — 360Giving passthrough — is the
-> current PR**: client, adapter, pre_warmer override, registration,
-> live test. Phase 3's `v0.4.0-phase-3` tag is still pending the
-> manual browser smoke documented in `docs/runbook-phase-3-smoke.md`.
+> Last updated: 2026-05-25
+> Status: **Phase 5 complete.** Phase 6 — new data sources (planning underway).
 
 ## System State Diagram
 
@@ -22,9 +18,14 @@ stateDiagram-v2
     Phase3Build --> Phase3Done: blocks A–J complete, tag v0.4.0-phase-3
     Phase3Done --> Phase4Build: phase 4 plan accepted
     Phase4Build --> Phase4Done: blocks 0–F complete, tag v0.5.0-phase-4
-    Phase4Done --> [*]: not started
+    Phase4Done --> Phase5Build: phase 5 plan accepted
+    Phase5Build --> Phase5Done: corpus release + doc pass
+    Phase5Done --> Phase6Build: phase 6 plan accepted
+    Phase6Build --> Phase6DataSources: URL validation + priority sources
+    Phase6DataSources --> Phase6Done: 50+ new indicators across 4 new domains
+    Phase6Done --> [*]: not started
 
-    note right of Phase4Build: ← WE ARE HERE (Block A landing)
+    note right of Phase6Build: ← WE ARE HERE
 ```
 
 ## Component Status
@@ -58,17 +59,22 @@ stateDiagram-v2
 | **UI Observable Plot charts (linkedom polyfill)** | ✅ Phase 3 (Block I) | Sparklines per IndicatorCard on `/place/[id]`; `/compare` page with bar charts + percentile badges; `/about` updated. |
 | **Phase 3 server e2e (`compare_places` + `get_trend` + Fingertips cache)** | ✅ Phase 3 (Block J) | Seeds 3 LTLAs + a Fingertips life-expectancy cache row, asserts ranked compare + ordered three-point trend. |
 | **Browser smoke runbook** | ✅ Phase 3 (Block J) | `docs/runbook-phase-3-smoke.md` — gates the `v0.4.0-phase-3` tag. |
-| **`v0.4.0-phase-3` tag** | ⏳ Phase 3 (Block J) | Pending browser smoke pass. |
+| **`v0.4.0-phase-3` tag** | ✅ Phase 3 | Delivered with Phase 4 merge. |
 | **`PassthroughAdapter` extensions + `pre_warmer` daemon** | ✅ Phase 4 (Block 0) | `fetch_organisations` + `pre_warm_for_places` optional methods; new compose service. |
 | **`OrganisationRef` + `GrantRef` contracts** | ✅ Phase 4 (Block 0) | Per design §4.6. |
 | **`CharityCommissionLoader` (loader-mode by carve-out)** | ✅ Phase 4 (Block A) | Bulk register pulled monthly. API-first principle's documented exception: CC API v2 is detail-lookup only, no search-by-area endpoint. Writes data.organisation + data.organisation_operates_in + civil_society.active_charities_* aggregates. |
 | **`ThreeSixtyGivingAdapter` (passthrough)** | ✅ Phase 4 (Block B) | Composes place-level grant aggregates by fanning out across CC charities in data.organisation. Three-layer cache (per-org aggregate + per-org grants + per-place grants); latest_grant_date filter skips orgs with no recent activity. Pre-warmer override drives weekly cache warming. Live test verified against Oxfam. |
-| **`FindThatCharityAdapter` (passthrough)** | ⏳ Phase 4 (Block C) | Not started. Cross-jurisdiction (Scotland/NI). |
-| **`find_organisations_in_place` tool** | ⏳ Phase 4 (Block D) | Not started. Mixed-mode dispatch: data.organisation SELECT for E&W, FTC passthrough for Scotland/NI, optional 360G grant enrichment. |
-| **UI Organisations section** | ⏳ Phase 4 (Block E) | Not started. |
-| **`v0.5.0-phase-4` tag** | ⏳ Phase 4 (Block F) | Not started. |
+|| **`FindThatCharityAdapter` (passthrough)** | ✅ Phase 4 (Block C) | Cross-jurisdiction lookup for Scotland/NI; fetch_organisations routes by place_id prefix. |
+| **`find_organisations_in_place` tool** | ✅ Phase 4 (Block D) | HTTP route + MCP registration. Mixed-mode dispatch. Regression unit tests in `test_orchestrator_find_organisations.py`. |
+| **UI Organisations section** | ✅ Phase 4 (Block E) | `OrganisationCard` + `OrganisationsSection` SSR-mounted on `/place/[id]`. Gated on E&W place_ids; FTC path exposed via the HTTP tool but not yet from the UI. `/about` mentions civil-society context. |
+| **Phase 4 server-side e2e** | ✅ Phase 4 (Block F) | `test_phase_4_e2e.py` covers both CC + FTC dispatch via HTTP. Runs against `soundings_test` DB (see `make test-db-create`). |
+|| **`v0.5.0-phase-4` tag** | ✅ Phase 4 | Delivered with Phase 4 merge. |
+|| **Phase 5 — First monthly corpus release** | ✅ Phase 5 | Published 2026-05-24; see `docs/corpus/`. |
+|| **Phase 5 — Doc pass** | ✅ Phase 5 | DRIs, error messages, inline docs reviewed. |
+| **`get_civil_society_profile` tool + CivilSocietyPanel** | ✅ Phase 6 slice 1 | Total, income distribution + median/mean, registration cohort trend. CC loader extended to capture `latest_income`, `date_of_registration`, `date_of_removal`. |
+|| **Phase 6 — New data sources** | 🔧 Planning | URL validation complete; priority: Ofcom, Ofsted, BEIS EPC, DEFRA Air, CQC, Land Registry, DfT. 50+ new indicators across 4 new domains (digital, environment, housing-extended, safety). |
 
-Status markers: ⏳ Not started · 🔧 In progress · ✅ Done · 🚫 Blocked · ⚠️ Needs attention.
+Status markers
 
 ## Data Flow (Phase 3)
 

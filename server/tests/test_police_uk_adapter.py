@@ -34,6 +34,7 @@ async def _seed_place_and_population(
     inside it."""
     engine = get_engine()
     async with engine.begin() as conn:
+        await conn.execute(text("DELETE FROM data.trend_point"))
         await conn.execute(text("DELETE FROM data.indicator_value"))
         await conn.execute(text("DELETE FROM cache.source_cache"))
         await conn.execute(text("DELETE FROM geography.postcode"))
@@ -166,6 +167,7 @@ async def test_fetch_indicator_returns_none_without_population() -> None:
     await _seed_place_and_population()
     engine = get_engine()
     async with engine.begin() as conn:
+        await conn.execute(text("DELETE FROM data.trend_point"))
         await conn.execute(text("DELETE FROM data.indicator_value"))
 
     transport = httpx.MockTransport(

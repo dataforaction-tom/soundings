@@ -1,0 +1,30 @@
+---
+import "../lib/dom-polyfill";
+import { renderRegistrationTrend } from "../lib/chart";
+import type { RegistrationCohort } from "../lib/types";
+
+interface Props {
+  cohort: RegistrationCohort[];
+  caption?: string;
+}
+
+const { cohort, caption } = Astro.props;
+const svg = renderRegistrationTrend(cohort);
+---
+
+{svg && (
+  <figure class="chart-figure">
+    <div class="chart" set:html={svg} aria-hidden="true" />
+    {caption && <figcaption>{caption}</figcaption>}
+  </figure>
+)}
+
+<style>
+  .chart-figure { margin: 0; color: var(--color-accent); }
+  .chart-figure .chart svg { width: 100%; height: auto; }
+  .chart-figure figcaption {
+    font-size: 0.75rem;
+    color: #666;
+    margin-top: 0.25rem;
+  }
+</style>

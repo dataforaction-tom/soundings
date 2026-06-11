@@ -3,91 +3,159 @@ import Base from "../layouts/Base.astro";
 ---
 
 <Base title="About Soundings">
-  <article>
-    <h2>About Soundings</h2>
-    <p>
-      Soundings is an MCP server wrapping a curated set of UK open data
-      sources behind a small surface of question-shaped tools. Ask about a
-      place — postcode, council, region — and get coherent answers grounded
-      in named sources.
-    </p>
+  <article class="about">
+    <header class="about-header">
+      <h2>About Soundings</h2>
+      <p class="lead">
+        Soundings is an MCP server wrapping a curated set of UK open data
+        sources behind a small surface of question-shaped tools. Ask about a
+        place — postcode, council, region — and get coherent answers grounded
+        in named sources.
+      </p>
+    </header>
 
-    <h3>How capture works</h3>
-    <p>
-      Every interaction with the server is logged as a structured record,
-      with your consent. The published corpus becomes a public artefact in
-      its own right under CC BY 4.0.
-    </p>
-    <ul>
-      <li>
-        <strong>Full consent</strong> — your question text and self-declared
-        sector are captured. The text is sanitised before publication
-        (postcodes truncated to sector, personal names redacted via NER,
-        small-charity names stripped).
-      </li>
-      <li>
-        <strong>Minimal consent (default)</strong> — only the structured
-        fields are captured: which tool was called, the place, the indicators
-        returned. Your question text is never stored.
-      </li>
-      <li>
-        <strong>No consent</strong> — nothing is captured. You can still use
-        the server.
-      </li>
-    </ul>
-    <p>
-      Change your choice any time using the banner at the top of every page.
-      The chosen level applies to the rest of your session.
-    </p>
+    <section>
+      <h3>How capture works</h3>
+      <p>
+        Every interaction with the server is logged as a structured record,
+        with your consent. The published corpus becomes a public artefact in
+        its own right under CC BY 4.0.
+      </p>
+      <ul class="consent-list">
+        <li>
+          <strong>Full consent</strong> — your question text and self-declared
+          sector are captured. The text is sanitised before publication
+          (postcodes truncated to sector, personal names redacted via NER,
+          small-charity names stripped).
+        </li>
+        <li>
+          <strong>Minimal consent (default)</strong> — only the structured
+          fields are captured: which tool was called, the place, the indicators
+          returned. Your question text is never stored.
+        </li>
+        <li>
+          <strong>No consent</strong> — nothing is captured. You can still use
+          the server.
+        </li>
+      </ul>
+      <p>
+        Change your choice any time using the banner at the top of every page.
+        The chosen level applies to the rest of your session.
+      </p>
+    </section>
 
-    <h3>The corpus</h3>
-    <p>
-      Every month a sanitised snapshot of the question corpus is published
-      as gzipped CSV and JSON Lines. The manifest records SHA-256 hashes,
-      the catalogue version, the sanitisation rules version, and the git
-      commit that produced it — so you can audit exactly what went in.
-    </p>
-    <p>
-      The Phase 2 plan defers pushing the corpus to a hosted bucket; v1
-      writes local artefacts only. See
-      <a href="https://github.com/dataforaction-tom/soundings/blob/main/docs/adr/0004-corpus-publication.md">
-        ADR-0004
-      </a>.
-    </p>
+    <section>
+      <h3>The corpus</h3>
+      <p>
+        Every month a sanitised snapshot of the question corpus is published
+        as gzipped CSV and JSON Lines. The manifest records SHA-256 hashes,
+        the catalogue version, the sanitisation rules version, and the git
+        commit that produced it — so you can audit exactly what went in.
+      </p>
+      <p>
+        The Phase 2 plan defers pushing the corpus to a hosted bucket; v1
+        writes local artefacts only. See
+        <a href="https://github.com/dataforaction-tom/soundings/blob/main/docs/adr/0004-corpus-publication.md">
+          ADR-0004
+        </a>.
+      </p>
+    </section>
 
-    <h3>The data behind every answer</h3>
-    <p>
-      Every page that shows indicator values also shows the SourceRef for
-      each one: where it came from, when we retrieved it, and what cache
-      status it has. A collapsed "data behind this" panel shows the raw
-      tool call and response so you can see what the UI saw.
-    </p>
+    <section>
+      <h3>The data behind every answer</h3>
+      <p>
+        Every page that shows indicator values also shows the SourceRef for
+        each one: where it came from, when we retrieved it, and what cache
+        status it has. A collapsed "data behind this" panel shows the raw
+        tool call and response so you can see what the UI saw.
+      </p>
+    </section>
 
-    <h3>Compare and trend</h3>
-    <p>
-      Each place page sparkline-charts the trend for any indicator whose
-      source publishes a time series, so you can see direction and recent
-      change alongside the latest value. The <a href="/compare">/compare</a>
-      page accepts a comma-separated list of places and indicators and
-      ranks each highlighted place against the full same-type peer
-      universe — percentile by default, with rank, absolute, and rate
-      bases also available.
-    </p>
+    <section>
+      <h3>Compare and trend</h3>
+      <p>
+        Each place page sparkline-charts the trend for any indicator whose
+        source publishes a time series, so you can see direction and recent
+        change alongside the latest value. The <a href="/compare">/compare</a>
+        page accepts a comma-separated list of places and indicators and
+        ranks each highlighted place against the full same-type peer
+        universe — percentile by default, with rank, absolute, and rate
+        bases also available.
+      </p>
+    </section>
 
-    <h3>Links</h3>
-    <ul>
-      <li>
-        <a href="https://github.com/dataforaction-tom/soundings">GitHub</a>
-        — source and spec
-      </li>
-      <li>
-        <a href="https://github.com/dataforaction-tom/soundings/blob/main/docs/v1-orchestration-and-capture.md">
-          v1 orchestration &amp; capture spec
-        </a>
-      </li>
-      <li>
-        Corpus downloads — coming with the first monthly release
-      </li>
-    </ul>
+    <section>
+      <h3>Civil society</h3>
+      <p>
+        Place pages also show the registered charities operating in that area
+        and the grants they've received in the last twelve months. The
+        organisations come from the Charity Commission's monthly register
+        (England &amp; Wales) and Find That Charity (Scotland &amp; Northern
+        Ireland); the grants come from
+        <a href="https://www.threesixtygiving.org/">360Giving</a>.
+      </p>
+    </section>
+
+    <section>
+      <h3>Links</h3>
+      <ul class="link-list">
+        <li>
+          <a href="https://github.com/dataforaction-tom/soundings">GitHub</a>
+          — source and spec
+        </li>
+        <li>
+          <a href="https://github.com/dataforaction-tom/soundings/blob/main/docs/v1-orchestration-and-capture.md">
+            v1 orchestration &amp; capture spec
+          </a>
+        </li>
+        <li>
+          Corpus downloads — via <code>make publish-corpus</code> or the
+          publication CLI
+        </li>
+      </ul>
+    </section>
   </article>
 </Base>
+
+<style>
+  .about-header {
+    padding-bottom: var(--space-lg);
+    margin-bottom: var(--space-xl);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .about-header h2 {
+    margin: 0 0 var(--space-md) 0;
+    font-size: var(--font-size-3xl);
+  }
+  .lead {
+    margin: 0;
+    font-size: var(--font-size-lg);
+    color: var(--color-text-light);
+    line-height: var(--line-height-relaxed);
+  }
+  .about section {
+    margin-bottom: var(--space-xl);
+  }
+  .about section h3 {
+    margin: 0 0 var(--space-md) 0;
+    padding-bottom: var(--space-sm);
+    border-bottom: 2px solid var(--color-accent);
+    display: inline-block;
+  }
+  .about p {
+    line-height: var(--line-height-relaxed);
+  }
+  .consent-list li,
+  .link-list li {
+    margin-bottom: var(--space-sm);
+    line-height: var(--line-height-relaxed);
+  }
+  .about code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.9em;
+    background: var(--color-bg);
+    padding: 0.1em 0.4em;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border-light);
+  }
+</style>

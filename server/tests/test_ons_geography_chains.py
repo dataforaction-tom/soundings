@@ -12,9 +12,10 @@ def test_all_canonical_levels_appear_as_a_child_or_parent_in_some_chain() -> Non
     for chain in ALL_CHAINS:
         for place_type, _ in chain.levels:
             types_seen.add(place_type)
+    # Note: msoa21 is no longer in the LSOA→LTLA chain (ONS simplified the lookup)
+    # It still exists as a boundary layer but isn't part of any hierarchy chain
     expected = {
         "lsoa21",
-        "msoa21",
         "ltla24",
         "utla24",
         "region",
@@ -28,7 +29,8 @@ def test_all_canonical_levels_appear_as_a_child_or_parent_in_some_chain() -> Non
 
 def test_lsoa_chain_descends_to_lad() -> None:
     types = [t for t, _ in LSOA_MSOA_LTLA.levels]
-    assert types == ["lsoa21", "msoa21", "ltla24"]
+    # ONS dropped the MSOA intermediate layer in the LSOA21_WD24_LAD24_EW_LU lookup
+    assert types == ["lsoa21", "ltla24"]
 
 
 def test_admin_chain_climbs_to_country() -> None:

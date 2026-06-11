@@ -69,19 +69,58 @@ const { consentLevel, askerSector } = readConsentFromCookieString(cookieHeader);
 
 <style>
   .consent-banner {
-    border: 1px solid var(--border, #444);
-    padding: 1rem;
-    margin: 1rem 0;
-    background: var(--banner-bg, #fafafa);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: var(--space-lg);
+    margin-bottom: var(--space-xl);
+    background: var(--color-surface);
+  }
+  .consent-banner[data-current-level="full"] {
+    display: none;
+  }
+  .banner-text {
+    margin: 0 0 var(--space-md) 0;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-light);
   }
   .consent-banner fieldset {
     border: none;
     padding: 0;
+    margin: 0;
+  }
+  .consent-banner legend {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-muted);
+    margin-bottom: var(--space-xs);
+  }
+  .consent-levels {
     display: flex;
-    gap: 1rem;
-    margin: 0.5rem 0;
+    gap: var(--space-lg);
+    margin-bottom: var(--space-md);
+  }
+  .consent-levels label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+  }
+  .consent-levels input[type="radio"] {
+    accent-color: var(--color-accent);
+  }
+  .sector-picker {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    font-size: var(--font-size-sm);
+    color: var(--color-muted);
+    margin-bottom: var(--space-md);
+  }
+  .sector-picker select {
+    max-width: 200px;
   }
   .consent-banner button {
-    margin-top: 0.5rem;
+    font-size: var(--font-size-sm);
   }
 </style>

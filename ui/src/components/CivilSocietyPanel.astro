@@ -1,0 +1,141 @@
+---
+import IncomeBucketsChart from "./IncomeBucketsChart.astro";
+import RegistrationTrendChart from "./RegistrationTrendChart.astro";
+import SourceCitations from "./SourceCitations.astro";
+import { getCivilSocietyProfile } from "../lib/api";
+import type { CivilSocietyProfile } from "../lib/types";
+
+interface Props {
+  placeId: string;
+  cookieHeader?: string;
+}
+
+const { placeId, cookieHeader } = Astro.props;
+
+// CC bulk register covers England + Wales registered charities only.
+// Skip the panel entirely for Scotland / NI place ids so we don't show
+// an honest-but-misleading "0 charities" for County Durham equivalents.
+const isEnglandOrWales =
+  placeId.startsWith("ltla24:E") || placeId.startsWith("ltla24:W") ||
+  placeId.startsWith("utla24:E") || placeId.startsWith("utla24:W");
+
+let profile: CivilSocietyProfile | null = null;
+let error: string | null = null;
+
+if (isEnglandOrWales) {
+  try {
+    profile = await getCivilSocietyProfile(placeId, { cookieHeader });
+  } catch (err) {
+    error = err instanceof Error ? err.message : String(err);
+  }
+}
+
+function fmtGBP(value: number | null): string {
+  if (value === null) return "—";
+  return new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency: "GBP",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function fmtInt(value: number): string {
+  return new Intl.NumberFormat("en-GB").format(value);
+}
+---
+
+{error && (
+  <p class="error">Couldn't load civil society profile: {error}</p>
+)}
+
+{profile && profile.total_organisations > 0 && (
+  <section class="cs-panel">
+    <h3>Civil society</h3>
+
+    <div class="cs-headlines">
+      <div class="cs-stat">
+        <span class="stat-value">{fmtInt(profile.total_organisations)}</span>
+        <span class="stat-label">registered charities</span>
+      </div>
+      <div class="cs-stat">
+        <span class="stat-value">{fmtGBP(profile.median_income)}</span>
+        <span class="stat-label">median annual income</span>
+      </div>
+      <div class="cs-stat">
+        <span class="stat-value">{fmtGBP(profile.mean_income)}</span>
+        <span class="stat-label">mean annual income</span>
+      </div>
+    </div>
+
+    <div class="cs-charts">
+      <div>
+        <h4>Income distribution</h4>
+        <IncomeBucketsChart buckets={profile.income_buckets} />
+      </div>
+      <div>
+        <h4>Net new charities per year</h4>
+        <RegistrationTrendChart cohort={profile.registration_cohort} />
+      </div>
+    </div>
+
+    {profile.caveats.length > 0 && (
+      <ul class="caveats">
+        {profile.caveats.map((c) => <li>{c}</li>)}
+      </ul>
+    )}
+
+    {profile.sources.length > 0 && <SourceCitations sources={profile.sources} />}
+  </section>
+)}
+
+<style>
+  .cs-panel {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--color-border);
+  }
+  .cs-panel h3 {
+    margin: 0 0 1rem;
+    font-size: 1.25rem;
+  }
+  .cs-panel h4 {
+    margin: 0 0 0.5rem;
+    font-size: 0.9375rem;
+    color: var(--color-muted);
+  }
+  .cs-headlines {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .cs-stat {
+    display: flex;
+    flex-direction: column;
+    padding: 0.75rem 1rem;
+    background: var(--color-bg);
+    border-radius: 6px;
+  }
+  .stat-value {
+    font-size: 1.5rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-label {
+    font-size: 0.8125rem;
+    color: var(--color-muted);
+    margin-top: 0.125rem;
+  }
+  .cs-charts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 1.5rem;
+  }
+  .caveats {
+    margin: 1rem 0 0;
+    padding-left: 1rem;
+    font-size: 0.8125rem;
+    color: var(--color-muted);
+  }
+  .error { color: #a00; }
+</style>

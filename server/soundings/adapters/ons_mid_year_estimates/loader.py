@@ -16,12 +16,18 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from soundings.adapters.base import LoaderAdapter, LoaderResult
 from soundings.adapters.nomis.client import NomisClient
 from soundings.adapters.nomis.mapping import NomisMapping, load_nomis_mapping
-from soundings.db.models.data import IndicatorValue
+from soundings.db.models.data import IndicatorValue, TrendPoint
 
 SOURCE_ID = "ons.mid_year_estimates"
 DEFAULT_MAPPING_PATH = (
     Path(__file__).resolve().parent.parent.parent.parent.parent / "catalogue" / "nomis-mapping.yaml"
 )
+
+# When the mapping asks for `latest`, request a 10-year window so the loader
+# can also populate `data.trend_point` for sparklines. Nomis returns every
+# observation in the range in one call; we keep all years in indicator_value
+# (the PK is (place, indicator, period)) and mirror them into trend_point.
+TREND_WINDOW = "latestMINUS9-latest"
 
 
 class OnsMidYearEstimatesLoader(LoaderAdapter):
@@ -63,6 +69,7 @@ class OnsMidYearEstimatesLoader(LoaderAdapter):
             for place_code in place_codes:
                 obs = await self._fetch_observations(mapping, place_code)
                 rows_written += await self._upsert_obs(mapping.indicator_key, place_type, obs)
+                await self._upsert_trend_points(mapping.indicator_key, place_type, obs)
         return rows_written
 
     async def _place_codes_for_type(self, place_type: str) -> list[str]:
@@ -78,11 +85,16 @@ class OnsMidYearEstimatesLoader(LoaderAdapter):
     async def _fetch_observations(
         self, mapping: NomisMapping, place_code: str
     ) -> list[dict[str, Any]]:
+        # Default "latest" mappings widen to a 10-year window so we can also
+        # write trend_point rows. Explicit periods (e.g. "2021") keep their
+        # single-year semantics.
+        configured = mapping.period or "latest"
+        time = TREND_WINDOW if configured == "latest" else configured
         payload = await self._nomis.get_observations(
             dataset_id=mapping.dataset_id,
             geography=place_code,
             measures=mapping.measures,
-            time=mapping.period or "latest",
+            time=time,
             **mapping.extra_params,
         )
         obs: list[dict[str, Any]] = payload.get("obs", [])
@@ -131,3 +143,47 @@ class OnsMidYearEstimatesLoader(LoaderAdapter):
             )
             await conn.execute(stmt)
         return len(rows)
+
+    async def _upsert_trend_points(
+        self, indicator_key: str, place_type: str, obs: list[dict[str, Any]]
+    ) -> None:
+        if not obs:
+            return
+        retrieved = datetime.now(tz=UTC)
+        rows = []
+        for o in obs:
+            geo_code = o.get("geography", {}).get("geogcode")
+            if not geo_code:
+                continue
+            value = o.get("obs_value", {}).get("value")
+            period = o.get("time", {}).get("description")
+            if not period:
+                continue
+            rows.append(
+                {
+                    "place_id": f"{place_type}:{geo_code}",
+                    "indicator_key": indicator_key,
+                    "period": str(period),
+                    "value": value,
+                    "revised": False,
+                    "source_id": self.source_id,
+                    "retrieved_at": retrieved,
+                }
+            )
+        if not rows:
+            return
+        async with self._engine.begin() as conn:
+            stmt = insert(TrendPoint).values(rows)
+            stmt = stmt.on_conflict_do_update(
+                index_elements=[
+                    TrendPoint.place_id,
+                    TrendPoint.indicator_key,
+                    TrendPoint.period,
+                ],
+                set_={
+                    "value": stmt.excluded.value,
+                    "retrieved_at": stmt.excluded.retrieved_at,
+                    "source_id": stmt.excluded.source_id,
+                },
+            )
+            await conn.execute(stmt)

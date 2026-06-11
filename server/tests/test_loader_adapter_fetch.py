@@ -63,6 +63,9 @@ async def _seed_source_indicator_and_value(
                 "cad": "annual",
             },
         )
+        await conn.execute(
+            text("DELETE FROM data.trend_point WHERE place_id = :id"), {"id": place_id}
+        )
         await conn.execute(text("DELETE FROM geography.postcode"))
         await conn.execute(text("DELETE FROM geography.place_hierarchy"))
         await conn.execute(text("DELETE FROM geography.place WHERE id = :id"), {"id": place_id})

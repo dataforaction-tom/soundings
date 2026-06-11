@@ -18,3 +18,12 @@ def test_seed_requires_mode_flag() -> None:
 def test_seed_full_and_light_are_mutually_exclusive() -> None:
     with pytest.raises(SystemExit):
         main(["--full", "--light"])
+
+
+def test_refresh_trends_is_in_the_mode_mutex() -> None:
+    # Combining --refresh-trends with any other mode must fail the argparser
+    # before any loader runs (otherwise a typo could trigger a full re-seed).
+    with pytest.raises(SystemExit):
+        main(["--refresh-trends", "--full"])
+    with pytest.raises(SystemExit):
+        main(["--refresh-trends", "--light"])

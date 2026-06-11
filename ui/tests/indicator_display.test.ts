@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { domainOf, formatValue, prettyKey } from "../src/lib/indicator_display";
+import { domainOf, formatValue, prettyKey, formatContext, formatDirection } from "../src/lib/indicator_display";
 
 describe("prettyKey", () => {
   it("renders a flat key with leading capital", () => {
@@ -28,6 +28,41 @@ describe("formatValue", () => {
 
   it("formats fractions to 3 sig figs", () => {
     expect(formatValue(0.12345)).toBe("0.123");
+  });
+});
+
+describe("formatContext", () => {
+  it("formats percentile as pXX", () => {
+    expect(formatContext(42, "percentile")).toBe("p42");
+  });
+
+  it("formats rank as #N", () => {
+    expect(formatContext(150, "rank")).toBe("#150");
+  });
+
+  it("returns empty string for null values", () => {
+    expect(formatContext(null, "percentile")).toBe("");
+    expect(formatContext(null, "rank")).toBe("");
+  });
+
+  it("rounds percentile to nearest integer", () => {
+    expect(formatContext(42.7, "percentile")).toBe("p43");
+    expect(formatContext(42.3, "percentile")).toBe("p42");
+  });
+});
+
+describe("formatDirection", () => {
+  it("returns '↑' for higher_is_better", () => {
+    expect(formatDirection("better")).toBe("↑");
+  });
+
+  it("returns '↓' for higher_is_worse", () => {
+    expect(formatDirection("worse")).toBe("↓");
+  });
+
+  it("returns empty string for neutral or null", () => {
+    expect(formatDirection("neutral")).toBe("");
+    expect(formatDirection(null)).toBe("");
   });
 });
 
