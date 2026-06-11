@@ -187,7 +187,7 @@ export function renderIncomeBuckets(
     x: { label: "Annual income band", tickRotate: -15 },
     y: { grid: true, label: "Charities", nice: true },
     marks: [
-      Plot.barY(buckets, { x: "label", y: "count", fill: "#2a5bd7" }),
+      Plot.barY(buckets, { x: "label", y: "count", fill: "#4a7c59" }),
       Plot.text(buckets, {
         x: "label",
         y: "count",
@@ -219,8 +219,8 @@ export function renderRegistrationTrend(
     y: { grid: true, label: "Net new charities", nice: true },
     marks: [
       Plot.ruleY([0]),
-      Plot.lineY(cohort, { x: "year", y: "net", stroke: "#2a5bd7", strokeWidth: 1.5 }),
-      Plot.dot(cohort, { x: "year", y: "net", r: 2.5, fill: "#2a5bd7" }),
+      Plot.lineY(cohort, { x: "year", y: "net", stroke: "#4a7c59", strokeWidth: 1.5 }),
+      Plot.dot(cohort, { x: "year", y: "net", r: 2.5, fill: "#4a7c59" }),
     ],
   });
   return (node as unknown as { outerHTML: string }).outerHTML;
