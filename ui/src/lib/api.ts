@@ -10,6 +10,7 @@
 // round-trip on UI ↔ API calls.
 
 import type {
+  CivilSocietyProfile,
   ComparePlacesResponse,
   ComparisonBasis,
   ConsentLevel,
@@ -196,6 +197,17 @@ export async function findOrganisationsInPlace(
   return postJSON<FindOrganisationsInPlaceResponse>(
     "/v1/tools/find_organisations_in_place",
     body,
+    { cookieHeader: opts.cookieHeader },
+  );
+}
+
+export async function getCivilSocietyProfile(
+  placeId: string,
+  opts: { cookieHeader?: string } = {},
+): Promise<CivilSocietyProfile> {
+  return postJSON<CivilSocietyProfile>(
+    "/v1/tools/get_civil_society_profile",
+    { place_id: placeId },
     { cookieHeader: opts.cookieHeader },
   );
 }

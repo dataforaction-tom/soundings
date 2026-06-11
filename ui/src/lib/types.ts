@@ -165,3 +165,32 @@ export interface FindOrganisationsInPlaceResponse {
   caveats: string[];
   partial: boolean;
 }
+
+// get_civil_society_profile (spec §5.1 / Phase 5 Block E) ----------------------
+
+export interface IncomeBucket {
+  label: string;
+  lower: number;
+  upper: number | null;
+  count: number;
+}
+
+export interface RegistrationCohort {
+  year: number;
+  registered: number;
+  removed: number;
+  net: number;
+}
+
+export interface CivilSocietyProfile {
+  place_id: string;
+  total_organisations: number;
+  with_reported_income: number;
+  median_income: number | null;
+  mean_income: number | null;
+  income_buckets: IncomeBucket[];
+  registration_cohort: RegistrationCohort[];
+  sources: SourceRef[];
+  caveats: string[];
+  partial: boolean;
+}
