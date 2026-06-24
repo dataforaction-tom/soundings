@@ -174,3 +174,8 @@ class ToolDispatcher:
         model = DetectInsightsInput.model_validate(args)
         result = await detect_insights(model, self._state.engine)
         return result.model_dump(mode="json")
+
+    @property
+    def sources(self) -> list[Any]:
+        """Accumulated SourceRefs from tool calls. Read-only view."""
+        return list(self._sources)
