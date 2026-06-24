@@ -153,5 +153,64 @@ def build_mcp_server(state: Any | None = None) -> FastMCP:
         )
         return result.model_dump(mode="json")
 
+    @mcp.tool(name="ask")
+    async def _ask(
+        query: str,
+        place_id: str | None = None,
+        mode: str = "open",
+    ) -> dict[str, Any]:
+        """Ask a natural-language question about a UK place."""
+        if state is None:
+            raise RuntimeError("MCP ask invoked without app state")
+
+        from soundings.ask.dispatcher import ToolDispatcher
+        from soundings.ask.orchestrator import AskOrchestrator
+        from soundings.ask.prompts import SystemPromptBuilder
+        from soundings.core.config import get_settings
+
+        settings = get_settings()
+        if not settings.anthropic_api_key:
+            raise RuntimeError("ANTHROPIC_API_KEY not configured")
+
+        place_name: str | None = None
+        if place_id:
+            from sqlalchemy import text
+
+            async with state.engine.connect() as conn:
+                row = (
+                    await conn.execute(
+                        text("SELECT name FROM geography.place WHERE id = :id"),
+                        {"id": place_id},
+                    )
+                ).first()
+            if row:
+                place_name = row.name
+
+        prompt_builder = SystemPromptBuilder(
+            mode=mode,  # type: ignore[arg-type]
+            place_name=place_name,
+            place_id=place_id,
+        )
+        dispatcher = ToolDispatcher(state)
+        orchestrator = AskOrchestrator(
+            dispatcher=dispatcher,
+            prompt_builder=prompt_builder,
+            api_key=settings.anthropic_api_key,
+            model=settings.ask_model,
+        )
+
+        blocks: list[dict[str, Any]] = []
+        sources: list[dict[str, Any]] = []
+
+        async def callback(event: dict[str, Any]) -> None:
+            if event["type"] == "block":
+                blocks.append(event["block"])
+            elif event["type"] == "sources":
+                sources.clear()
+                sources.extend(event["sources"])
+
+        await orchestrator.run(query, callback)
+        return {"blocks": blocks, "sources": sources}
+
     _MCP_SERVER = mcp
     return mcp
