@@ -1,0 +1,144 @@
+---
+interface Props {
+  placeId?: string;
+  placeName?: string;
+}
+
+const { placeId, placeName } = Astro.props;
+const hasPlace = Boolean(placeId);
+---
+
+<form class="ask-box" method="get" action="/ask">
+  <div class="ask-input-row">
+    <input
+      type="text"
+      name="q"
+      class="ask-input"
+      placeholder={hasPlace && placeName
+        ? `Ask about ${placeName}…`
+        : "Ask a question about a place…"}
+      autocomplete="off"
+      required
+    />
+    {hasPlace && <input type="hidden" name="place_id" value={placeId} />}
+    <button type="submit" class="ask-submit">Ask</button>
+  </div>
+
+  <fieldset class="mode-chips" aria-label="Answer mode">
+    <legend class="mode-legend">Mode</legend>
+    <button type="button" class="mode-chip is-active" data-mode="summary">
+      Summary
+    </button>
+    <button type="button" class="mode-chip" data-mode="compare">
+      Compare
+    </button>
+    <button type="button" class="mode-chip" data-mode="insight">
+      Surprise me
+    </button>
+    <input type="hidden" name="mode" value="summary" class="mode-input" />
+  </fieldset>
+</form>
+
+<script>
+  const placeholders: Record<string, string> = {
+    summary: "Summarise this place — population, deprivation, key indicators…",
+    compare: "Compare this place against its peers…",
+    insight: "Surprise me — show me something unexpected about this place…",
+  };
+
+  function initAskBox(root: HTMLElement) {
+    const chips = root.querySelectorAll<HTMLButtonElement>(".mode-chip");
+    const input = root.querySelector<HTMLInputElement>(".mode-input");
+    const qInput = root.querySelector<HTMLInputElement>("input[name='q']");
+    const form = root.querySelector<HTMLFormElement>(".ask-box");
+    if (!input || !form) return;
+
+    const placeId = form.querySelector<HTMLInputElement>(
+      "input[name='place_id']",
+    );
+
+    for (const chip of chips) {
+      chip.addEventListener("click", () => {
+        for (const c of chips) c.classList.remove("is-active");
+        chip.classList.add("is-active");
+        const mode = chip.dataset.mode ?? "summary";
+        input.value = mode;
+        if (qInput) qInput.placeholder = placeholders[mode] ?? placeholders.summary!;
+
+        // Auto-submit when a place is already selected and the user has
+        // typed a question, so mode switching feels instant on a place page.
+        if (placeId && qInput && qInput.value.trim().length > 0) {
+          form.requestSubmit();
+        }
+      });
+    }
+  }
+
+  document
+    .querySelectorAll<HTMLElement>(".ask-box")
+    .forEach(initAskBox);
+</script>
+
+<style>
+  .ask-box {
+    margin-bottom: var(--space-xl);
+  }
+  .ask-input-row {
+    display: flex;
+    gap: var(--space-md);
+    align-items: stretch;
+    margin-bottom: var(--space-md);
+  }
+  .ask-input {
+    flex: 1;
+    padding: var(--space-md);
+    font-size: var(--font-size-lg);
+  }
+  .ask-submit {
+    padding: var(--space-md) var(--space-xl);
+  }
+  .mode-chips {
+    border: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    align-items: center;
+  }
+  .mode-legend {
+    font-size: var(--font-size-sm);
+    color: var(--color-muted);
+    margin-right: var(--space-sm);
+    padding: 0;
+  }
+  .mode-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--space-sm) var(--space-md);
+    background: var(--color-surface);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+  }
+  .mode-chip:hover {
+    background: var(--color-bg);
+    border-color: var(--color-accent);
+  }
+  .mode-chip.is-active {
+    background: var(--color-accent);
+    color: white;
+    border-color: var(--color-accent);
+  }
+  .mode-chip.is-active:hover {
+    background: var(--color-accent-hover);
+    border-color: var(--color-accent-hover);
+  }
+  .mode-input {
+    display: none;
+  }
+</style>
