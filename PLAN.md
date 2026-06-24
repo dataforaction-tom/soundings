@@ -45,6 +45,7 @@ to `main`.
 - [x] Phase 5 — First monthly corpus release, doc pass. **Complete.**
 - [x] UI Design — Apply Good Ship branding, new design system. **Complete.**
 - [x] Phase 6 — Civil society profile slice (`get_civil_society_profile` tool + panel). Follow-ups: funder rollup, map, ask interface.
+- [x] Ask interface — `/v1/ask` endpoint with Claude tool-use loop, SSE streaming, `detect_insights`, `SystemPromptBuilder`, `AskOrchestrator`, `ToolDispatcher`, block schema. `/ask` page with `AskBox` + `answer_stream.ts`. MCP registration. 12 commits, 40+ tests. Live test pending API key in CI.
 - [ ] Phase 6 — New data sources. **Planning underway.**
 
 ## Phase 6: Data Source Expansion

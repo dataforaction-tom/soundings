@@ -1,7 +1,7 @@
 # State
 
-> Last updated: 2026-05-25
-> Status: **Phase 5 complete.** Phase 6 — new data sources (planning underway).
+> Last updated: 2026-06-24
+> Status: **Phase 6 — ask interface built.** Server foundation + UI shipped; live test pending API key.
 
 ## System State Diagram
 
@@ -73,6 +73,8 @@ stateDiagram-v2
 || **Phase 5 — Doc pass** | ✅ Phase 5 | DRIs, error messages, inline docs reviewed. |
 | **`get_civil_society_profile` tool + CivilSocietyPanel** | ✅ Phase 6 slice 1 | Total, income distribution + median/mean, registration cohort trend. CC loader extended to capture `latest_income`, `date_of_registration`, `date_of_removal`. |
 || **Phase 6 — New data sources** | 🔧 Planning | URL validation complete; priority: Ofcom, Ofsted, BEIS EPC, DEFRA Air, CQC, Land Registry, DfT. 50+ new indicators across 4 new domains (digital, environment, housing-extended, safety). |
+| **Ask interface — `/v1/ask` + `/ask` page** | ✅ Phase 6 (ask) | Claude tool-use loop over existing tools. SSE streaming. 4 modes (open/summary/compare/insight). detect_insights SQL detector. AskBox on homepage + place page. |
+| **Ask interface — live test** | ⏳ Pending | `@pytest.mark.live` test written; needs `ANTHROPIC_API_KEY` in GitHub Secrets for nightly CI. |
 
 Status markers
 
