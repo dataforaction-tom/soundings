@@ -39,6 +39,7 @@ from soundings.http.session import (
 )
 
 TOOLS_PATH_PREFIX = "/v1/tools/"
+ASK_PATH = "/v1/ask"
 
 
 class RawWriter(Protocol):
@@ -56,7 +57,8 @@ class _RateLimiter(Protocol):
 
 
 def _extract_tool_name(path: str) -> str:
-    # /v1/tools/find_place → "find_place"
+    if path == ASK_PATH:
+        return "ask"
     return path[len(TOOLS_PATH_PREFIX) :].split("/", 1)[0]
 
 
@@ -145,7 +147,9 @@ class CaptureMiddleware:
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or not scope["path"].startswith(TOOLS_PATH_PREFIX):
+        if scope["type"] != "http" or not (
+            scope["path"].startswith(TOOLS_PATH_PREFIX) or scope["path"] == ASK_PATH
+        ):
             await self.app(scope, receive, send)
             return
 
