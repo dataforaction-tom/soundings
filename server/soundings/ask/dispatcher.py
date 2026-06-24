@@ -19,6 +19,13 @@ from soundings.tools.compare_places import (
 from soundings.tools.compare_places import (
     tool_spec as compare_places_spec,
 )
+from soundings.tools.detect_insights import (
+    DetectInsightsInput,
+    detect_insights,
+)
+from soundings.tools.detect_insights import (
+    tool_spec as detect_insights_spec,
+)
 from soundings.tools.find_organisations_in_place import (
     FindOrganisationsInPlaceInput,
     find_organisations_in_place,
@@ -89,6 +96,7 @@ class ToolDispatcher:
             get_trend_spec(),
             find_orgs_spec(),
             get_csp_spec(),
+            detect_insights_spec(),
             {
                 "name": TERMINAL_TOOL,
                 "description": COMPOSE_ANSWER_DESCRIPTION,
@@ -122,6 +130,7 @@ class ToolDispatcher:
             "get_trend": self._handle_get_trend,
             "find_organisations_in_place": self._handle_find_organisations,
             "get_civil_society_profile": self._handle_get_csp,
+            "detect_insights": self._handle_detect_insights,
         }
 
     # --- Non-terminal handlers -------------------------------------------
@@ -159,4 +168,9 @@ class ToolDispatcher:
     async def _handle_get_csp(self, args: dict[str, Any]) -> dict[str, Any]:
         model = GetCivilSocietyProfileInput.model_validate(args)
         result = await get_civil_society_profile(model, self._state.orchestrator)
+        return result.model_dump(mode="json")
+
+    async def _handle_detect_insights(self, args: dict[str, Any]) -> dict[str, Any]:
+        model = DetectInsightsInput.model_validate(args)
+        result = await detect_insights(model, self._state.engine)
         return result.model_dump(mode="json")
