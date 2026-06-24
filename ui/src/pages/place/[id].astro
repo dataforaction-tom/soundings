@@ -1,5 +1,6 @@
 ---
 import Base from "../../layouts/Base.astro";
+import AskBox from "../../components/AskBox.astro";
 import DomainSection from "../../components/DomainSection.astro";
 import CivilSocietyPanel from "../../components/CivilSocietyPanel.astro";
 import SourceCitations from "../../components/SourceCitations.astro";
@@ -78,6 +79,8 @@ const sources: SourceRef[] = profile
 ---
 
 <Base title={profile ? profile.place.name : placeId}>
+  <AskBox placeId={profile?.place.id ?? placeId} placeName={profile?.place.name ?? placeId} />
+
   {error && (
     <p class="error">Couldn't load profile: {error}</p>
   )}

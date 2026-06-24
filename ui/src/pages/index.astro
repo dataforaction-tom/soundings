@@ -1,5 +1,6 @@
 ---
 import Base from "../layouts/Base.astro";
+import AskBox from "../components/AskBox.astro";
 import { findPlace } from "../lib/api";
 import { readConsentFromCookieString } from "../lib/consent";
 import type { PlaceMatch } from "../lib/types";
@@ -45,6 +46,8 @@ if (query) {
     </label>
     <button type="submit">Search</button>
   </form>
+
+  <AskBox />
 
   {error && (
     <p class="error">
