@@ -1,0 +1,375 @@
+---
+import Base from "../layouts/Base.astro";
+import AskBox from "../components/AskBox.astro";
+
+export const prerender = false;
+
+const url = new URL(Astro.request.url);
+const query = (url.searchParams.get("q") ?? "").trim();
+const placeId = url.searchParams.get("place_id") ?? "";
+const mode = url.searchParams.get("mode") ?? "summary";
+
+const apiBase =
+  (typeof process !== "undefined" && process.env.SOUNDINGS_API_BASE) ||
+  "http://localhost:8001";
+---
+
+<Base title={query ? `Ask: ${query}` : "Ask"}>
+  <header class="ask-header">
+    <h1>{query ? query : "Ask a question"}</h1>
+    {placeId && (
+      <p class="place-context">About place <code>{placeId}</code></p>
+    )}
+  </header>
+
+  <AskBox placeId={placeId || undefined} />
+
+  {query ? (
+    <div id="answer-surface" class="answer-surface" data-api-base={apiBase} data-mode={mode} data-place-id={placeId}>
+      <p class="answer-status">Thinking…</p>
+    </div>
+  ) : (
+    <p class="ask-prompt">Type a question above to get started.</p>
+  )}
+
+  <div id="answer-sources" class="answer-sources"></div>
+
+  {query && (
+    <script type="module">
+      import { streamAsk } from "../lib/answer_stream";
+
+      const surface = document.getElementById("answer-surface");
+      if (surface) {
+        const apiBase = surface.dataset.apiBase || "http://localhost:8001";
+        const mode = surface.dataset.mode || "summary";
+        const placeId = surface.dataset.placeId || undefined;
+        const query = document.querySelector("h1")?.textContent || "";
+
+        function setStatus(message: string) {
+          let el = surface.querySelector<HTMLElement>(".answer-status");
+          if (!el) {
+            el = document.createElement("p");
+            el.className = "answer-status";
+            surface.appendChild(el);
+          }
+          el.textContent = message;
+        }
+
+        function renderMarkdown(text: string): string {
+          // Minimal markdown: paragraphs, **bold**, *italic*, `code`, line breaks.
+          const esc = (s: string) =>
+            s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+          const lines = esc(text).split("\n");
+          const out: string[] = [];
+          let inList = false;
+          for (const line of lines) {
+            if (/^\s*[-*]\s+/.test(line)) {
+              if (!inList) {
+                out.push("<ul>");
+                inList = true;
+              }
+              out.push("<li>" + line.replace(/^\s*[-*]\s+/, "") + "</li>");
+            } else {
+              if (inList) {
+                out.push("</ul>");
+                inList = false;
+              }
+              if (line.trim().length === 0) {
+                out.push("");
+              } else {
+                out.push("<p>" + line + "</p>");
+              }
+            }
+          }
+          if (inList) out.push("</ul>");
+          return out
+            .join("\n")
+            .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+            .replace(/\*([^*]+)\*/g, "<em>$1</em>")
+            .replace(
+              /`([^`]+)`/g,
+              '<code class="inline-code">$1</code>',
+            );
+        }
+
+        function renderBlock(block: { type: string; [k: string]: unknown }) {
+          const host = document.createElement("div");
+          host.className = "answer-block block-" + block.type;
+          switch (block.type) {
+            case "text": {
+              const text = typeof block.text === "string" ? block.text : "";
+              const div = document.createElement("div");
+              div.className = "answer-text";
+              div.innerHTML = renderMarkdown(text);
+              host.appendChild(div);
+              break;
+            }
+            case "insight-callout": {
+              const severity =
+                typeof block.severity === "string" ? block.severity : "info";
+              const message =
+                typeof block.message === "string" ? block.message : "";
+              const callout = document.createElement("div");
+              callout.className =
+                "insight-callout severity-" + severity;
+              callout.textContent = message;
+              host.appendChild(callout);
+              break;
+            }
+            case "indicator": {
+              const ph = document.createElement("div");
+              ph.className = "block-placeholder";
+              ph.textContent = "Indicator block: " + JSON.stringify(block);
+              host.appendChild(ph);
+              break;
+            }
+            case "trend": {
+              const ph = document.createElement("div");
+              ph.className = "block-placeholder";
+              ph.textContent = "Trend block: " + JSON.stringify(block);
+              host.appendChild(ph);
+              break;
+            }
+            case "compare": {
+              const ph = document.createElement("div");
+              ph.className = "block-placeholder";
+              ph.textContent = "Compare block: " + JSON.stringify(block);
+              host.appendChild(ph);
+              break;
+            }
+            case "organisations": {
+              const ph = document.createElement("div");
+              ph.className = "block-placeholder";
+              ph.textContent =
+                "Organisations block: " + JSON.stringify(block);
+              host.appendChild(ph);
+              break;
+            }
+            default: {
+              const ph = document.createElement("div");
+              ph.className = "block-placeholder block-unknown";
+              ph.textContent = "Unknown block: " + JSON.stringify(block);
+              host.appendChild(ph);
+            }
+          }
+          surface.appendChild(host);
+        }
+
+        function renderSources(sources: { source_id?: string; source_label?: string; publisher?: string; dataset_url?: string }[]) {
+          const footer = document.getElementById("answer-sources");
+          if (!footer) return;
+          footer.innerHTML = "";
+          if (sources.length === 0) return;
+          const sec = document.createElement("section");
+          sec.className = "sources-footer";
+          const h = document.createElement("h3");
+          h.textContent = "Sources";
+          sec.appendChild(h);
+          const ul = document.createElement("ul");
+          for (const ref of sources) {
+            const li = document.createElement("li");
+            if (ref.dataset_url) {
+              const a = document.createElement("a");
+              a.href = ref.dataset_url;
+              a.target = "_blank";
+              a.rel = "noopener";
+              a.textContent = ref.source_label || ref.source_id || "source";
+              li.appendChild(a);
+            } else {
+              li.textContent = ref.source_label || ref.source_id || "source";
+            }
+            if (ref.publisher) {
+              const span = document.createElement("span");
+              span.className = "source-publisher";
+              span.textContent = " · " + ref.publisher;
+              li.appendChild(span);
+            }
+            ul.appendChild(li);
+          }
+          sec.appendChild(ul);
+          footer.appendChild(sec);
+        }
+
+        function renderError(message: string) {
+          surface.innerHTML = "";
+          const div = document.createElement("div");
+          div.className = "answer-error";
+          const p = document.createElement("p");
+          p.textContent = "Sorry — something went wrong: " + message;
+          div.appendChild(p);
+          const retry = document.createElement("a");
+          retry.href = window.location.pathname + window.location.search;
+          retry.textContent = "Retry";
+          div.appendChild(retry);
+          surface.appendChild(div);
+        }
+
+        const body: Record<string, unknown> = { query, mode };
+        if (placeId) body.place_id = placeId;
+
+        // Clear the "Thinking…" status placeholder once first event arrives.
+        let firstEvent = true;
+
+        streamAsk(apiBase + "/v1/ask", body, (event) => {
+          if (firstEvent && event.type !== "status") {
+            const s = surface.querySelector(".answer-status");
+            if (s) s.remove();
+            firstEvent = false;
+          }
+          switch (event.type) {
+            case "status":
+              setStatus(event.message);
+              break;
+            case "block":
+              if (firstEvent) {
+                const s = surface.querySelector(".answer-status");
+                if (s) s.remove();
+                firstEvent = false;
+              }
+              renderBlock(event.block);
+              break;
+            case "sources":
+              renderSources(event.sources);
+              break;
+            case "done":
+              setStatus("");
+              const s = surface.querySelector(".answer-status");
+              if (s && s.textContent === "") s.remove();
+              break;
+            case "error":
+              renderError(event.message);
+              break;
+          }
+        }).catch((err) => {
+          renderError(err instanceof Error ? err.message : String(err));
+        });
+      }
+    </script>
+  )}
+
+  <style>
+    .ask-header {
+      margin-bottom: var(--space-xl);
+      padding-bottom: var(--space-lg);
+      border-bottom: 1px solid var(--color-border);
+    }
+    .ask-header h1 {
+      margin: 0 0 var(--space-xs) 0;
+    }
+    .place-context {
+      margin: 0;
+      color: var(--color-muted);
+      font-size: var(--font-size-sm);
+    }
+    .place-context code {
+      font-family: var(--font-sans);
+      font-size: var(--font-size-xs);
+      background: var(--color-bg);
+      padding: var(--space-xs) var(--space-sm);
+      border-radius: var(--radius-sm);
+    }
+    .ask-prompt {
+      color: var(--color-muted);
+      font-size: var(--font-size-lg);
+    }
+    .answer-surface {
+      min-height: 4rem;
+    }
+    .answer-status {
+      color: var(--color-muted);
+      font-style: italic;
+    }
+    .answer-block {
+      margin-bottom: var(--space-lg);
+    }
+    .answer-text {
+      line-height: var(--line-height-relaxed);
+    }
+    .answer-text p {
+      margin-bottom: var(--space-md);
+    }
+    .answer-text ul {
+      margin-bottom: var(--space-md);
+    }
+    .inline-code {
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 0.9em;
+      background: var(--color-bg);
+      padding: 0.1em 0.4em;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-border-light);
+    }
+    .insight-callout {
+      padding: var(--space-lg);
+      border-radius: var(--radius);
+      border-left: 4px solid var(--color-muted);
+      margin-bottom: var(--space-lg);
+      background: var(--color-surface);
+      line-height: var(--line-height-relaxed);
+    }
+    .insight-callout.severity-info {
+      border-left-color: var(--color-accent);
+      background: #f0f9f0;
+    }
+    .insight-callout.severity-warning {
+      border-left-color: var(--color-warning);
+      background: #fef3c7;
+    }
+    .insight-callout.severity-critical {
+      border-left-color: #dc2626;
+      background: #fee2e2;
+    }
+    .insight-callout.severity-positive {
+      border-left-color: var(--color-success);
+      background: #dcfce7;
+    }
+    .block-placeholder {
+      padding: var(--space-lg);
+      background: var(--color-surface);
+      border: 1px dashed var(--color-border);
+      border-radius: var(--radius);
+      font-size: var(--font-size-sm);
+      color: var(--color-muted);
+      word-break: break-word;
+    }
+    .block-unknown {
+      border-style: dotted;
+    }
+    .answer-error {
+      background: #fee2e2;
+      color: #991b1b;
+      padding: var(--space-lg);
+      border-radius: var(--radius);
+    }
+    .answer-error a {
+      color: #991b1b;
+      font-weight: var(--font-weight-medium);
+      text-decoration: underline;
+    }
+    .sources-footer {
+      margin-top: var(--space-xl);
+      padding-top: var(--space-lg);
+      border-top: 1px solid var(--color-border-light);
+      font-size: var(--font-size-sm);
+    }
+    .sources-footer h3 {
+      font-size: var(--font-size-base);
+      margin-bottom: var(--space-md);
+    }
+    .sources-footer ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .sources-footer li {
+      padding: var(--space-sm) 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-sm);
+      align-items: center;
+    }
+    .source-publisher {
+      color: var(--color-muted);
+    }
+  </style>
+</Base>
