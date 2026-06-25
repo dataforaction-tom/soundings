@@ -60,17 +60,30 @@ async def find_organisations_in_place(
     input: FindOrganisationsInPlaceInput,
     orchestrator: Any,
 ) -> FindOrganisationsInPlaceOutput:
-    """Tool handler - calls orchestrator method and wraps result."""
+    """Tool handler - calls orchestrator method and wraps result.
+
+    Grant enrichment is intentionally disabled: it fans out a live 360Giving
+    call per organisation (tens of seconds for a typical place), which blows
+    past the request-time budget and doesn't scale across thousands of orgs.
+    Populating grants needs the 360G bulk loader (a separate slice); until
+    then this tool returns the organisation list only, fast, and the aggregate
+    funding picture is available via `get_civil_society_profile`.
+    """
     result = await orchestrator.find_organisations_in_place(
         place_id=input.place_id,
         activity_filter=input.activity_filter,
         funded_only=input.funded_only,
         limit=input.limit,
-        enrich_grants=True,
+        enrich_grants=False,
+    )
+    caveats = list(result.caveats)
+    caveats.append(
+        "Per-organisation grant detail is not included here; "
+        "use get_civil_society_profile for the area's funding picture."
     )
     return FindOrganisationsInPlaceOutput(
         organisations=result.organisations,
         sources=result.sources,
-        caveats=result.caveats,
+        caveats=caveats,
         partial=result.partial,
     )

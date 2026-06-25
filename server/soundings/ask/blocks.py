@@ -13,7 +13,7 @@ ComparisonBasis = Literal["percentile", "rank", "absolute", "rate"]
 Severity = Literal["notable", "extreme"]
 
 MAX_TOTAL_BLOCKS = 20
-MAX_VISUAL_BLOCKS = 6
+MAX_VISUAL_BLOCKS = 10
 
 _VISUAL_TYPES = frozenset(
     {
@@ -93,9 +93,16 @@ class ComposeAnswerArgs(BaseModel):
 
     @model_validator(mode="after")
     def _enforce_caps(self) -> "ComposeAnswerArgs":
-        if len(self.blocks) > MAX_TOTAL_BLOCKS:
-            raise ValueError(f"Too many blocks: {len(self.blocks)} > {MAX_TOTAL_BLOCKS}")
-        visual_count = sum(1 for b in self.blocks if b.type in _VISUAL_TYPES)
-        if visual_count > MAX_VISUAL_BLOCKS:
-            raise ValueError(f"Too many visual blocks: {visual_count} > {MAX_VISUAL_BLOCKS}")
+        # Trim rather than reject. An over-eager model emitting a few too many
+        # blocks shouldn't fail the entire answer — keep every text block, drop
+        # only the visual blocks past the cap, then bound the total length.
+        kept: list[AnswerBlock] = []
+        visual_count = 0
+        for block in self.blocks:
+            if block.type in _VISUAL_TYPES:
+                if visual_count >= MAX_VISUAL_BLOCKS:
+                    continue
+                visual_count += 1
+            kept.append(block)
+        self.blocks = kept[:MAX_TOTAL_BLOCKS]
         return self

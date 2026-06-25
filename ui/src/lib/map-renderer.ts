@@ -20,11 +20,14 @@ const NAVY = "#1a2f4e";
 function baseMapOptions(container: HTMLElement): maplibregl.MapOptions {
   return {
     container,
+    // Minimal blank style (no external tiles — local-first). `glyphs` must be
+    // omitted entirely: setting it to `undefined` fails MapLibre's style
+    // validation ("glyphs: string expected, undefined found"), which aborts
+    // the style load so the boundary layers are never added.
     style: {
       version: 8,
       sources: {},
       layers: [],
-      glyphs: undefined,
     },
     attributionControl: false,
     dragRotate: false,
@@ -34,13 +37,12 @@ function baseMapOptions(container: HTMLElement): maplibregl.MapOptions {
 }
 
 function featureBounds(geojson: GeoJSON.GeoJSON): maplibregl.LngLatBoundsLike {
-  // Use MapLibre's GeoJSONSource to compute bounds reliably across
-  // Polygon/MultiPolygon/FeatureCollection shapes.
-  const src = new maplibregl.GeoJSONSource({ data: geojson });
-  // The source exposes _data; fall back to a manual bounds calc.
-  const data = (src as unknown as { _data?: GeoJSON.GeoJSON })._data ?? geojson;
-  const bounds = computeBounds(data);
-  return bounds;
+  // Compute bounds directly. (A previous version constructed a standalone
+  // maplibregl.GeoJSONSource to do this, but that constructor needs a map
+  // context and threw here — which aborted the load handler before fitBounds
+  // ran, leaving the camera at world zoom 0 and the boundary an invisible
+  // speck.) computeBounds handles Polygon/MultiPolygon/FeatureCollection.
+  return computeBounds(geojson);
 }
 
 function computeBounds(geojson: GeoJSON.GeoJSON): maplibregl.LngLatBoundsLike {

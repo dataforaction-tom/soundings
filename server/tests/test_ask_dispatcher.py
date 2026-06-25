@@ -38,8 +38,21 @@ class FakeOrchestrator:
         return SimpleNamespace()
 
 
+class _FakeConn:
+    async def __aenter__(self) -> "_FakeConn":
+        return self
+
+    async def __aexit__(self, *exc: object) -> bool:
+        return False
+
+    async def execute(self, *args: object, **kwargs: object) -> list[tuple[str]]:
+        # Stand in for `SELECT key FROM catalogue.indicator`.
+        return [("population.total",), ("deprivation.imd.average_score",)]
+
+
 class FakeEngine:
-    pass
+    def connect(self) -> _FakeConn:
+        return _FakeConn()
 
 
 def _make_dispatcher() -> ToolDispatcher:
@@ -128,3 +141,37 @@ async def test_dispatcher_dispatch_unknown_tool_raises() -> None:
     dispatcher = _make_dispatcher()
     with pytest.raises(ValueError, match="Unknown tool"):
         await dispatcher.dispatch("bogus_tool", {})
+
+
+@pytest.mark.asyncio
+async def test_dispatch_drops_blocks_with_unknown_indicator() -> None:
+    """Blocks naming a non-catalogue indicator are dropped; a bad-indicator
+    map is downgraded to a boundary map rather than dropped."""
+    dispatcher = _make_dispatcher()  # FakeEngine knows population.total only-ish
+    tool_input = {
+        "blocks": [
+            {"type": "text", "markdown": "intro"},
+            {
+                "type": "indicator-card",
+                "indicator_key": "population.total",
+                "place_id": "ltla24:E06000047",
+            },
+            {
+                "type": "indicator-card",
+                "indicator_key": "civil_society.total_organisations",
+                "place_id": "ltla24:E06000047",
+            },
+            {
+                "type": "map",
+                "place_id": "ltla24:E06000047",
+                "indicator_key": "civil_society.total_organisations",
+            },
+        ]
+    }
+    result = await dispatcher.dispatch("compose_answer", tool_input)
+    blocks = result["blocks"]
+    types = [b["type"] for b in blocks]
+    # text + valid card + map(boundary) kept; invalid card dropped.
+    assert types == ["text", "indicator-card", "map"]
+    assert blocks[1]["indicator_key"] == "population.total"
+    assert blocks[2]["indicator_key"] is None  # map downgraded to boundary

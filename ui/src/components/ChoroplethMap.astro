@@ -24,18 +24,16 @@ const labelStr = label ?? "";
 </div>
 
 <script type="module">
-  type MapRendererModule = typeof import("../lib/map-renderer");
-
   const containers = document.querySelectorAll<HTMLElement>(".choropleth-container[data-geojson]");
 
   for (const container of containers) {
     const jsonEl = container.querySelector<HTMLScriptElement>("script[data-geojson]");
     if (!jsonEl?.textContent) continue;
     try {
-      const fc = JSON.parse(jsonEl.textContent) as GeoJSON.FeatureCollection;
+      const fc = JSON.parse(jsonEl.textContent);
       const valueKey = container.dataset.valueKey || "value";
       const label = container.dataset.label || undefined;
-      const { renderChoroplethMap } = await import("../lib/map-renderer") as MapRendererModule;
+      const { renderChoroplethMap } = await import("../lib/map-renderer");
       renderChoroplethMap(container, fc, valueKey, { label });
     } catch (err) {
       console.error("ChoroplethMap init error:", err);

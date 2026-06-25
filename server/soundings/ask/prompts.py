@@ -64,11 +64,19 @@ Block types for compose_answer:
 - map: a map showing a place boundary, or a choropleth of peer places
   coloured by an indicator value (requires indicator_key for choropleth)
 
-Limits: max 20 blocks total, max 6 visual blocks (everything except text).
+Limits: max 20 blocks total, max 10 visual blocks (everything except text).
 Always interleave text with visual blocks — never put all charts at the end.
 Use a map block when the user asks about geography, boundaries, or visual
 comparisons across places. A map with indicator_key renders a choropleth
 showing how the place compares to its peers.
+
+Indicator keys: indicator-card, trend-chart, compare-chart, and choropleth
+maps require an `indicator_key` that actually exists — only use keys returned
+by get_indicators or get_place_profile in this conversation. Never invent a
+key. Civil-society figures (charity counts, income, registrations) come from
+get_civil_society_profile and are NOT catalogue indicators — present them as
+text or an organisations block, and use a plain boundary map (no indicator_key)
+to show where a place is.
 """
 
 

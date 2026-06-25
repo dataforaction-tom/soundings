@@ -29,7 +29,11 @@ logger = logging.getLogger(__name__)
 
 MAX_ITERATIONS = 12
 MAX_TOKENS_OUTPUT = 8192
-REQUEST_TIMEOUT_SECONDS = 45
+# Whole-request budget. Multi-tool answers (a place overview can touch the
+# profile, civil-society, several indicators and a comparison) legitimately
+# take over a minute when upstreams are cold, so allow generous headroom.
+# Effective only because the blocking LLM calls run via asyncio.to_thread.
+REQUEST_TIMEOUT_SECONDS = 120
 
 SSECallback = Callable[[dict[str, Any]], Awaitable[None] | None]
 
@@ -87,12 +91,18 @@ class AskOrchestrator:
         callback: SSECallback,
     ) -> None:
         for _iteration in range(self._max_iterations):
-            response = client.messages.create(
-                model=self._model,
-                max_tokens=MAX_TOKENS_OUTPUT,
-                system=system_prompt,
-                tools=tool_specs,  # type: ignore[arg-type]
-                messages=messages,  # type: ignore[arg-type]
+            # The Anthropic client is synchronous; calling it directly would
+            # block the event loop for the whole request, stalling the SSE
+            # stream and rendering `asyncio.timeout` (in run()) ineffective.
+            # Run it in a worker thread so the loop stays responsive.
+            response = await asyncio.to_thread(
+                lambda: client.messages.create(
+                    model=self._model,
+                    max_tokens=MAX_TOKENS_OUTPUT,
+                    system=system_prompt,
+                    tools=tool_specs,  # type: ignore[arg-type]
+                    messages=messages,  # type: ignore[arg-type]
+                )
             )
 
             # Collect content blocks from the response
