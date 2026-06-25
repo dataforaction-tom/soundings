@@ -139,10 +139,12 @@ export function renderCompareBars(
   opts: CompareBarsOptions = {},
 ): string {
   const basis = opts.basis ?? "percentile";
-  const bars = toBarPoints(comparison.values, basis);
+  let bars = toBarPoints(comparison.values, basis);
   if (bars.length === 0) {
     return "";
   }
+  // Sort bars by value descending so the largest is first (leftmost).
+  bars = [...bars].sort((a, b) => b.value - a.value);
   const width = opts.containerWidth ?? opts.width ?? COMPARE_DEFAULTS.width;
   const { height } = COMPARE_DEFAULTS;
   const node = Plot.plot({
@@ -163,7 +165,8 @@ export function renderCompareBars(
       Plot.barY(bars, {
         x: "place_id",
         y: "value",
-        fill: "#4a7c59",
+        // Cycle through PALETTE so each bar can be distinguished.
+        fill: (d: BarPoint, i: number) => PALETTE[i % PALETTE.length],
       }),
       Plot.text(bars, {
         x: "place_id",
@@ -175,7 +178,7 @@ export function renderCompareBars(
       }),
     ],
   });
-  return svgWithA11y(node, "Compare bars", "Bar chart comparing values across places.");
+  return svgWithA11y(node, "Compare bars", "Bar chart comparing values across places, sorted by value.");
 }
 
 export function renderSparkline(
@@ -268,4 +271,57 @@ export function renderRegistrationTrend(
     ],
   });
   return svgWithA11y(node, "Registration trend", "Line chart of net new charity registrations by year.");
+}
+
+interface TrendChartOptions {
+  width?: number;
+  height?: number;
+  containerWidth?: number;
+}
+
+interface TrendChartInput {
+  points: TrendPoint[];
+  unit: string;
+  caption?: string;
+}
+
+const TREND_CHART_DEFAULTS: Required<Pick<TrendChartOptions, "width" | "height">> = {
+  width: 480,
+  height: 220,
+};
+
+export function renderTrendChart(
+  input: TrendChartInput,
+  opts: TrendChartOptions = {},
+): string {
+  const chartPoints = toChartPoints(input.points);
+  if (chartPoints.length === 0) {
+    return "";
+  }
+  const width = opts.containerWidth ?? opts.width ?? TREND_CHART_DEFAULTS.width;
+  const height = opts.height ?? TREND_CHART_DEFAULTS.height;
+  const node = Plot.plot({
+    width,
+    height,
+    marginTop: 16,
+    marginRight: 16,
+    marginBottom: 36,
+    marginLeft: 48,
+    style: {
+      background: "transparent",
+      fontSize: "12px",
+      fontFamily: "system-ui, sans-serif",
+    },
+    x: { type: "point", label: "Period", tickFormat: (d: unknown) => String(d) },
+    y: { grid: true, label: input.unit, nice: true },
+    marks: [
+      Plot.line(chartPoints, { x: "period", y: "value", strokeWidth: 2, stroke: PALETTE[0] }),
+      Plot.dot(chartPoints, { x: "period", y: "value", r: 3, fill: PALETTE[0] }),
+    ],
+  });
+  return svgWithA11y(
+    node,
+    "Trend chart",
+    `Line chart showing ${input.unit} over time${input.caption ? ": " + input.caption : ""}.`,
+  );
 }
