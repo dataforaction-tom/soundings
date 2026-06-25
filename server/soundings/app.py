@@ -36,6 +36,7 @@ from soundings.http.capture import router as capture_router
 from soundings.http.catalogue import router as catalogue_router
 from soundings.http.errors import install_error_envelope
 from soundings.http.health import router as health_router
+from soundings.http.place_geometry import router as place_geometry_router
 from soundings.http.session import SessionMiddleware
 from soundings.http.sources import router as sources_router
 from soundings.http.tools import router as tools_router
@@ -138,4 +139,5 @@ app.include_router(ask_router)
 app.include_router(sources_router)
 app.include_router(catalogue_router)
 app.include_router(capture_router)
+app.include_router(place_geometry_router)
 install_error_envelope(app)
