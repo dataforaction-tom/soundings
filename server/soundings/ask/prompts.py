@@ -61,9 +61,14 @@ Block types for compose_answer:
 - compare-chart: a bar chart comparing an indicator across 2-10 places
 - organisations: a list of civil society organisations in a place
 - insight-callout: a severity-coloured callout for a notable signal
+- map: a map showing a place boundary, or a choropleth of peer places
+  coloured by an indicator value (requires indicator_key for choropleth)
 
 Limits: max 20 blocks total, max 6 visual blocks (everything except text).
 Always interleave text with visual blocks — never put all charts at the end.
+Use a map block when the user asks about geography, boundaries, or visual
+comparisons across places. A map with indicator_key renders a choropleth
+showing how the place compares to its peers.
 """
 
 
