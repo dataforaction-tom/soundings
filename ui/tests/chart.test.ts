@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 // dom-polyfill side-effect runs first so Plot has a document to mutate.
 import "../src/lib/dom-polyfill";
 
-import { PALETTE, renderSparkline } from "../src/lib/chart";
+import { PALETTE, renderSparkline, renderTrendChart } from "../src/lib/chart";
 
 const POINTS = [
   { period: "2020", value: 100 },
@@ -89,5 +89,58 @@ describe("renderSparkline — accessibility", () => {
     const svg = renderSparkline(POINTS);
     expect(svg).toContain("<desc>");
     expect(svg).toContain("</desc>");
+  });
+});
+
+describe("renderTrendChart", () => {
+  it("returns an SVG string", () => {
+    const svg = renderTrendChart({ points: POINTS, unit: "people" });
+    expect(svg).toContain("<svg");
+    expect(svg).toContain("</svg>");
+  });
+
+  it("defaults to 480x220", () => {
+    const svg = renderTrendChart({ points: POINTS, unit: "people" });
+    expect(svg).toContain('width="480"');
+    expect(svg).toContain('height="220"');
+  });
+
+  it("has grid lines", () => {
+    const svg = renderTrendChart({ points: POINTS, unit: "people" });
+    // Plot emits grid lines as <line> elements inside a y-grid group.
+    expect(svg).toContain("y-grid");
+  });
+
+  it("has data point dots (circles)", () => {
+    const svg = renderTrendChart({ points: POINTS, unit: "people" });
+    const circleCount = (svg.match(/<circle/g) ?? []).length;
+    expect(circleCount).toBe(5);
+  });
+
+  it("includes a <title> element", () => {
+    const svg = renderTrendChart({ points: POINTS, unit: "people" });
+    expect(svg).toContain("<title>");
+    expect(svg).toContain("</title>");
+  });
+
+  it("includes a <desc> element", () => {
+    const svg = renderTrendChart({ points: POINTS, unit: "people" });
+    expect(svg).toContain("<desc>");
+    expect(svg).toContain("</desc>");
+  });
+
+  it("uses the PALETTE line colour", () => {
+    const svg = renderTrendChart({ points: POINTS, unit: "people" });
+    // PALETTE[0] is the accent green used for the line stroke.
+    expect(svg).toContain(PALETTE[0]);
+  });
+
+  it("returns empty string for empty points", () => {
+    expect(renderTrendChart({ points: [], unit: "people" })).toBe("");
+  });
+
+  it("supports containerWidth", () => {
+    const svg = renderTrendChart({ points: POINTS, unit: "people" }, { containerWidth: 600 });
+    expect(svg).toContain('width="600"');
   });
 });
