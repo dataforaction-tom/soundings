@@ -1,5 +1,6 @@
       import { streamAsk } from "../lib/answer_stream";
       import { marked } from "marked";
+      import type { ComparePlacesResponse } from "../lib/types";
 
       // Non-null assertion: the runtime `if (surface)` guard below still
       // protects against a missing element; the assertion only keeps the
@@ -331,20 +332,6 @@
 
         // compare-chart ------------------------------------------------------
 
-        interface CompareResponse {
-          results: {
-            indicator: string;
-            unit: string;
-            period: string;
-            values: {
-              place_id: string;
-              value: number | null;
-              rank?: number | null;
-              percentile?: number | null;
-            }[];
-          }[];
-        }
-
         async function renderCompareChartBlock(
           host: HTMLElement,
           block: { type: string; [k: string]: unknown },
@@ -360,9 +347,9 @@
             );
             return;
           }
-          let compare: CompareResponse;
+          let compare: ComparePlacesResponse;
           try {
-            compare = await postJSON<CompareResponse>(
+            compare = await postJSON<ComparePlacesResponse>(
               "/v1/tools/compare_places",
               {
                 place_ids: placeIds,
