@@ -204,27 +204,29 @@ class CaptureMiddleware:
         async def replay_receive() -> Message:
             nonlocal replay_sent
             if replay_sent:
-                # Once the downstream handler has consumed the body, any
-                # subsequent receive() should not deliver another body —
-                # block waiting for a disconnect message.
-                return {"type": "http.disconnect"}
+                # The downstream handler has already consumed the body. Delegate
+                # to the real receive() so any further reads block on the actual
+                # client connection. Returning a synthetic `http.disconnect` here
+                # tells a StreamingResponse's disconnect-watcher that the client
+                # vanished, which cancels the stream mid-flight — fatal for the
+                # SSE `/v1/ask` endpoint.
+                return await receive()
             replay_sent = True
             return {"type": "http.request", "body": replay_body, "more_body": False}
 
-        # Buffer the response so we can inspect + rebuild it.
-        response_status = 500
-        response_headers: list[tuple[bytes, bytes]] = []
+        # Stream the response straight through to the client while teeing a copy
+        # of the body for capture. The middleware never rewrites the response —
+        # it only inspects it — so there's no need to buffer the whole thing
+        # first. Buffering would defeat streaming endpoints like `/v1/ask`, which
+        # emit Server-Sent Events incrementally.
         response_body_chunks: list[bytes] = []
 
-        async def buffered_send(message: Message) -> None:
-            nonlocal response_status, response_headers
-            if message["type"] == "http.response.start":
-                response_status = message["status"]
-                response_headers = list(message.get("headers", []))
-            elif message["type"] == "http.response.body":
+        async def teeing_send(message: Message) -> None:
+            if message["type"] == "http.response.body":
                 response_body_chunks.append(message.get("body", b""))
+            await send(message)
 
-        await self.app(scope, replay_receive, buffered_send)
+        await self.app(scope, replay_receive, teeing_send)
 
         response_bytes = b"".join(response_body_chunks)
 
@@ -248,13 +250,3 @@ class CaptureMiddleware:
         record_id = await writer.write(ctx)
         if record_id is not None:
             _schedule_sanitiser(app_obj, record_id)
-
-        # Forward buffered response to the real downstream send.
-        await send(
-            {
-                "type": "http.response.start",
-                "status": response_status,
-                "headers": response_headers,
-            }
-        )
-        await send({"type": "http.response.body", "body": response_bytes, "more_body": False})
