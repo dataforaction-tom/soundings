@@ -83,7 +83,15 @@ def upgrade() -> None:
     # for at most 30 days, used only for sanitiser debugging. The main
     # `soundings` user may INSERT but not read; a separate sanitiser role
     # may SELECT and DELETE only.
-    op.execute("CREATE ROLE soundings_sanitiser NOLOGIN")
+    # Roles are cluster-global, so they survive a database drop. Create only
+    # if absent (mirrors the `DROP ROLE IF EXISTS` in downgrade) so the
+    # migration is re-runnable against a fresh database on a shared cluster.
+    op.execute(
+        "DO $$ BEGIN "
+        "IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'soundings_sanitiser') "
+        "THEN CREATE ROLE soundings_sanitiser NOLOGIN; END IF; "
+        "END $$"
+    )
     op.execute("REVOKE ALL ON corpus.raw_record FROM PUBLIC")
     op.execute("GRANT INSERT ON corpus.raw_record TO soundings")
     op.execute("GRANT SELECT, DELETE ON corpus.raw_record TO soundings_sanitiser")
