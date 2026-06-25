@@ -5,6 +5,14 @@ import "../src/lib/dom-polyfill";
 
 import { PALETTE, renderSparkline } from "../src/lib/chart";
 
+const POINTS = [
+  { period: "2020", value: 100 },
+  { period: "2021", value: 120 },
+  { period: "2022", value: 110 },
+  { period: "2023", value: 130 },
+  { period: "2024", value: 145 },
+];
+
 describe("PALETTE", () => {
   it("exports a 6-colour Good Ship palette", () => {
     expect(PALETTE).toBeInstanceOf(Array);
@@ -25,13 +33,7 @@ describe("PALETTE", () => {
 
 describe("renderSparkline", () => {
   it("returns an SVG string with one shape per data point", () => {
-    const svg = renderSparkline([
-      { period: "2020", value: 100 },
-      { period: "2021", value: 120 },
-      { period: "2022", value: 110 },
-      { period: "2023", value: 130 },
-      { period: "2024", value: 145 },
-    ]);
+    const svg = renderSparkline(POINTS);
 
     expect(svg).toContain("<svg");
     expect(svg).toContain("</svg>");
@@ -55,5 +57,23 @@ describe("renderSparkline", () => {
 
   it("returns an empty string for an empty series", () => {
     expect(renderSparkline([])).toBe("");
+  });
+});
+
+describe("renderSparkline — responsive sizing", () => {
+  it("defaults to the fixed width (240) when no containerWidth", () => {
+    const svg = renderSparkline(POINTS);
+    // Plot emits width as an attribute on the root <svg>.
+    expect(svg).toContain('width="240"');
+  });
+
+  it("scales to containerWidth when provided", () => {
+    const svg = renderSparkline(POINTS, { containerWidth: 400 });
+    expect(svg).toContain('width="400"');
+  });
+
+  it("containerWidth does not alter height", () => {
+    const svg = renderSparkline(POINTS, { containerWidth: 400 });
+    expect(svg).toContain('height="64"');
   });
 });

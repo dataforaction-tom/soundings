@@ -24,6 +24,7 @@ export const PALETTE: readonly string[] = [
 interface SparklineOptions {
   width?: number;
   height?: number;
+  containerWidth?: number;
 }
 
 interface ChartPoint {
@@ -32,7 +33,7 @@ interface ChartPoint {
   value: number;
 }
 
-const DEFAULTS: Required<SparklineOptions> = {
+const DEFAULTS: Required<Pick<SparklineOptions, "width" | "height">> = {
   width: 240,
   height: 64,
 };
@@ -52,6 +53,7 @@ interface CompareBarsOptions {
   width?: number;
   height?: number;
   basis?: ComparisonBasis;
+  containerWidth?: number;
 }
 
 const COMPARE_DEFAULTS: Required<Pick<CompareBarsOptions, "width" | "height">> = {
@@ -114,7 +116,8 @@ export function renderCompareBars(
   if (bars.length === 0) {
     return "";
   }
-  const { width, height } = { ...COMPARE_DEFAULTS, width: opts.width ?? COMPARE_DEFAULTS.width, height: opts.height ?? COMPARE_DEFAULTS.height };
+  const width = opts.containerWidth ?? opts.width ?? COMPARE_DEFAULTS.width;
+  const { height } = COMPARE_DEFAULTS;
   const node = Plot.plot({
     width,
     height,
@@ -156,7 +159,8 @@ export function renderSparkline(
   if (chartPoints.length === 0) {
     return "";
   }
-  const { width, height } = { ...DEFAULTS, ...opts };
+  const { width: defaultWidth, height } = DEFAULTS;
+  const width = opts.containerWidth ?? opts.width ?? defaultWidth;
 
   // `Plot.plot` returns an SVGSVGElement (linkedom-shaped under SSR). The
   // outerHTML is the serialised string ready to insert as `set:html`.
@@ -185,10 +189,10 @@ export function renderSparkline(
 
 export function renderIncomeBuckets(
   buckets: IncomeBucket[],
-  opts: { width?: number; height?: number } = {},
+  opts: { width?: number; height?: number; containerWidth?: number } = {},
 ): string {
   if (buckets.length === 0) return "";
-  const width = opts.width ?? 480;
+  const width = opts.containerWidth ?? opts.width ?? 480;
   const height = opts.height ?? 200;
   const node = Plot.plot({
     width,
@@ -216,10 +220,10 @@ export function renderIncomeBuckets(
 
 export function renderRegistrationTrend(
   cohort: RegistrationCohort[],
-  opts: { width?: number; height?: number } = {},
+  opts: { width?: number; height?: number; containerWidth?: number } = {},
 ): string {
   if (cohort.length === 0) return "";
-  const width = opts.width ?? 480;
+  const width = opts.containerWidth ?? opts.width ?? 480;
   const height = opts.height ?? 180;
   const node = Plot.plot({
     width,
