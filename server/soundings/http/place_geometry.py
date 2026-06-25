@@ -54,7 +54,8 @@ def _parse_geojson(geojson_str: str | None) -> dict[str, object] | None:
     """ST_AsGeoJSON returns a text JSON string; parse it, or None if NULL."""
     if geojson_str is None:
         return None
-    return json.loads(geojson_str)
+    parsed: dict[str, object] = json.loads(geojson_str)
+    return parsed
 
 
 @router.get("/place/{place_id}/peers/geometry")
