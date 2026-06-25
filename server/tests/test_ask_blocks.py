@@ -81,22 +81,26 @@ def test_compose_answer_rejects_unknown_block_type():
         ComposeAnswerArgs.model_validate({"blocks": [{"type": "unknown", "data": "x"}]})
 
 
-def test_compose_answer_enforces_max_blocks():
+def test_compose_answer_trims_to_max_total_blocks():
     blocks = [TextBlock(type="text", markdown=f"Block {i}") for i in range(21)]
-    with pytest.raises(ValidationError):
-        ComposeAnswerArgs(blocks=blocks)
+    args = ComposeAnswerArgs(blocks=blocks)
+    # Over-length answers are trimmed to the cap rather than rejected.
+    assert len(args.blocks) == 20
 
 
-def test_compose_answer_enforces_max_visual_blocks():
+def test_compose_answer_trims_excess_visual_blocks():
     visual = [
         IndicatorCardBlock(
             type="indicator-card", indicator_key=f"k{i}", place_id="ltla24:E06000047"
         )
-        for i in range(7)
+        for i in range(12)
     ]
     text = [TextBlock(type="text", markdown="intro")]
-    with pytest.raises(ValidationError):
-        ComposeAnswerArgs(blocks=text + visual)
+    args = ComposeAnswerArgs(blocks=text + visual)
+    # Excess visual blocks are dropped; text blocks are always kept.
+    visual_kept = sum(1 for b in args.blocks if b.type == "indicator-card")
+    assert visual_kept == 10
+    assert any(b.type == "text" for b in args.blocks)
 
 
 def test_compose_answer_at_limits():
@@ -154,11 +158,11 @@ def test_map_block_in_compose_answer():
 
 
 def test_map_block_counts_as_visual():
-    """MapBlock should count toward the visual block cap."""
-    visual = [MapBlock(type="map", place_id=f"ltla24:E0600000{i}") for i in range(7)]
+    """MapBlock should count toward the visual block cap (and be trimmed)."""
+    visual = [MapBlock(type="map", place_id=f"ltla24:E060000{i:02d}") for i in range(12)]
     text = [TextBlock(type="text", markdown="intro")]
-    with pytest.raises(ValidationError):
-        ComposeAnswerArgs(blocks=text + visual)
+    args = ComposeAnswerArgs(blocks=text + visual)
+    assert sum(1 for b in args.blocks if b.type == "map") == 10
 
 
 def test_map_block_discriminator():
