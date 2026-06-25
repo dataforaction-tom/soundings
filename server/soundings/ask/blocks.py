@@ -22,6 +22,7 @@ _VISUAL_TYPES = frozenset(
         "compare-chart",
         "organisations",
         "insight-callout",
+        "map",
     }
 )
 
@@ -67,13 +68,22 @@ class InsightCalloutBlock(BaseModel):
     evidence: str
 
 
+class MapBlock(BaseModel):
+    type: Literal["map"]
+    place_id: str
+    indicator_key: str | None = None
+    period: str | None = None
+    caption: str | None = None
+
+
 AnswerBlock = Annotated[
     TextBlock
     | IndicatorCardBlock
     | TrendChartBlock
     | CompareChartBlock
     | OrganisationsBlock
-    | InsightCalloutBlock,
+    | InsightCalloutBlock
+    | MapBlock,
     Field(discriminator="type"),
 ]
 

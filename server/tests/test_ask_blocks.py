@@ -9,6 +9,7 @@ from soundings.ask.blocks import (
     ComposeAnswerArgs,
     IndicatorCardBlock,
     InsightCalloutBlock,
+    MapBlock,
     OrganisationsBlock,
     TextBlock,
     TrendChartBlock,
@@ -119,3 +120,49 @@ def test_discriminator_routes_correctly():
     raw = {"type": "insight-callout", "severity": "notable", "headline": "x", "evidence": "y"}
     b = _adapter.validate_python(raw)
     assert isinstance(b, InsightCalloutBlock)
+
+
+def test_map_block_valid():
+    b = MapBlock(type="map", place_id="ltla24:E06000047")
+    assert b.place_id == "ltla24:E06000047"
+    assert b.indicator_key is None
+    assert b.period is None
+    assert b.caption is None
+
+
+def test_map_block_with_choropleth():
+    b = MapBlock(
+        type="map",
+        place_id="ltla24:E06000047",
+        indicator_key="population.total",
+        period="2023",
+        caption="Population density across peer places",
+    )
+    assert b.indicator_key == "population.total"
+    assert b.period == "2023"
+    assert b.caption == "Population density across peer places"
+
+
+def test_map_block_in_compose_answer():
+    args = ComposeAnswerArgs(
+        blocks=[
+            TextBlock(type="text", markdown="Here is a map:"),
+            MapBlock(type="map", place_id="ltla24:E06000047"),
+        ]
+    )
+    assert len(args.blocks) == 2
+
+
+def test_map_block_counts_as_visual():
+    """MapBlock should count toward the visual block cap."""
+    visual = [MapBlock(type="map", place_id=f"ltla24:E0600000{i}") for i in range(7)]
+    text = [TextBlock(type="text", markdown="intro")]
+    with pytest.raises(ValidationError):
+        ComposeAnswerArgs(blocks=text + visual)
+
+
+def test_map_block_discriminator():
+    _adapter = TypeAdapter(AnswerBlock)
+    raw = {"type": "map", "place_id": "ltla24:E06000047"}
+    b = _adapter.validate_python(raw)
+    assert isinstance(b, MapBlock)
