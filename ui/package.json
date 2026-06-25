@@ -16,7 +16,8 @@
     "@astrojs/node": "^9.5.0",
     "@observablehq/plot": "^0.6.17",
     "astro": "^5.17.0",
-    "linkedom": "^0.18.12"
+    "linkedom": "^0.18.12",
+    "maplibre-gl": "^5.24.0"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.0",
