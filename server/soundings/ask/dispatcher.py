@@ -87,8 +87,14 @@ class ToolDispatcher:
         self._sources: list[Any] = []
 
     def tool_specs(self) -> list[dict[str, object]]:
-        """Return the full tool catalogue including the terminal compose_answer."""
-        return [
+        """Return the full tool catalogue including the terminal compose_answer.
+
+        The shared tool specs carry an ``output_schema`` key for the HTTP/MCP
+        layers; the Anthropic Messages API rejects any key beyond
+        ``name``/``description``/``input_schema``, so project each spec down to
+        the accepted shape here.
+        """
+        specs: list[dict[str, object]] = [
             find_place_spec(),
             get_indicators_spec(),
             get_place_profile_spec(),
@@ -103,6 +109,8 @@ class ToolDispatcher:
                 "input_schema": ComposeAnswerArgs.model_json_schema(),
             },
         ]
+        allowed = ("name", "description", "input_schema")
+        return [{key: spec[key] for key in allowed if key in spec} for spec in specs]
 
     def is_terminal_tool(self, tool_name: str) -> bool:
         return tool_name == TERMINAL_TOOL
