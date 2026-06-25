@@ -8,6 +8,19 @@ import * as Plot from "@observablehq/plot";
 
 import type { Comparison, ComparisonBasis, ComparisonValue, IncomeBucket, RegistrationCohort, TrendPoint } from "./types";
 
+// Good Ship colour palette — aligned with CSS variables in global.css.
+// Used for chart fills/strokes so server-rendered SVG matches the design
+// system without depending on a CSS runtime. Order matters: index 0 is the
+// default/primary chart colour (accent green).
+export const PALETTE: readonly string[] = [
+  "#4a7c59", // green  (--color-accent)
+  "#1a2f4e", // navy   (--color-primary)
+  "#8b6f47", // brown
+  "#6b7280", // gray   (--color-muted)
+  "#9c6644", // rust
+  "#365314", // dark green
+];
+
 interface SparklineOptions {
   width?: number;
   height?: number;
