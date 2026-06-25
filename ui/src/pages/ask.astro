@@ -106,34 +106,52 @@ const apiBase =
             }
             case "insight-callout": {
               const severity =
-                typeof block.severity === "string" ? block.severity : "info";
-              const message =
-                typeof block.message === "string" ? block.message : "";
+                typeof block.severity === "string" ? block.severity : "notable";
+              const headline =
+                typeof block.headline === "string" ? block.headline : "";
+              const evidence =
+                typeof block.evidence === "string" ? block.evidence : "";
               const callout = document.createElement("div");
               callout.className =
                 "insight-callout severity-" + severity;
-              callout.textContent = message;
+              const h = document.createElement("p");
+              h.className = "callout-headline";
+              h.textContent = headline;
+              callout.appendChild(h);
+              if (evidence) {
+                const e = document.createElement("p");
+                e.className = "callout-evidence";
+                e.textContent = evidence;
+                callout.appendChild(e);
+              }
               host.appendChild(callout);
               break;
             }
-            case "indicator": {
+            case "indicator-card": {
               const ph = document.createElement("div");
               ph.className = "block-placeholder";
-              ph.textContent = "Indicator block: " + JSON.stringify(block);
+              ph.textContent = "Indicator card: " + JSON.stringify(block);
               host.appendChild(ph);
               break;
             }
-            case "trend": {
+            case "trend-chart": {
               const ph = document.createElement("div");
               ph.className = "block-placeholder";
-              ph.textContent = "Trend block: " + JSON.stringify(block);
+              ph.textContent = "Trend chart: " + JSON.stringify(block);
               host.appendChild(ph);
               break;
             }
-            case "compare": {
+            case "compare-chart": {
               const ph = document.createElement("div");
               ph.className = "block-placeholder";
-              ph.textContent = "Compare block: " + JSON.stringify(block);
+              ph.textContent = "Compare chart: " + JSON.stringify(block);
+              host.appendChild(ph);
+              break;
+            }
+            case "map": {
+              const ph = document.createElement("div");
+              ph.className = "block-placeholder";
+              ph.textContent = "Map: " + JSON.stringify(block);
               host.appendChild(ph);
               break;
             }
@@ -307,21 +325,22 @@ const apiBase =
       background: var(--color-surface);
       line-height: var(--line-height-relaxed);
     }
-    .insight-callout.severity-info {
+    .insight-callout.severity-notable {
       border-left-color: var(--color-accent);
       background: #f0f9f0;
     }
-    .insight-callout.severity-warning {
-      border-left-color: var(--color-warning);
-      background: #fef3c7;
-    }
-    .insight-callout.severity-critical {
+    .insight-callout.severity-extreme {
       border-left-color: #dc2626;
       background: #fee2e2;
     }
-    .insight-callout.severity-positive {
-      border-left-color: var(--color-success);
-      background: #dcfce7;
+    .callout-headline {
+      font-weight: var(--font-weight-semibold);
+      margin: 0 0 var(--space-xs) 0;
+    }
+    .callout-evidence {
+      margin: 0;
+      font-size: var(--font-size-sm);
+      color: var(--color-text-light);
     }
     .block-placeholder {
       padding: var(--space-lg);
