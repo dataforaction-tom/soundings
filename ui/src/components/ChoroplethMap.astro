@@ -1,0 +1,54 @@
+---
+// ChoroplethMap.astro — SSR wrapper for a MapLibre choropleth map showing
+// peer places coloured by an indicator value.
+
+interface Props {
+  featureCollection: GeoJSON.FeatureCollection;
+  valueKey: string;
+  label?: string;
+  height?: string;
+}
+
+const { featureCollection, valueKey, label, height = "300px" } = Astro.props;
+const fcStr = JSON.stringify(featureCollection);
+const labelStr = label ?? "";
+---
+
+<div
+  class="map-container choropleth-container"
+  style={`height: ${height}`}
+  data-value-key={valueKey}
+  data-label={labelStr}
+>
+  <script type="application/json" data-geojson set:html={fcStr} />
+</div>
+
+<script type="module">
+  type MapRendererModule = typeof import("../lib/map-renderer");
+
+  const containers = document.querySelectorAll<HTMLElement>(".choropleth-container[data-geojson]");
+
+  for (const container of containers) {
+    const jsonEl = container.querySelector<HTMLScriptElement>("script[data-geojson]");
+    if (!jsonEl?.textContent) continue;
+    try {
+      const fc = JSON.parse(jsonEl.textContent) as GeoJSON.FeatureCollection;
+      const valueKey = container.dataset.valueKey || "value";
+      const label = container.dataset.label || undefined;
+      const { renderChoroplethMap } = await import("../lib/map-renderer") as MapRendererModule;
+      renderChoroplethMap(container, fc, valueKey, { label });
+    } catch (err) {
+      console.error("ChoroplethMap init error:", err);
+    }
+  }
+</script>
+
+<style>
+  .map-container {
+    width: 100%;
+    border-radius: var(--radius);
+    border: 1px solid var(--color-border-light);
+    overflow: hidden;
+    background: var(--color-bg);
+  }
+</style>

@@ -1,0 +1,51 @@
+---
+// PlaceMap.astro — SSR wrapper that creates a container and initialises
+// a MapLibre map client-side to show a single place boundary.
+
+interface Props {
+  geojson: GeoJSON.Feature;
+  label?: string;
+  height?: string;
+}
+
+const { geojson, label, height = "300px" } = Astro.props;
+const geojsonStr = JSON.stringify(geojson);
+const labelStr = label ?? "";
+---
+
+<div
+  class="map-container"
+  style={`height: ${height}`}
+  data-label={labelStr}
+>
+  <script type="application/json" data-geojson set:html={geojsonStr} />
+</div>
+
+<script type="module">
+  type MapRendererModule = typeof import("../lib/map-renderer");
+
+  const containers = document.querySelectorAll<HTMLElement>(".map-container[data-geojson]");
+
+  for (const container of containers) {
+    const jsonEl = container.querySelector<HTMLScriptElement>("script[data-geojson]");
+    if (!jsonEl?.textContent) continue;
+    try {
+      const geojson = JSON.parse(jsonEl.textContent) as GeoJSON.Feature;
+      const label = container.dataset.label || undefined;
+      const { renderPlaceMap } = await import("../lib/map-renderer") as MapRendererModule;
+      renderPlaceMap(container, geojson, { label });
+    } catch (err) {
+      console.error("PlaceMap init error:", err);
+    }
+  }
+</script>
+
+<style>
+  .map-container {
+    width: 100%;
+    border-radius: var(--radius);
+    border: 1px solid var(--color-border-light);
+    overflow: hidden;
+    background: var(--color-bg);
+  }
+</style>
