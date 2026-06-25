@@ -11,6 +11,8 @@ not execute it — the orchestrator owns that step.
 
 from typing import Any
 
+from sqlalchemy import text
+
 from soundings.ask.blocks import ComposeAnswerArgs
 from soundings.tools.compare_places import (
     ComparePlacesInput,
@@ -85,6 +87,7 @@ class ToolDispatcher:
         self._fetch_cache: dict[tuple[str, str], Any] = {}
         self._compare_cache: dict[tuple[str, frozenset[str]], Any] = {}
         self._sources: list[Any] = []
+        self._known_indicator_keys: set[str] | None = None
 
     def tool_specs(self) -> list[dict[str, object]]:
         """Return the full tool catalogue including the terminal compose_answer.
@@ -118,9 +121,40 @@ class ToolDispatcher:
     def _parse_compose_answer(self, args: dict[str, Any]) -> ComposeAnswerArgs:
         return ComposeAnswerArgs.model_validate(args)
 
+    async def _known_keys(self) -> set[str]:
+        """Valid indicator keys from the catalogue (fetched once, then cached)."""
+        if self._known_indicator_keys is None:
+            async with self._state.engine.connect() as conn:
+                rows = await conn.execute(text("SELECT key FROM catalogue.indicator"))
+                self._known_indicator_keys = {row[0] for row in rows}
+        return self._known_indicator_keys
+
+    async def _sanitise_blocks(self, parsed: ComposeAnswerArgs) -> None:
+        """Drop blocks that reference an indicator the catalogue doesn't have.
+
+        The model occasionally invents plausible-but-nonexistent keys (e.g.
+        ``civil_society.total_organisations``), which would otherwise surface in
+        the UI as a "No data" card or a blank choropleth. A map that names a
+        bad indicator is downgraded to a plain boundary map rather than dropped,
+        since the boundary is still useful.
+        """
+        known = await self._known_keys()
+        kept: list[Any] = []
+        for block in parsed.blocks:
+            key = getattr(block, "indicator_key", None)
+            if key is None or key in known:
+                kept.append(block)
+                continue
+            if block.type == "map":
+                block.indicator_key = None  # fall back to a boundary map
+                kept.append(block)
+            # indicator-card / trend-chart / compare-chart with a bad key: drop.
+        parsed.blocks = kept
+
     async def dispatch(self, tool_name: str, tool_input: dict[str, Any]) -> dict[str, Any]:
         if tool_name == TERMINAL_TOOL:
             parsed = self._parse_compose_answer(tool_input)
+            await self._sanitise_blocks(parsed)
             return parsed.model_dump(mode="json")
         handler = self._handlers.get(tool_name)
         if handler is None:
