@@ -73,10 +73,13 @@ async def ask(input: AskInput, request: Request) -> StreamingResponse:
         # Run the orchestrator in the background
         task = asyncio.create_task(orchestrator.run(input.query, callback))
 
-        # Stream events as SSE
+        # Stream events as SSE. The per-event wait is a backstop set just above
+        # the orchestrator's own REQUEST_TIMEOUT_SECONDS budget, so the
+        # orchestrator emits "error"/"done" first and this only fires if the
+        # background task is genuinely wedged (e.g. a stuck upstream).
         while True:
             try:
-                data = await asyncio.wait_for(queue.get(), timeout=45.0)
+                data = await asyncio.wait_for(queue.get(), timeout=130.0)
                 yield f"data: {data}\n\n"
                 event_obj = json.loads(data)
                 if event_obj.get("type") in ("done", "error"):
