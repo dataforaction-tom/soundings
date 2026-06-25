@@ -1,6 +1,10 @@
       import { streamAsk } from "../lib/answer_stream";
+      import { marked } from "marked";
 
-      const surface = document.getElementById("answer-surface");
+      // Non-null assertion: the runtime `if (surface)` guard below still
+      // protects against a missing element; the assertion only keeps the
+      // closures that capture `surface` from widening it back to null.
+      const surface = document.getElementById("answer-surface")!;
       if (surface) {
         const apiBase = surface.dataset.apiBase ?? "";
         const mode = surface.dataset.mode || "summary";
@@ -21,40 +25,11 @@
         }
 
         function renderMarkdown(text: string): string {
-          // Minimal markdown: paragraphs, **bold**, *italic*, `code`, line breaks.
-          const esc = (s: string) =>
-            s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-          const lines = esc(text).split("\n");
-          const out: string[] = [];
-          let inList = false;
-          for (const line of lines) {
-            if (/^\s*[-*]\s+/.test(line)) {
-              if (!inList) {
-                out.push("<ul>");
-                inList = true;
-              }
-              out.push("<li>" + line.replace(/^\s*[-*]\s+/, "") + "</li>");
-            } else {
-              if (inList) {
-                out.push("</ul>");
-                inList = false;
-              }
-              if (line.trim().length === 0) {
-                out.push("");
-              } else {
-                out.push("<p>" + line + "</p>");
-              }
-            }
-          }
-          if (inList) out.push("</ul>");
-          return out
-            .join("\n")
-            .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-            .replace(/\*([^*]+)\*/g, "<em>$1</em>")
-            .replace(
-              /`([^`]+)`/g,
-              '<code class="inline-code">$1</code>',
-            );
+          // Full GitHub-flavoured markdown: headings, tables, blockquotes,
+          // ordered/unordered lists, bold/italic/code. `gfm` is on by default.
+          // `breaks` keeps single newlines as <br>, matching how the model
+          // tends to write. marked.parse is synchronous with no async tokens.
+          return marked.parse(text, { async: false, gfm: true, breaks: true }) as string;
         }
 
         // --- Block renderers -------------------------------------------------
