@@ -117,3 +117,27 @@ describe("renderCompareBars — responsive sizing", () => {
     expect(svg).toContain('width="600"');
   });
 });
+
+describe("renderCompareBars — accessibility", () => {
+  it("includes a <title> element", () => {
+    const svg = renderCompareBars(
+      comparison([
+        { place_id: "ltla24:A", value: 100 },
+        { place_id: "ltla24:B", value: 200 },
+      ]),
+    );
+    expect(svg).toContain("<title>");
+    expect(svg).toContain("</title>");
+  });
+
+  it("includes a <desc> element", () => {
+    const svg = renderCompareBars(
+      comparison([
+        { place_id: "ltla24:A", value: 100 },
+        { place_id: "ltla24:B", value: 200 },
+      ]),
+    );
+    expect(svg).toContain("<desc>");
+    expect(svg).toContain("</desc>");
+  });
+});

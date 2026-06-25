@@ -77,3 +77,17 @@ describe("renderSparkline — responsive sizing", () => {
     expect(svg).toContain('height="64"');
   });
 });
+
+describe("renderSparkline — accessibility", () => {
+  it("includes a <title> element", () => {
+    const svg = renderSparkline(POINTS);
+    expect(svg).toContain("<title>");
+    expect(svg).toContain("</title>");
+  });
+
+  it("includes a <desc> element", () => {
+    const svg = renderSparkline(POINTS);
+    expect(svg).toContain("<desc>");
+    expect(svg).toContain("</desc>");
+  });
+});

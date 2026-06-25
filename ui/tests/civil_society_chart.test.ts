@@ -66,3 +66,31 @@ describe("renderRegistrationTrend — responsive sizing", () => {
     expect(svg).toContain('width="360"');
   });
 });
+
+describe("renderIncomeBuckets — accessibility", () => {
+  it("includes a <title> element", () => {
+    const svg = renderIncomeBuckets(BUCKETS);
+    expect(svg).toContain("<title>");
+    expect(svg).toContain("</title>");
+  });
+
+  it("includes a <desc> element", () => {
+    const svg = renderIncomeBuckets(BUCKETS);
+    expect(svg).toContain("<desc>");
+    expect(svg).toContain("</desc>");
+  });
+});
+
+describe("renderRegistrationTrend — accessibility", () => {
+  it("includes a <title> element", () => {
+    const svg = renderRegistrationTrend(COHORTS);
+    expect(svg).toContain("<title>");
+    expect(svg).toContain("</title>");
+  });
+
+  it("includes a <desc> element", () => {
+    const svg = renderRegistrationTrend(COHORTS);
+    expect(svg).toContain("<desc>");
+    expect(svg).toContain("</desc>");
+  });
+});

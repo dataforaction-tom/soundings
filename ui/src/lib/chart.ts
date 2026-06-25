@@ -107,6 +107,33 @@ function toBarPoints(values: ComparisonValue[], basis: ComparisonBasis): BarPoin
   return out;
 }
 
+// Prepend <title> and <desc> accessibility elements to an SVG node returned
+// by Plot.plot. Per SVG spec these must be the first children of the root
+// <svg>. Returns the serialised outerHTML string.
+function svgWithA11y(
+  node: unknown,
+  title: string,
+  desc: string,
+): string {
+  const svg = node as SVGElement & {
+    createElementNS?: (ns: string, tag: string) => SVGElement;
+    insertBefore?: (newNode: Node, ref: Node | null) => Node;
+    firstChild?: Node | null;
+    ownerDocument?: Document;
+  };
+  const doc = svg.ownerDocument ?? (globalThis as { document?: Document }).document;
+  if (doc && svg.insertBefore && svg.firstChild != null) {
+    const ns = "http://www.w3.org/2000/svg";
+    const titleEl = doc.createElementNS(ns, "title");
+    titleEl.textContent = title;
+    const descEl = doc.createElementNS(ns, "desc");
+    descEl.textContent = desc;
+    svg.insertBefore(descEl, svg.firstChild);
+    svg.insertBefore(titleEl, descEl);
+  }
+  return (svg as unknown as { outerHTML: string }).outerHTML;
+}
+
 export function renderCompareBars(
   comparison: Comparison,
   opts: CompareBarsOptions = {},
@@ -148,7 +175,7 @@ export function renderCompareBars(
       }),
     ],
   });
-  return (node as unknown as { outerHTML: string }).outerHTML;
+  return svgWithA11y(node, "Compare bars", "Bar chart comparing values across places.");
 }
 
 export function renderSparkline(
@@ -184,7 +211,7 @@ export function renderSparkline(
     ],
   });
   // linkedom and the browser both expose outerHTML on SVG elements.
-  return (node as unknown as { outerHTML: string }).outerHTML;
+  return svgWithA11y(node, "Sparkline", "Trend sparkline showing values over time.");
 }
 
 export function renderIncomeBuckets(
@@ -215,7 +242,7 @@ export function renderIncomeBuckets(
       }),
     ],
   });
-  return (node as unknown as { outerHTML: string }).outerHTML;
+  return svgWithA11y(node, "Income buckets", "Bar chart of charity counts by income band.");
 }
 
 export function renderRegistrationTrend(
@@ -240,5 +267,5 @@ export function renderRegistrationTrend(
       Plot.dot(cohort, { x: "year", y: "net", r: 2.5, fill: "#4a7c59" }),
     ],
   });
-  return (node as unknown as { outerHTML: string }).outerHTML;
+  return svgWithA11y(node, "Registration trend", "Line chart of net new charity registrations by year.");
 }
