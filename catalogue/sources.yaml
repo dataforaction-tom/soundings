@@ -150,3 +150,13 @@ sources:
     mode: passthrough
     ttl_hours: 168
     rate_limit: { rps: 4 }
+
+  - id: openaq
+    label: OpenAQ
+    publisher: OpenAQ
+    publisher_url: https://openaq.org/
+    dataset_url: https://api.openaq.org/v3/
+    licence: CC-BY-4.0
+    mode: passthrough
+    ttl_hours: 1
+    rate_limit: { rps: 4 }

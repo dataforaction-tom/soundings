@@ -151,6 +151,15 @@ sources:
     refresh_cadence: "as boundaries change"
     notes: "Boundary geometries, code history, lookups. Internal use; underlies the geography spine."
 
+  openaq:
+    label: "OpenAQ"
+    publisher: "OpenAQ"
+    publisher_url: "https://openaq.org/"
+    dataset_url: "https://api.openaq.org/v3/"
+    licence: "CC-BY-4.0"
+    refresh_cadence: "hourly"
+    notes: "Aggregates global air quality monitoring data. UK coverage from DEFRA AURN network + local authority monitors. Point sensor data interpolated to place level."
+
 # -----------------------------------------------------------------------------
 # Indicators
 # -----------------------------------------------------------------------------
@@ -631,3 +640,63 @@ indicators:
     source_id: "threesixtygiving"
     available_at: ["ltla24", "utla24", "region", "country"]
     refresh_cadence: "monthly"
+
+  - key: environment.air_quality.pm25
+    label: "PM2.5 concentration"
+    description: "Fine particulate matter (PM2.5) concentration, interpolated from nearby monitoring stations."
+    unit: "µg/m³"
+    higher_is: "worse"
+    source_id: "openaq"
+    available_at: ["ltla24", "utla24"]
+    refresh_cadence: "hourly"
+    confidence: "modelled"
+    caveats:
+      - "Interpolated from nearby monitoring stations using inverse distance weighting. Actual local exposure may vary."
+
+  - key: environment.air_quality.pm10
+    label: "PM10 concentration"
+    description: "Coarse particulate matter (PM10) concentration, interpolated from nearby monitoring stations."
+    unit: "µg/m³"
+    higher_is: "worse"
+    source_id: "openaq"
+    available_at: ["ltla24", "utla24"]
+    refresh_cadence: "hourly"
+    confidence: "modelled"
+    caveats:
+      - "Interpolated from nearby monitoring stations using inverse distance weighting. Actual local exposure may vary."
+
+  - key: environment.air_quality.no2
+    label: "NO₂ concentration"
+    description: "Nitrogen dioxide (NO₂) concentration, interpolated from nearby monitoring stations."
+    unit: "µg/m³"
+    higher_is: "worse"
+    source_id: "openaq"
+    available_at: ["ltla24", "utla24"]
+    refresh_cadence: "hourly"
+    confidence: "modelled"
+    caveats:
+      - "Interpolated from nearby monitoring stations using inverse distance weighting. Actual local exposure may vary."
+
+  - key: environment.air_quality.o3
+    label: "O₃ concentration"
+    description: "Ozone (O₃) concentration, interpolated from nearby monitoring stations."
+    unit: "µg/m³"
+    higher_is: "worse"
+    source_id: "openaq"
+    available_at: ["ltla24", "utla24"]
+    refresh_cadence: "hourly"
+    confidence: "modelled"
+    caveats:
+      - "Interpolated from nearby monitoring stations using inverse distance weighting. Actual local exposure may vary."
+
+  - key: environment.air_quality.so2
+    label: "SO₂ concentration"
+    description: "Sulphur dioxide (SO₂) concentration, interpolated from nearby monitoring stations."
+    unit: "µg/m³"
+    higher_is: "worse"
+    source_id: "openaq"
+    available_at: ["ltla24", "utla24"]
+    refresh_cadence: "hourly"
+    confidence: "modelled"
+    caveats:
+      - "Interpolated from nearby monitoring stations using inverse distance weighting. Actual local exposure may vary."
