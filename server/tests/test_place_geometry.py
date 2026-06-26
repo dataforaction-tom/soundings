@@ -187,3 +187,75 @@ async def test_get_peers_geometry_404_for_missing_place() -> None:
                 params={"indicator": "population.total", "period": "2024"},
             )
     assert response.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Task 3: GET /v1/place/{place_id}/children/geometry
+# ---------------------------------------------------------------------------
+
+
+async def _seed_parent_with_lsoa_children() -> None:
+    engine = get_engine()
+    async with engine.begin() as conn:
+        await conn.execute(text("DELETE FROM data.indicator_value"))
+        await conn.execute(text("DELETE FROM geography.place_hierarchy"))
+        await conn.execute(text("DELETE FROM geography.place"))
+        await conn.execute(
+            text(
+                "INSERT INTO geography.place (id, type, code, name, geom) VALUES "
+                "('ltla24:P1','ltla24','P1','Parent', ST_GeomFromEWKT(:g))"
+            ),
+            {"g": "SRID=4326;MULTIPOLYGON(((0 0,0 2,2 0,0 0)))"},
+        )
+        for cid, geom in [
+            ("lsoa21:L1", "SRID=4326;MULTIPOLYGON(((0 0,0 1,1 0,0 0)))"),
+            ("lsoa21:L2", "SRID=4326;MULTIPOLYGON(((1 1,1 2,2 1,1 1)))"),
+        ]:
+            await conn.execute(
+                text(
+                    "INSERT INTO geography.place (id, type, code, name, geom) VALUES "
+                    "(:id,'lsoa21',:c,:n, ST_GeomFromEWKT(:g))"
+                ),
+                {"id": cid, "c": cid.split(":")[1], "n": cid, "g": geom},
+            )
+            await conn.execute(
+                text(
+                    "INSERT INTO geography.place_hierarchy (child_id, parent_id) VALUES (:c,'ltla24:P1')"
+                ),
+                {"c": cid},
+            )
+        # Only L1 has an IMD value.
+        await conn.execute(
+            text(
+                "INSERT INTO data.indicator_value (place_id, indicator_key, value, period, source_id, retrieved_at, caveats) "
+                "VALUES ('lsoa21:L1','deprivation.imd.score', 42.0, '2025', 'mhclg.imd2025', NOW(), '[]'::jsonb)"
+            )
+        )
+
+
+async def test_children_geometry_returns_valued_children_only() -> None:
+    await _seed_parent_with_lsoa_children()
+    async with app.router.lifespan_context(app):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            response = await ac.get(
+                "/v1/place/ltla24:P1/children/geometry",
+                params={"indicator": "deprivation.imd.score"},
+            )
+    assert response.status_code == 200
+    fc = response.json()
+    assert fc["type"] == "FeatureCollection"
+    assert len(fc["features"]) == 1  # L2 has no value → excluded
+    props = fc["features"][0]["properties"]
+    assert props["id"] == "lsoa21:L1" and props["value"] == 42.0
+
+
+async def test_children_geometry_empty_for_indicator_without_subarea_data() -> None:
+    await _seed_parent_with_lsoa_children()
+    async with app.router.lifespan_context(app):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            response = await ac.get(
+                "/v1/place/ltla24:P1/children/geometry",
+                params={"indicator": "population.total"},
+            )
+    assert response.status_code == 200
+    assert response.json()["features"] == []

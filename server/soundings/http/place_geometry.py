@@ -152,3 +152,63 @@ def _percentile_from_rank(rank: int | None, n: int) -> float | None:
     if rank is None or n is None or n <= 1:
         return None
     return (n - rank) / (n - 1) * 100.0
+
+
+@router.get("/place/{place_id}/children/geometry")
+async def get_children_geometry(
+    request: Request,
+    place_id: str,
+    indicator: str = Query(...),
+    period: str | None = Query(default=None),
+    child_type: str = Query(default="lsoa21"),
+) -> dict[str, object]:
+    """FeatureCollection of a place's sub-areas (default LSOAs) coloured by an
+    indicator. A LATERAL join picks the latest period per child when `period`
+    is omitted. Children without a value are excluded so the caller can detect
+    'no sub-area data' (empty collection) and fall back to peer mode."""
+    engine = request.app.state.engine
+    async with engine.connect() as conn:
+        rows = (
+            await conn.execute(
+                text(
+                    """
+                    SELECT c.id, c.name,
+                           ST_AsGeoJSON(ST_Simplify(c.geom, 0.005)) AS geojson,
+                           iv.value
+                    FROM geography.place_hierarchy h
+                    JOIN geography.place c ON c.id = h.child_id
+                    LEFT JOIN LATERAL (
+                        SELECT v.value
+                        FROM data.indicator_value v
+                        WHERE v.place_id = c.id
+                          AND v.indicator_key = :indicator
+                          AND (COALESCE(:period, v.period) = v.period)
+                        ORDER BY v.period DESC
+                        LIMIT 1
+                    ) iv ON TRUE
+                    WHERE h.parent_id = :place_id
+                      AND c.type = :child_type
+                      AND c.geom IS NOT NULL
+                    """
+                ),
+                {
+                    "place_id": place_id,
+                    "indicator": indicator,
+                    "period": period,
+                    "child_type": child_type,
+                },
+            )
+        ).all()
+
+    features: list[dict[str, object]] = []
+    for r in rows:
+        if r.value is None:
+            continue
+        features.append(
+            {
+                "type": "Feature",
+                "geometry": _parse_geojson(r.geojson),
+                "properties": {"id": r.id, "name": r.name, "value": float(r.value)},
+            }
+        )
+    return {"type": "FeatureCollection", "features": features}
