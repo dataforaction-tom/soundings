@@ -363,7 +363,9 @@ export function renderDistributionChart(
     marks: [
       Plot.rectY(
         data,
-        Plot.binX({ y: "count" }, { x: "value", fill: "#1a2f4e", fillOpacity: 0.6 }),
+        // Plot's TS types don't allow fill/fillOpacity in the second binX arg,
+        // but the runtime accepts it. Cast to suppress the type error.
+        Plot.binX({ y: "count" }, { x: "value", fill: "#1a2f4e", fillOpacity: 0.6 } as Record<string, unknown>),
       ),
       ...(input.focal_value !== null
         ? [Plot.ruleX([input.focal_value], { stroke: "#4a7c59", strokeWidth: 2.5 })]
