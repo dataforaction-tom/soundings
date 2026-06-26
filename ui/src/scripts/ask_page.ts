@@ -504,11 +504,15 @@
           block: { type: string; [k: string]: unknown },
           apiBase: string,
         ) {
-          const placeId = asString(block.place_id);
+          const mapPlaceId = asString(block.place_id);
           const indicatorKey = asStringOrUndef(block.indicator_key);
+          const granularity = asStringOrUndef(block.granularity) ?? "peers";
           const period = asStringOrUndef(block.period);
           const caption = asStringOrUndef(block.caption);
-          if (!placeId) {
+          const overlay = block.overlay as
+            | { source?: string; indicator_keys?: unknown }
+            | undefined;
+          if (!mapPlaceId) {
             showBlockError(host, "Map block missing place_id.");
             return;
           }
@@ -516,15 +520,57 @@
           const container = document.createElement("div");
           container.className = "map-container";
           host.appendChild(container);
+
           try {
-            // Dynamic-import the map renderer (which in turn pulls in
-            // maplibre-gl) only when a map block is encountered.
-            const { renderPlaceMap, renderChoroplethMap } = await import(
-              "../lib/map-renderer"
-            );
-            if (indicatorKey) {
+            const { renderPlaceMap, renderChoroplethMap, renderAmenityMap } =
+              await import("../lib/map-renderer");
+
+            // 1) amenity points take precedence when an overlay is present.
+            if (overlay?.source === "amenities") {
+              const keys = asStringArray(overlay.indicator_keys);
+              if (keys.length === 0) {
+                showBlockError(host, "Amenity overlay missing indicator_keys.");
+                container.remove();
+                return;
+              }
+              const [boundary, points] = await Promise.all([
+                getJSON<GeoJSON.Feature>(
+                  `/v1/place/${encodeURIComponent(mapPlaceId)}/geometry`,
+                  apiBase,
+                ),
+                getJSON<GeoJSON.FeatureCollection>(
+                  `/v1/place/${encodeURIComponent(mapPlaceId)}/amenities/geometry` +
+                    `?indicators=${encodeURIComponent(keys.join(","))}`,
+                  apiBase,
+                ),
+              ]);
+              renderAmenityMap(container, boundary, points, {
+                tilesUrl: mapTilesUrl || undefined,
+              });
+            } else if (indicatorKey && granularity === "sub_areas") {
+              // 2) sub-area choropleth, falling back to peers if empty.
+              let fc = await getJSON<GeoJSON.FeatureCollection>(
+                `/v1/place/${encodeURIComponent(mapPlaceId)}/children/geometry` +
+                  `?indicator=${encodeURIComponent(indicatorKey)}` +
+                  (period ? `&period=${encodeURIComponent(period)}` : ""),
+                apiBase,
+              );
+              if (!fc.features || fc.features.length === 0) {
+                fc = await getJSON<GeoJSON.FeatureCollection>(
+                  `/v1/place/${encodeURIComponent(mapPlaceId)}/peers/geometry` +
+                    `?indicator=${encodeURIComponent(indicatorKey)}` +
+                    (period ? `&period=${encodeURIComponent(period)}` : ""),
+                  apiBase,
+                );
+              }
+              renderChoroplethMap(container, fc, "value", {
+                label: prettyKey(indicatorKey),
+                tilesUrl: mapTilesUrl || undefined,
+              });
+            } else if (indicatorKey) {
+              // 3) peer choropleth.
               const fc = await getJSON<GeoJSON.FeatureCollection>(
-                `/v1/place/${encodeURIComponent(placeId)}/peers/geometry` +
+                `/v1/place/${encodeURIComponent(mapPlaceId)}/peers/geometry` +
                   `?indicator=${encodeURIComponent(indicatorKey)}` +
                   (period ? `&period=${encodeURIComponent(period)}` : ""),
                 apiBase,
@@ -534,23 +580,22 @@
                 tilesUrl: mapTilesUrl || undefined,
               });
             } else {
+              // 4) boundary only.
               const feature = await getJSON<GeoJSON.Feature>(
-                `/v1/place/${encodeURIComponent(placeId)}/geometry`,
+                `/v1/place/${encodeURIComponent(mapPlaceId)}/geometry`,
                 apiBase,
               );
-              renderPlaceMap(container, feature, {
-                tilesUrl: mapTilesUrl || undefined,
-              });
+              renderPlaceMap(container, feature, { tilesUrl: mapTilesUrl || undefined });
             }
           } catch (err) {
             container.remove();
             showBlockError(
               host,
-              "Could not load map: " +
-                (err instanceof Error ? err.message : String(err)),
+              "Could not load map: " + (err instanceof Error ? err.message : String(err)),
             );
             return;
           }
+
           if (caption) {
             const figcaption = document.createElement("p");
             figcaption.className = "map-caption text-muted text-small";

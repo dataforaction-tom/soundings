@@ -330,6 +330,41 @@ const mapTilesUrl =
     #answer-surface .map-caption {
       margin: var(--space-xs) 0 0;
     }
+    #answer-surface .map-container { position: relative; }
+    #answer-surface .map-legend {
+      position: absolute;
+      bottom: var(--space-sm);
+      left: var(--space-sm);
+      background: rgba(250, 249, 246, 0.92);
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-sm);
+      padding: var(--space-xs) var(--space-sm);
+      font-size: var(--font-size-xs);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      z-index: 1;
+    }
+    #answer-surface .map-legend .legend-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+    #answer-surface .map-legend .legend-swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      display: inline-block;
+    }
+    #answer-surface .choropleth-legend .legend-gradient {
+      display: block;
+      width: 120px;
+      height: 8px;
+      border-radius: 2px;
+      background: linear-gradient(to right, #faf9f6, #4a7c59, #1a2f4e);
+    }
+    #answer-surface .choropleth-legend .legend-min { float: left; }
+    #answer-surface .choropleth-legend .legend-max { float: right; }
     .answer-error {
       background: #fee2e2;
       color: #991b1b;
