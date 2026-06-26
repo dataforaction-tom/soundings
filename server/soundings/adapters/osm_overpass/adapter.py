@@ -115,7 +115,7 @@ class OsmOverpassAdapter(PassthroughAdapter):
             confidence="official",
         )
 
-    async def amenity_locations(self, indicator_key: str, place_id: str) -> dict | None:
+    async def amenity_locations(self, indicator_key: str, place_id: str) -> dict[str, Any] | None:
         """GeoJSON FeatureCollection of amenity point locations for one
         indicator within a place. Cached under `osmgeo:{key}:{place_id}`.
 
