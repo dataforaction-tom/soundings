@@ -427,11 +427,6 @@ export function renderCompositionChart(
   if (input.segments.length === 0) return "";
 
   const width = opts.containerWidth ?? opts.width ?? 480;
-  const height = opts.height ?? 260;
-  const cx = width / 2;
-  const cy = height / 2;
-  const outerR = Math.min(width, height) / 2 - 40;
-  const innerR = outerR * 0.55;
 
   // Assign colours: explicit override → PALETTE cycle.
   const coloured = input.segments.map((s, i) => ({
@@ -440,6 +435,18 @@ export function renderCompositionChart(
   }));
 
   const total = coloured.reduce((sum, s) => sum + s.value, 0);
+
+  // Layout: donut on the left, legend column on the right. The legend is what
+  // makes the chart readable — without it the slices are unlabelled colour.
+  // Height grows to fit whichever is taller: the donut or the legend rows.
+  const legendRowH = 22;
+  const legendH = coloured.length * legendRowH;
+  const donutBox = Math.min(width * 0.5, 220);
+  const height = Math.max(opts.height ?? 0, donutBox, legendH + 24, 160);
+  const cx = donutBox / 2;
+  const cy = height / 2;
+  const outerR = donutBox / 2 - 16;
+  const innerR = outerR * 0.55;
 
   // Build donut slice <path> elements manually — Observable Plot 0.6.x has no
   // arc mark, so we emit SVG arc paths directly and wrap them in an <svg>.
@@ -479,6 +486,35 @@ export function renderCompositionChart(
     p.setAttribute("stroke-width", "2");
     root.appendChild(p);
   }
+
+  // Legend column — one row per segment: colour swatch, label, value (share%).
+  // SSR SVG is static (no JS attaches to it), so legends, not hover tooltips,
+  // are how a reader maps a colour back to what it means.
+  const legendX = donutBox + 16;
+  const legendStartY = (height - legendH) / 2 + legendRowH / 2;
+  slices.forEach((s, i) => {
+    const rowY = legendStartY + i * legendRowH;
+    const swatch = doc.createElementNS(ns, "rect");
+    swatch.setAttribute("x", String(legendX));
+    swatch.setAttribute("y", String(rowY - 6));
+    swatch.setAttribute("width", "12");
+    swatch.setAttribute("height", "12");
+    swatch.setAttribute("rx", "2");
+    swatch.setAttribute("fill", s.colour);
+    root.appendChild(swatch);
+
+    const pct = total > 0 ? Math.round((s.value / total) * 100) : 0;
+    const text = doc.createElementNS(ns, "text");
+    text.setAttribute("x", String(legendX + 18));
+    text.setAttribute("y", String(rowY));
+    text.setAttribute("dominant-baseline", "middle");
+    text.setAttribute("font-size", "12");
+    text.setAttribute("font-family", "system-ui, sans-serif");
+    text.setAttribute("fill", "#2d2d2d");
+    text.textContent = `${s.label} — ${formatShort(s.value)} (${pct}%)`;
+    root.appendChild(text);
+  });
+
   return svgWithA11y(
     root,
     "Composition chart",

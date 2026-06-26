@@ -205,6 +205,31 @@ describe("renderCompositionChart", () => {
     );
     expect(result).toContain('width="500"');
   });
+
+  it("renders a legend with each segment label, value and percentage", () => {
+    // total = 1000 → 41% / 30% / 29%
+    const result = renderCompositionChart(
+      {
+        title: "Income distribution",
+        segments: [
+          { label: "Under £10k", value: 412 },
+          { label: "£10k-£100k", value: 301 },
+          { label: "£100k-£1m", value: 287 },
+        ],
+        caption: null,
+      },
+      { containerWidth: 480 },
+    );
+    // Every segment is named in the legend...
+    expect(result).toContain("Under £10k");
+    expect(result).toContain("£10k-£100k");
+    expect(result).toContain("£100k-£1m");
+    // ...with its value and share of the whole.
+    expect(result).toContain("412");
+    expect(result).toContain("41%");
+    // Legend swatches reuse the slice colours.
+    expect(result).toContain(PALETTE[0]);
+  });
 });
 
 // ---------------------------------------------------------------------------
