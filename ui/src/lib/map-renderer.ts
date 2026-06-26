@@ -9,7 +9,8 @@
 //   --color-primary #1a2f4e  (navy)
 //   --color-bg      #faf9f6  (cream)
 
-import maplibregl, { type Map, type Popup } from "maplibre-gl";
+import maplibregl, { type Popup } from "maplibre-gl";
+import { PALETTE } from "./chart";
 
 const ACCENT_GREEN = "#4a7c59";
 const CREAM = "#faf9f6";
@@ -321,6 +322,111 @@ export function renderChoroplethMap(
   return () => {
     popup.remove();
     legend.remove();
+    map.remove();
+  };
+}
+
+/** "infrastructure.food_banks_count" → "Food banks". */
+export function amenityLayerLabel(indicatorKey: string): string {
+  const base = indicatorKey.replace(/^infrastructure\./, "").replace(/_count$/, "");
+  const words = base.replace(/_/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+export function amenityLegendItems(
+  layers: string[],
+): Array<{ label: string; colour: string }> {
+  return layers.map((layer, i) => ({
+    label: amenityLayerLabel(layer),
+    colour: PALETTE[i % PALETTE.length],
+  }));
+}
+
+/**
+ * Render a place boundary plus one colour-coded circle layer per amenity
+ * `layer` property in `points`, with a legend and name popups. Returns a
+ * cleanup function.
+ */
+export function renderAmenityMap(
+  container: HTMLElement,
+  boundary: GeoJSON.Feature,
+  points: GeoJSON.FeatureCollection,
+  options: { tilesUrl?: string } = {},
+): () => void {
+  const map = new maplibregl.Map(baseMapOptions(container, options.tilesUrl));
+
+  const layers = Array.from(
+    new Set(points.features.map((f) => String((f.properties ?? {}).layer ?? ""))),
+  ).filter(Boolean);
+  const colourByLayer = new Map(
+    amenityLegendItems(layers).map((it, i) => [layers[i], it.colour]),
+  );
+
+  const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false });
+
+  map.on("load", () => {
+    map.addSource("boundary", { type: "geojson", data: boundary });
+    map.addLayer({
+      id: "boundary-fill",
+      type: "fill",
+      source: "boundary",
+      paint: { "fill-color": ACCENT_GREEN, "fill-opacity": 0.08 },
+    });
+    map.addLayer({
+      id: "boundary-outline",
+      type: "line",
+      source: "boundary",
+      paint: { "line-color": ACCENT_GREEN, "line-width": 1 },
+    });
+
+    map.addSource("amenities", { type: "geojson", data: points });
+    for (const layer of layers) {
+      map.addLayer({
+        id: `amenity-${layer}`,
+        type: "circle",
+        source: "amenities",
+        filter: ["==", ["get", "layer"], layer],
+        paint: {
+          "circle-radius": 5,
+          "circle-color": colourByLayer.get(layer) ?? NAVY,
+          "circle-stroke-color": CREAM,
+          "circle-stroke-width": 1,
+        },
+      });
+      map.on("mouseenter", `amenity-${layer}`, (e) => {
+        const f = e.features?.[0];
+        const props = (f?.properties ?? {}) as Record<string, unknown>;
+        const name = (props.name as string | undefined) ?? amenityLayerLabel(layer);
+        const coords = (f?.geometry as GeoJSON.Point | undefined)?.coordinates;
+        popup.setHTML(
+          `<div style="font-family:system-ui,sans-serif"><strong>${escapeHtml(name)}</strong><br/>${escapeHtml(amenityLayerLabel(layer))}</div>`,
+        );
+        if (coords) popup.setLngLat(coords as [number, number]).addTo(map);
+        map.getCanvas().style.cursor = "pointer";
+      });
+      map.on("mouseleave", `amenity-${layer}`, () => {
+        popup.remove();
+        map.getCanvas().style.cursor = "";
+      });
+    }
+
+    map.fitBounds(featureBounds(boundary), { padding: 20 });
+  });
+
+  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
+
+  const legend = document.createElement("div");
+  legend.className = "map-legend amenity-legend";
+  legend.innerHTML = amenityLegendItems(layers)
+    .map(
+      (it) =>
+        `<span class="legend-item"><span class="legend-swatch" style="background:${it.colour}"></span>${escapeHtml(it.label)}</span>`,
+    )
+    .join("");
+  container.appendChild(legend);
+
+  return () => {
+    popup.remove();
     map.remove();
   };
 }
