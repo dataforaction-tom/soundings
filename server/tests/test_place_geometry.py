@@ -10,6 +10,29 @@ from sqlalchemy import text
 from soundings.app import app
 from soundings.db.engine import get_engine
 
+
+class _StubRegistry:
+    def __init__(self, adapter: object) -> None:
+        self._adapter = adapter
+
+    def adapter_for_source(self, source_id: str) -> object:
+        return self._adapter
+
+
+class _StubOsmAdapter:
+    async def amenity_locations(self, indicator_key: str, place_id: str) -> dict:
+        return {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "geometry": {"type": "Point", "coordinates": [-1.5, 54.7]},
+                    "properties": {"name": indicator_key, "layer": indicator_key},
+                }
+            ],
+        }
+
+
 pytestmark = pytest.mark.integration
 
 # Simple triangle WKT geometries (SRID 4326 not strictly needed for tests,
@@ -259,3 +282,25 @@ async def test_children_geometry_empty_for_indicator_without_subarea_data() -> N
             )
     assert response.status_code == 200
     assert response.json()["features"] == []
+
+
+# ---------------------------------------------------------------------------
+# Task 4: GET /v1/place/{place_id}/amenities/geometry
+# ---------------------------------------------------------------------------
+
+
+async def test_amenities_geometry_merges_layers(monkeypatch: pytest.MonkeyPatch) -> None:
+    async with app.router.lifespan_context(app):
+        monkeypatch.setattr(app.state, "adapter_registry", _StubRegistry(_StubOsmAdapter()))
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.get(
+                "/v1/place/ltla24:E06000047/amenities/geometry",
+                params={
+                    "indicators": "infrastructure.food_banks_count,infrastructure.schools_count"
+                },
+            )
+    assert resp.status_code == 200
+    fc = resp.json()
+    layers = {f["properties"]["layer"] for f in fc["features"]}
+    assert layers == {"infrastructure.food_banks_count", "infrastructure.schools_count"}
+    assert len(fc["features"]) == 2

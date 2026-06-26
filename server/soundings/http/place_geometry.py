@@ -6,6 +6,10 @@ ST_Simplify(geom, 0.005) and serialised via ST_AsGeoJSON.
 
 Peer geometries optionally join `data.indicator_value` to attach the
 indicator value and percentile for a given indicator/period.
+
+GET /v1/place/{place_id}/amenities/geometry merges OSM amenity point
+features across multiple infrastructure indicators into a single
+FeatureCollection. Per-indicator failures degrade gracefully.
 """
 
 import json
@@ -212,3 +216,32 @@ async def get_children_geometry(
             }
         )
     return {"type": "FeatureCollection", "features": features}
+
+
+@router.get("/place/{place_id}/amenities/geometry")
+async def get_amenities_geometry(
+    request: Request,
+    place_id: str,
+    indicators: str = Query(..., description="comma-separated infrastructure.*_count keys"),
+) -> dict[str, object]:
+    """Merged FeatureCollection of OSM amenity point locations across the
+    requested indicators. Per-indicator failures degrade to a partial
+    collection rather than failing the whole request."""
+    keys = [k.strip() for k in indicators.split(",") if k.strip()][:6]
+    adapter = request.app.state.adapter_registry.adapter_for_source("osm_overpass")
+
+    features: list[dict[str, object]] = []
+    errors: list[str] = []
+    for key in keys:
+        try:
+            fc = await adapter.amenity_locations(key, place_id)
+        except Exception as exc:
+            errors.append(f"{key}: {exc.__class__.__name__}")
+            continue
+        if fc:
+            features.extend(fc.get("features", []))
+
+    result: dict[str, object] = {"type": "FeatureCollection", "features": features}
+    if errors:
+        result["errors"] = errors
+    return result
