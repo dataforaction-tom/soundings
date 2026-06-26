@@ -304,3 +304,96 @@ async def test_amenities_geometry_merges_layers(monkeypatch: pytest.MonkeyPatch)
     layers = {f["properties"]["layer"] for f in fc["features"]}
     assert layers == {"infrastructure.food_banks_count", "infrastructure.schools_count"}
     assert len(fc["features"]) == 2
+
+
+# ---------------------------------------------------------------------------
+# Task 5: source-aware routing
+# ---------------------------------------------------------------------------
+
+
+class _SourceAwareRegistry:
+    def __init__(self, by_source: dict[str, object]) -> None:
+        self._by_source = by_source
+
+    def adapter_for_source(self, source_id: str):
+        return self._by_source[source_id]
+
+
+class _LayerStubAdapter:
+    """Tags each returned feature with WHICH adapter (source) produced it, so
+    the test can prove routing — not just that a layer name survived."""
+
+    def __init__(self, source_tag: str) -> None:
+        self._source_tag = source_tag
+
+    async def amenity_locations(self, indicator_key: str, place_id: str) -> dict:
+        return {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "geometry": {"type": "Point", "coordinates": [-1.5, 54.7]},
+                    "properties": {
+                        "name": indicator_key,
+                        "layer": indicator_key,
+                        "source": self._source_tag,
+                    },
+                }
+            ],
+        }
+
+
+async def test_amenities_geometry_routes_by_indicator_source(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    engine = get_engine()
+    # Seed two indicators with different sources in the catalogue.
+    async with engine.begin() as conn:
+        for sid in ("givefood", "osm_overpass"):
+            await conn.execute(
+                text(
+                    "INSERT INTO catalogue.source (id, label, publisher, licence, mode, rate_limit) "
+                    "VALUES (:id, :label, 'p', 'x', 'passthrough', '{}'::jsonb) ON CONFLICT (id) DO NOTHING"
+                ),
+                {"id": sid, "label": sid},
+            )
+        await conn.execute(
+            text(
+                "INSERT INTO catalogue.indicator (key, label, unit, source_id, available_at, caveats, related_keys) "
+                "VALUES ('infrastructure.food_banks_count','fb','count','givefood', ARRAY['ltla24'], '[]'::jsonb, ARRAY[]::varchar[]) "
+                "ON CONFLICT (key) DO UPDATE SET source_id='givefood'"
+            )
+        )
+        await conn.execute(
+            text(
+                "INSERT INTO catalogue.indicator (key, label, unit, source_id, available_at, caveats, related_keys) "
+                "VALUES ('infrastructure.schools_count','sc','count','osm_overpass', ARRAY['ltla24'], '[]'::jsonb, ARRAY[]::varchar[]) "
+                "ON CONFLICT (key) DO UPDATE SET source_id='osm_overpass'"
+            )
+        )
+
+    gf_adapter = _LayerStubAdapter("givefood")
+    osm_adapter = _LayerStubAdapter("osm_overpass")
+    transport = ASGITransport(app=app)
+    async with app.router.lifespan_context(app):
+        monkeypatch.setattr(
+            app.state,
+            "adapter_registry",
+            _SourceAwareRegistry({"givefood": gf_adapter, "osm_overpass": osm_adapter}),
+        )
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.get(
+                "/v1/place/ltla24:E06000047/amenities/geometry",
+                params={
+                    "indicators": "infrastructure.food_banks_count,infrastructure.schools_count"
+                },
+            )
+    assert resp.status_code == 200
+    # Each indicator must be served by the adapter that OWNS it (its source).
+    source_by_layer = {
+        f["properties"]["layer"]: f["properties"]["source"] for f in resp.json()["features"]
+    }
+    assert source_by_layer == {
+        "infrastructure.food_banks_count": "givefood",
+        "infrastructure.schools_count": "osm_overpass",
+    }

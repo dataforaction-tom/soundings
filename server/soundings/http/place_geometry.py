@@ -222,18 +222,34 @@ async def get_children_geometry(
 async def get_amenities_geometry(
     request: Request,
     place_id: str,
-    indicators: str = Query(..., description="comma-separated infrastructure.*_count keys"),
+    indicators: str = Query(..., description="comma-separated indicator keys"),
 ) -> dict[str, object]:
-    """Merged FeatureCollection of OSM amenity point locations across the
-    requested indicators. Per-indicator failures degrade to a partial
-    collection rather than failing the whole request."""
+    """Merged FeatureCollection of amenity point locations. Each indicator is
+    routed to the adapter that owns it (per its catalogue source_id), so food
+    banks come from Give Food while schools/GPs come from OSM. Per-indicator
+    failures degrade to a partial collection rather than failing the request."""
     keys = [k.strip() for k in indicators.split(",") if k.strip()][:6]
-    adapter = request.app.state.adapter_registry.adapter_for_source("osm_overpass")
+    engine = request.app.state.engine
+    registry = request.app.state.adapter_registry
+
+    async with engine.connect() as conn:
+        rows = (
+            await conn.execute(
+                text("SELECT key, source_id FROM catalogue.indicator WHERE key = ANY(:keys)"),
+                {"keys": keys},
+            )
+        ).all()
+    source_by_key = {r.key: r.source_id for r in rows}
 
     features: list[dict[str, object]] = []
     errors: list[str] = []
     for key in keys:
+        source_id = source_by_key.get(key)
+        if source_id is None:
+            errors.append(f"{key}: unknown indicator")
+            continue
         try:
+            adapter = registry.adapter_for_source(source_id)
             fc = await adapter.amenity_locations(key, place_id)
         except Exception as exc:
             errors.append(f"{key}: {exc.__class__.__name__}")
