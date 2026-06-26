@@ -23,6 +23,9 @@ _VISUAL_TYPES = frozenset(
         "organisations",
         "insight-callout",
         "map",
+        "distribution-chart",
+        "composition-chart",
+        "scatter-plot",
     }
 )
 
@@ -76,6 +79,34 @@ class MapBlock(BaseModel):
     caption: str | None = None
 
 
+class DistributionChartBlock(BaseModel):
+    type: Literal["distribution-chart"]
+    indicator_key: str
+    place_id: str
+    caption: str | None = None
+
+
+class CompositionSegment(BaseModel):
+    label: str
+    value: float
+    colour: str | None = None
+
+
+class CompositionChartBlock(BaseModel):
+    type: Literal["composition-chart"]
+    title: str
+    segments: list[CompositionSegment]
+    caption: str | None = None
+
+
+class ScatterPlotBlock(BaseModel):
+    type: Literal["scatter-plot"]
+    x_indicator_key: str
+    y_indicator_key: str
+    place_id: str
+    caption: str | None = None
+
+
 AnswerBlock = Annotated[
     TextBlock
     | IndicatorCardBlock
@@ -83,7 +114,10 @@ AnswerBlock = Annotated[
     | CompareChartBlock
     | OrganisationsBlock
     | InsightCalloutBlock
-    | MapBlock,
+    | MapBlock
+    | DistributionChartBlock
+    | CompositionChartBlock
+    | ScatterPlotBlock,
     Field(discriminator="type"),
 ]
 

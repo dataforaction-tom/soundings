@@ -7,10 +7,14 @@ from soundings.ask.blocks import (
     AnswerBlock,
     CompareChartBlock,
     ComposeAnswerArgs,
+    CompositionChartBlock,
+    CompositionSegment,
+    DistributionChartBlock,
     IndicatorCardBlock,
     InsightCalloutBlock,
     MapBlock,
     OrganisationsBlock,
+    ScatterPlotBlock,
     TextBlock,
     TrendChartBlock,
 )
@@ -170,3 +174,176 @@ def test_map_block_discriminator():
     raw = {"type": "map", "place_id": "ltla24:E06000047"}
     b = _adapter.validate_python(raw)
     assert isinstance(b, MapBlock)
+
+
+# ---------------------------------------------------------------------------
+# DistributionChartBlock
+# ---------------------------------------------------------------------------
+
+
+def test_distribution_chart_block_valid():
+    b = DistributionChartBlock(
+        type="distribution-chart",
+        indicator_key="population.total",
+        place_id="ltla24:E06000047",
+        caption="Distribution across peer places",
+    )
+    assert b.indicator_key == "population.total"
+    assert b.place_id == "ltla24:E06000047"
+    assert b.caption == "Distribution across peer places"
+
+
+def test_distribution_chart_block_optional_caption_default():
+    b = DistributionChartBlock(
+        type="distribution-chart",
+        indicator_key="population.total",
+        place_id="ltla24:E06000047",
+    )
+    assert b.caption is None
+
+
+def test_distribution_chart_block_counts_as_visual():
+    """DistributionChartBlock should count toward the visual block cap (and be trimmed)."""
+    visual = [
+        DistributionChartBlock(
+            type="distribution-chart",
+            indicator_key=f"k{i}",
+            place_id="ltla24:E06000047",
+        )
+        for i in range(12)
+    ]
+    text = [TextBlock(type="text", markdown="intro")]
+    args = ComposeAnswerArgs(blocks=text + visual)
+    assert sum(1 for b in args.blocks if b.type == "distribution-chart") == 10
+    assert any(b.type == "text" for b in args.blocks)
+
+
+def test_distribution_chart_block_discriminator():
+    _adapter = TypeAdapter(AnswerBlock)
+    raw = {
+        "type": "distribution-chart",
+        "indicator_key": "population.total",
+        "place_id": "ltla24:E06000047",
+    }
+    b = _adapter.validate_python(raw)
+    assert isinstance(b, DistributionChartBlock)
+
+
+# ---------------------------------------------------------------------------
+# CompositionChartBlock
+# ---------------------------------------------------------------------------
+
+
+def test_composition_chart_block_valid():
+    segments = [
+        CompositionSegment(label="Public", value=60.0, colour="#4c78a8"),
+        CompositionSegment(label="Private", value=40.0),
+    ]
+    b = CompositionChartBlock(
+        type="composition-chart",
+        title="Funding sources",
+        segments=segments,
+        caption="Breakdown of income by source",
+    )
+    assert b.title == "Funding sources"
+    assert len(b.segments) == 2
+    assert b.segments[0].label == "Public"
+    assert b.segments[0].value == 60.0
+    assert b.segments[0].colour == "#4c78a8"
+    assert b.segments[1].colour is None
+    assert b.caption == "Breakdown of income by source"
+
+
+def test_composition_chart_block_optional_caption_default():
+    b = CompositionChartBlock(
+        type="composition-chart",
+        title="Funding sources",
+        segments=[CompositionSegment(label="Public", value=60.0)],
+    )
+    assert b.caption is None
+
+
+def test_composition_chart_block_counts_as_visual():
+    """CompositionChartBlock should count toward the visual block cap (and be trimmed)."""
+    visual = [
+        CompositionChartBlock(
+            type="composition-chart",
+            title=f"Chart {i}",
+            segments=[CompositionSegment(label="A", value=1.0)],
+        )
+        for i in range(12)
+    ]
+    text = [TextBlock(type="text", markdown="intro")]
+    args = ComposeAnswerArgs(blocks=text + visual)
+    assert sum(1 for b in args.blocks if b.type == "composition-chart") == 10
+    assert any(b.type == "text" for b in args.blocks)
+
+
+def test_composition_chart_block_discriminator():
+    _adapter = TypeAdapter(AnswerBlock)
+    raw = {
+        "type": "composition-chart",
+        "title": "Funding sources",
+        "segments": [{"label": "Public", "value": 60.0}],
+    }
+    b = _adapter.validate_python(raw)
+    assert isinstance(b, CompositionChartBlock)
+    assert isinstance(b.segments[0], CompositionSegment)
+
+
+# ---------------------------------------------------------------------------
+# ScatterPlotBlock
+# ---------------------------------------------------------------------------
+
+
+def test_scatter_plot_block_valid():
+    b = ScatterPlotBlock(
+        type="scatter-plot",
+        x_indicator_key="income.median",
+        y_indicator_key="health.expectancy",
+        place_id="ltla24:E06000047",
+        caption="Income vs life expectancy",
+    )
+    assert b.x_indicator_key == "income.median"
+    assert b.y_indicator_key == "health.expectancy"
+    assert b.place_id == "ltla24:E06000047"
+    assert b.caption == "Income vs life expectancy"
+
+
+def test_scatter_plot_block_optional_caption_default():
+    b = ScatterPlotBlock(
+        type="scatter-plot",
+        x_indicator_key="income.median",
+        y_indicator_key="health.expectancy",
+        place_id="ltla24:E06000047",
+    )
+    assert b.caption is None
+
+
+def test_scatter_plot_block_counts_as_visual():
+    """ScatterPlotBlock should count toward the visual block cap (and be trimmed)."""
+    visual = [
+        ScatterPlotBlock(
+            type="scatter-plot",
+            x_indicator_key=f"x{i}",
+            y_indicator_key="health.expectancy",
+            place_id="ltla24:E06000047",
+        )
+        for i in range(12)
+    ]
+    text = [TextBlock(type="text", markdown="intro")]
+    args = ComposeAnswerArgs(blocks=text + visual)
+    assert sum(1 for b in args.blocks if b.type == "scatter-plot") == 10
+    assert any(b.type == "text" for b in args.blocks)
+
+
+def test_scatter_plot_block_discriminator():
+    _adapter = TypeAdapter(AnswerBlock)
+    raw = {
+        "type": "scatter-plot",
+        "x_indicator_key": "income.median",
+        "y_indicator_key": "health.expectancy",
+        "place_id": "ltla24:E06000047",
+    }
+    b = _adapter.validate_python(raw)
+    assert isinstance(b, ScatterPlotBlock)
