@@ -46,10 +46,6 @@ INDICATOR_TAGS: dict[str, list[dict[str, str]]] = {
         {"leisure": "pitch"},
         {"leisure": "sports_hub"},
     ],
-    "infrastructure.food_banks_count": [
-        {"amenity": "food_bank"},
-        {"social_facility": "food_bank"},
-    ],
 }
 
 

@@ -794,11 +794,11 @@ indicators:
 
   - key: infrastructure.food_banks_count
     label: "Food banks"
-    description: "Count of food banks (amenity=food_bank, social_facility=food_bank) within the place boundary from OpenStreetMap."
+    description: "Count of food bank distribution locations within the place boundary, from Give Food (givefood.org.uk)."
     unit: "count"
     higher_is: null
-    source_id: "osm_overpass"
+    source_id: "givefood"
     available_at: ["ltla24", "utla24"]
-    refresh_cadence: "monthly"
+    refresh_cadence: "daily"
     caveats:
-      - "Food bank tagging in OSM is inconsistent. May undercount actual provision."
+      - "Food bank locations from Give Food, updated daily. Counts distribution locations whose coordinates fall within the place boundary."

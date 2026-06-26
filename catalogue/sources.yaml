@@ -173,3 +173,16 @@ sources:
     # populates county-wide amenity counts out-of-band so user reads stay warm.
     refresh_cadence: "0 3 1 * *"
     rate_limit: { rps: 2 }
+
+  - id: givefood
+    label: Give Food
+    publisher: Give Food
+    publisher_url: https://www.givefood.org.uk/
+    dataset_url: https://www.givefood.org.uk/api/2/docs/
+    licence: "Give Food terms - attribution required"
+    mode: passthrough
+    ttl_hours: 24
+    # Daily warm pass — the dump updates daily; the pre_warmer warms the dump
+    # and per-LTLA counts so user reads stay warm.
+    refresh_cadence: "0 4 * * *"
+    rate_limit: { rps: 1 }

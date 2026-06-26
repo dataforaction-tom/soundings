@@ -11,6 +11,7 @@ from soundings.adapters.charity_commission import CharityCommissionAdapter
 from soundings.adapters.dfe_explore.adapter import DfeExploreAdapter
 from soundings.adapters.dwp_statxplore.adapter import DwpStatXploreAdapter
 from soundings.adapters.find_that_charity import FindThatCharityAdapter
+from soundings.adapters.givefood.adapter import GiveFoodAdapter
 from soundings.adapters.mhclg_imd2025.adapter import MhclgImd2019Adapter, MhclgImd2025Adapter
 from soundings.adapters.ohid_fingertips.adapter import OhidFingertipsAdapter
 from soundings.adapters.ons_aps.adapter import OnsApsAdapter
@@ -67,6 +68,7 @@ def build_adapter_registry(engine: object) -> AdapterRegistry:
     registry.register("ons.aps", OnsApsAdapter)
     registry.register("openaq", OpenAqAdapter)
     registry.register("osm_overpass", OsmOverpassAdapter)
+    registry.register("givefood", GiveFoodAdapter)
     registry.register("charity_commission", CharityCommissionAdapter)
     registry.register("threesixtygiving", ThreeSixtyGivingAdapter)
     registry.register("find_that_charity", FindThatCharityAdapter)

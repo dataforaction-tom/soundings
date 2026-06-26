@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 
 from soundings.catalogue.loader import load_catalogue_into_db
 from soundings.catalogue.models import load_indicators_yaml
@@ -82,3 +82,20 @@ def test_imd_indicators_carry_series_break_caveat() -> None:
             f"{key} is missing a `series_break:` caveat; cross-edition trend "
             "responses won't be flagged in Trend.breaks_in_series."
         )
+
+
+async def test_food_banks_indicator_sourced_from_givefood() -> None:
+    engine = get_engine()
+    await load_catalogue_into_db(engine, sources_path=SOURCES_YAML, indicators_path=INDICATORS_YAML)
+    async with engine.connect() as conn:
+        source_id = (
+            await conn.execute(
+                text("SELECT source_id FROM catalogue.indicator WHERE key = :k"),
+                {"k": "infrastructure.food_banks_count"},
+            )
+        ).scalar_one()
+        givefood = (
+            await conn.execute(text("SELECT count(*) FROM catalogue.source WHERE id = 'givefood'"))
+        ).scalar_one()
+    assert source_id == "givefood"
+    assert givefood == 1
