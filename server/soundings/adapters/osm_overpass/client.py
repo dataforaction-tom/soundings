@@ -1,7 +1,7 @@
 """Async HTTP wrapper for the OpenStreetMap Overpass API.
 
-Primary endpoint: Britain & Ireland instance.
-Fallback: main Overpass instance.
+Primary endpoint: the main overpass-api.de instance.
+Fallback: the kumi.systems mirror.
 
 Overpass queries are POST requests with body `data=<Overpass QL query>`.
 The client only issues count queries — `out count;` — returning the total
@@ -10,13 +10,31 @@ number of matching elements (nodes + ways + relations) within a bounding box.
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import httpx
 from aiolimiter import AsyncLimiter
 
-OVERPASS_PRIMARY = "https://overpass.atownsend.org.uk/api/interpreter"
-OVERPASS_FALLBACK = "https://overpass-api.de/api/interpreter"
+OVERPASS_PRIMARY = "https://overpass-api.de/api/interpreter"
+OVERPASS_FALLBACK = "https://overpass.kumi.systems/api/interpreter"
+
+# Public Overpass instances reject requests with a default/blank User-Agent
+# (overpass-api.de returns HTTP 406). Identify ourselves explicitly and ask
+# for JSON.
+OVERPASS_HEADERS = {
+    "User-Agent": "Soundings/1.0 (open insight commons; +https://github.com/dataforaction/soundings)",
+    "Accept": "application/json",
+}
+
+
+class OverpassUnavailableError(RuntimeError):
+    """Raised when no Overpass endpoint yielded a usable response.
+
+    Distinguishes a genuine transport/parse failure (which must surface as a
+    caveat) from a successful query that legitimately matched zero elements.
+    Without this, the adapter would cache a bogus 0 for the indicator's TTL.
+    """
 
 
 class OsmOverpassClient:
@@ -56,15 +74,30 @@ class OsmOverpassClient:
         return await self._post_count(query)
 
     async def _post_count(self, query: str) -> int:
-        """Send the count query, trying primary then fallback endpoint."""
+        """Send the count query, trying primary then fallback endpoint.
+
+        Returns the count if any endpoint responds. A 0 is only returned when
+        Overpass genuinely responded but matched no count element. If every
+        endpoint fails at the transport or parse layer, raises
+        OverpassUnavailableError so the caller treats it as unavailable rather
+        than caching a fabricated 0.
+        """
+        responded = False
+        last_error: Exception | None = None
         for endpoint in (OVERPASS_PRIMARY, OVERPASS_FALLBACK):
             try:
                 count = await self._post(endpoint, query)
-            except (httpx.HTTPError, httpx.HTTPStatusError):
+            except (httpx.HTTPError, json.JSONDecodeError) as exc:
+                last_error = exc
                 continue
+            # Endpoint returned a parseable response (count may be None if the
+            # shape was unexpected — that's a real "no count", not a failure).
+            responded = True
             if count is not None:
                 return count
-        return 0
+        if responded:
+            return 0
+        raise OverpassUnavailableError(f"all Overpass endpoints failed; last error: {last_error!r}")
 
     async def _post(self, endpoint: str, query: str) -> int | None:
         """POST to a single endpoint. Returns the count or None on failure."""
@@ -74,6 +107,7 @@ class OsmOverpassClient:
                 response = await client.post(
                     endpoint,
                     data={"data": query},
+                    headers=OVERPASS_HEADERS,
                 )
                 response.raise_for_status()
                 payload: Any = response.json()

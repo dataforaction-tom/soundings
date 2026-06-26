@@ -4,11 +4,13 @@ Mock transport covers the Overpass count-by-tag query and fallback behaviour.
 """
 
 import httpx
+import pytest
 
 from soundings.adapters.osm_overpass.client import (
     OVERPASS_FALLBACK,
     OVERPASS_PRIMARY,
     OsmOverpassClient,
+    OverpassUnavailableError,
 )
 
 
@@ -40,6 +42,7 @@ async def test_count_by_tag_sends_post_with_overpass_ql_body() -> None:
         captured["url"] = str(request.url)
         captured["method"] = request.method
         captured["body"] = request.content.decode()
+        captured["user_agent"] = request.headers.get("user-agent", "")
         return httpx.Response(200, json=_count_payload(15, nodes=12, ways=3))
 
     transport = httpx.MockTransport(handler)
@@ -50,6 +53,8 @@ async def test_count_by_tag_sends_post_with_overpass_ql_body() -> None:
     assert count == 15
     assert captured["method"] == "POST"
     assert OVERPASS_PRIMARY in str(captured["url"])
+    # Public Overpass instances 406 a request without a real User-Agent.
+    assert "Soundings" in str(captured["user_agent"])
     body = str(captured["body"])
     assert "amenity" in body
     assert "school" in body
@@ -105,6 +110,38 @@ async def test_count_by_tag_falls_back_to_main_instance_on_primary_failure() -> 
     assert count == 7
     assert any(OVERPASS_PRIMARY in u for u in calls)
     assert any(OVERPASS_FALLBACK in u for u in calls)
+
+
+async def test_count_by_tag_raises_when_all_endpoints_fail() -> None:
+    # Regression: a transport failure on every endpoint must NOT be reported
+    # as a count of 0. A real zero (endpoint responded, no matching elements)
+    # is indistinguishable downstream from "we never reached Overpass" — and
+    # the adapter would cache the bogus 0 for 30 days. Surface it as an error
+    # so it becomes a caveat instead.
+    def handler(request: httpx.Request) -> httpx.Response:
+        del request
+        return httpx.Response(503, text="Overpass server overloaded")
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as http:
+        client = OsmOverpassClient(http_client=http)
+        with pytest.raises(OverpassUnavailableError):
+            await client.count_by_tag("amenity", "school", (54.0, -1.0, 55.0, 0.0))
+
+
+async def test_count_by_tag_raises_when_response_is_not_json() -> None:
+    # The public Overpass mirror often returns an HTML rate-limit page with a
+    # 200 status. response.json() raises json.JSONDecodeError, which is not an
+    # httpx.HTTPError — it used to escape the except clause uncaught.
+    def handler(request: httpx.Request) -> httpx.Response:
+        del request
+        return httpx.Response(200, text="<html>too many requests</html>")
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as http:
+        client = OsmOverpassClient(http_client=http)
+        with pytest.raises(OverpassUnavailableError):
+            await client.count_by_tag("amenity", "school", (54.0, -1.0, 55.0, 0.0))
 
 
 async def test_count_by_tag_returns_zero_on_unexpected_shape() -> None:

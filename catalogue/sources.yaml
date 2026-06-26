@@ -165,8 +165,11 @@ sources:
     label: OpenStreetMap (Overpass API)
     publisher: OpenStreetMap contributors
     publisher_url: https://www.openstreetmap.org/
-    dataset_url: https://overpass.atownsend.org.uk/api/interpreter
+    dataset_url: https://overpass-api.de/api/interpreter
     licence: ODbL-1.0
     mode: passthrough
     ttl_hours: 720
+    # Monthly warm pass, matching the 30-day cache TTL. The pre_warmer daemon
+    # populates county-wide amenity counts out-of-band so user reads stay warm.
+    refresh_cadence: "0 3 1 * *"
     rate_limit: { rps: 2 }

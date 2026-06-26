@@ -9,6 +9,7 @@ import pytest
 from sqlalchemy import text
 
 from soundings.adapters.osm_overpass.adapter import (
+    INDICATOR_TAGS,
     METHODOLOGY_CAVEAT,
     OsmOverpassAdapter,
 )
@@ -177,6 +178,32 @@ async def test_second_fetch_uses_cache() -> None:
     assert second.value == first.value
     # Upstream called once on miss, zero times on the cached second fetch.
     assert len(fake.calls) == 1
+
+
+async def test_pre_warm_for_places_caches_every_indicator() -> None:
+    """The pre_warmer daemon path: warming a place must populate the cache for
+    every OSM indicator so later user reads never hit upstream (and so slow
+    multi-tag/county-wide counts can't be cancelled by the orchestrator's
+    soft budget mid-flight)."""
+    await _seed_place()
+    # One canned count for every tag the indicators query.
+    counts: dict[tuple[str, str], int] = {}
+    for tags in INDICATOR_TAGS.values():
+        for tag in tags:
+            for k, v in tag.items():
+                counts[(k, v)] = 1
+    fake = _FakeOverpassClient(counts)
+    adapter = OsmOverpassAdapter(get_engine(), overpass_client=fake)
+
+    await adapter.pre_warm_for_places(["ltla24:E06000004"])
+
+    # Every indicator is now a warm cache hit — a subsequent fetch issues no
+    # upstream calls.
+    fake.calls.clear()
+    for indicator_key in INDICATOR_TAGS:
+        iv = await adapter.fetch_indicator(indicator_key, "ltla24:E06000004", period=None)
+        assert iv is not None, indicator_key
+    assert fake.calls == [], "pre-warm should have cached every indicator"
 
 
 async def test_fetch_indicator_uses_period_when_provided() -> None:

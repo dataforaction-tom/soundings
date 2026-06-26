@@ -115,6 +115,31 @@ class OsmOverpassAdapter(PassthroughAdapter):
             confidence="official",
         )
 
+    async def pre_warm_for_places(self, place_ids: list[str]) -> None:
+        """Populate the amenity-count cache for every OSM indicator across the
+        given places, out-of-band of the orchestrator's soft budget.
+
+        County-wide and multi-tag Overpass counts can take longer than the
+        orchestrator's per-call budget; a user-path fetch that overruns is
+        cancelled before it can cache, so it would time out on every request.
+        The pre_warmer daemon calls this on the source's refresh cadence so
+        user reads always hit a warm cache. Per-(indicator, place) failures
+        are logged and skipped — one bad lookup must not blank the warm pass.
+        """
+        import logging
+
+        log = logging.getLogger(__name__)
+        for place_id in place_ids:
+            for indicator_key in INDICATOR_TAGS:
+                try:
+                    await self.fetch_indicator(indicator_key, place_id, None)
+                except Exception:
+                    log.exception(
+                        "OSM pre_warm failed for indicator=%s place_id=%s",
+                        indicator_key,
+                        place_id,
+                    )
+
     async def _get_bbox(self, place_id: str) -> tuple[float, float, float, float] | None:
         """Get bounding box (south, west, north, east) from PostGIS."""
         async with self._engine.connect() as conn:
