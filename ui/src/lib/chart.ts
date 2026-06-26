@@ -325,3 +325,230 @@ export function renderTrendChart(
     `Line chart showing ${input.unit} over time${input.caption ? ": " + input.caption : ""}.`,
   );
 }
+
+// --- Distribution chart -------------------------------------------------
+
+export interface DistributionChartInput {
+  peer_values: number[];
+  focal_value: number | null;
+  unit: string;
+  caption?: string | null;
+}
+
+export function renderDistributionChart(
+  input: DistributionChartInput,
+  opts: { containerWidth?: number; width?: number; height?: number } = {},
+): string {
+  if (input.peer_values.length === 0) return "";
+
+  const width = opts.containerWidth ?? opts.width ?? 480;
+  const height = opts.height ?? 220;
+
+  const data = input.peer_values.map((v) => ({ value: v }));
+
+  const node = Plot.plot({
+    width,
+    height,
+    marginTop: 16,
+    marginRight: 16,
+    marginBottom: 36,
+    marginLeft: 48,
+    style: {
+      background: "transparent",
+      fontSize: "12px",
+      fontFamily: "system-ui, sans-serif",
+    },
+    x: { label: input.unit, nice: true },
+    y: { grid: true, label: "Peer places", nice: true },
+    marks: [
+      Plot.rectY(
+        data,
+        Plot.binX({ y: "count" }, { x: "value", fill: "#1a2f4e", fillOpacity: 0.6 }),
+      ),
+      ...(input.focal_value !== null
+        ? [Plot.ruleX([input.focal_value], { stroke: "#4a7c59", strokeWidth: 2.5 })]
+        : []),
+    ],
+  });
+
+  return svgWithA11y(
+    node,
+    "Distribution chart",
+    `Histogram of peer values for ${input.unit}${input.caption ? ": " + input.caption : ""}.`,
+  );
+}
+
+// --- Composition chart (donut) ------------------------------------------
+
+export interface CompositionSegmentInput {
+  label: string;
+  value: number;
+  colour?: string | null;
+}
+
+export interface CompositionChartInput {
+  title: string;
+  segments: CompositionSegmentInput[];
+  caption?: string | null;
+}
+
+function polarToCartesian(cx: number, cy: number, r: number, angleRad: number): { x: number; y: number } {
+  return { x: cx + r * Math.cos(angleRad), y: cy + r * Math.sin(angleRad) };
+}
+
+function donutSlicePath(
+  cx: number,
+  cy: number,
+  outerR: number,
+  innerR: number,
+  startAngle: number,
+  endAngle: number,
+): string {
+  const largeArc = endAngle - startAngle > Math.PI ? 1 : 0;
+  const outerStart = polarToCartesian(cx, cy, outerR, startAngle);
+  const outerEnd = polarToCartesian(cx, cy, outerR, endAngle);
+  const innerStart = polarToCartesian(cx, cy, innerR, endAngle);
+  const innerEnd = polarToCartesian(cx, cy, innerR, startAngle);
+  return [
+    `M ${outerStart.x.toFixed(2)} ${outerStart.y.toFixed(2)}`,
+    `A ${outerR} ${outerR} 0 ${largeArc} 1 ${outerEnd.x.toFixed(2)} ${outerEnd.y.toFixed(2)}`,
+    `L ${innerStart.x.toFixed(2)} ${innerStart.y.toFixed(2)}`,
+    `A ${innerR} ${innerR} 0 ${largeArc} 0 ${innerEnd.x.toFixed(2)} ${innerEnd.y.toFixed(2)}`,
+    "Z",
+  ].join(" ");
+}
+
+export function renderCompositionChart(
+  input: CompositionChartInput,
+  opts: { containerWidth?: number; width?: number; height?: number } = {},
+): string {
+  if (input.segments.length === 0) return "";
+
+  const width = opts.containerWidth ?? opts.width ?? 480;
+  const height = opts.height ?? 260;
+  const cx = width / 2;
+  const cy = height / 2;
+  const outerR = Math.min(width, height) / 2 - 40;
+  const innerR = outerR * 0.55;
+
+  // Assign colours: explicit override → PALETTE cycle.
+  const coloured = input.segments.map((s, i) => ({
+    ...s,
+    colour: s.colour ?? PALETTE[i % PALETTE.length],
+  }));
+
+  const total = coloured.reduce((sum, s) => sum + s.value, 0);
+
+  // Build donut slice <path> elements manually — Observable Plot 0.6.x has no
+  // arc mark, so we emit SVG arc paths directly and wrap them in an <svg>.
+  let currentAngle = -Math.PI / 2; // start at 12 o'clock
+  const slices = coloured.map((s) => {
+    const angleSpan = total > 0 ? (s.value / total) * 2 * Math.PI : 0;
+    const startAngle = currentAngle;
+    const endAngle = currentAngle + angleSpan;
+    currentAngle = endAngle;
+    return {
+      ...s,
+      startAngle,
+      endAngle,
+      path: donutSlicePath(cx, cy, outerR, innerR, startAngle, endAngle),
+    };
+  });
+
+  // Build the donut as a standalone <svg> element — Observable Plot 0.6.x has
+  // no arc mark, so we emit SVG arc paths directly and then reuse svgWithA11y
+  // to prepend <title>/<desc> and serialise the outerHTML.
+  const ns = "http://www.w3.org/2000/svg";
+  const doc = (globalThis as { document?: Document }).document;
+  if (!doc) {
+    // No DOM available — cannot build the SVG. Return empty rather than throw.
+    return "";
+  }
+  const root = doc.createElementNS(ns, "svg");
+  root.setAttribute("width", String(width));
+  root.setAttribute("height", String(height));
+  root.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  root.setAttribute("xmlns", ns);
+  for (const s of slices) {
+    const p = doc.createElementNS(ns, "path");
+    p.setAttribute("d", s.path);
+    p.setAttribute("fill", s.colour);
+    p.setAttribute("stroke", "#faf9f6");
+    p.setAttribute("stroke-width", "2");
+    root.appendChild(p);
+  }
+  return svgWithA11y(
+    root,
+    "Composition chart",
+    `Donut chart showing ${input.title}${input.caption ? ": " + input.caption : ""}.`,
+  );
+}
+
+// --- Scatter plot --------------------------------------------------------
+
+export interface ScatterPoint {
+  place_id: string;
+  x_value: number;
+  y_value: number;
+  is_focal: boolean;
+}
+
+export interface ScatterPlotInput {
+  points: ScatterPoint[];
+  focal_place_id: string;
+  x_label: string;
+  y_label: string;
+  caption?: string | null;
+}
+
+export function renderScatterPlot(
+  input: ScatterPlotInput,
+  opts: { containerWidth?: number; width?: number; height?: number } = {},
+): string {
+  if (input.points.length === 0) return "";
+
+  const width = opts.containerWidth ?? opts.width ?? 480;
+  const height = opts.height ?? 320;
+
+  const peerPoints = input.points.filter((p) => !p.is_focal);
+  const focalPoints = input.points.filter((p) => p.is_focal);
+
+  const node = Plot.plot({
+    width,
+    height,
+    marginTop: 16,
+    marginRight: 16,
+    marginBottom: 40,
+    marginLeft: 56,
+    style: {
+      background: "transparent",
+      fontSize: "12px",
+      fontFamily: "system-ui, sans-serif",
+    },
+    x: { label: input.x_label, nice: true },
+    y: { label: input.y_label, grid: true, nice: true },
+    marks: [
+      Plot.dot(peerPoints, {
+        x: "x_value",
+        y: "y_value",
+        fill: "#1a2f4e",
+        fillOpacity: 0.4,
+        r: 4,
+      }),
+      Plot.dot(focalPoints, {
+        x: "x_value",
+        y: "y_value",
+        fill: "#4a7c59",
+        r: 7,
+        stroke: "#faf9f6",
+        strokeWidth: 1.5,
+      }),
+    ],
+  });
+
+  return svgWithA11y(
+    node,
+    "Scatter plot",
+    `Scatter plot of ${input.x_label} vs ${input.y_label}${input.caption ? ": " + input.caption : ""}.`,
+  );
+}
