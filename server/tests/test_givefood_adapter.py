@@ -113,3 +113,35 @@ async def test_fetch_indicator_transport_failure_propagates_uncached() -> None:
     # second call still raises -> nothing cached
     with pytest.raises(GiveFoodUnavailableError):
         await adapter.fetch_indicator(FOOD_BANKS_INDICATOR, "ltla24:FB1", None)
+
+
+async def test_amenity_locations_returns_points_in_boundary() -> None:
+    await _seed_place()
+    adapter = GiveFoodAdapter(get_engine(), client=_FakeClient(_ROWS))
+    fc = await adapter.amenity_locations(FOOD_BANKS_INDICATOR, "ltla24:FB1")
+    assert fc is not None and fc["type"] == "FeatureCollection"
+    assert len(fc["features"]) == 2  # outside one excluded
+    f0 = fc["features"][0]
+    assert f0["geometry"]["type"] == "Point"
+    # [lng, lat] order; properties carry name + layer
+    assert f0["geometry"]["coordinates"] == [0.5, 0.5]
+    assert f0["properties"]["layer"] == FOOD_BANKS_INDICATOR
+    assert f0["properties"]["name"] in {"Inside One", "Inside Two"}
+
+
+async def test_amenity_locations_unknown_indicator_returns_none() -> None:
+    await _seed_place()
+    adapter = GiveFoodAdapter(get_engine(), client=_FakeClient(_ROWS))
+    assert await adapter.amenity_locations("not.food_banks", "ltla24:FB1") is None
+
+
+async def test_pre_warm_caches_counts_for_places() -> None:
+    await _seed_place()
+    fake = _FakeClient(_ROWS)
+    adapter = GiveFoodAdapter(get_engine(), client=fake)
+    await adapter.pre_warm_for_places(["ltla24:FB1"])
+    # After warming, a fetch makes no further upstream call.
+    fake.calls = 0
+    iv = await adapter.fetch_indicator(FOOD_BANKS_INDICATOR, "ltla24:FB1", None)
+    assert iv is not None and iv.value == 2.0
+    assert fake.calls == 0

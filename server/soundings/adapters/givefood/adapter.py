@@ -148,3 +148,37 @@ class GiveFoodAdapter(PassthroughAdapter):
             caveats=[METHODOLOGY_CAVEAT],
             confidence="official",
         )
+
+    async def amenity_locations(self, indicator_key: str, place_id: str) -> dict | None:
+        """GeoJSON FeatureCollection of food-bank locations within a place."""
+        if indicator_key != FOOD_BANKS_INDICATOR:
+            return None
+
+        cache_key = f"geo:{place_id}"
+        cached = await self._cache.get(self.source_id, cache_key)
+        if isinstance(cached, dict):
+            return cached
+
+        within = await self._locations_within(place_id)
+        features = [
+            {
+                "type": "Feature",
+                "geometry": {"type": "Point", "coordinates": [r["lng"], r["lat"]]},
+                "properties": {"name": r["name"], "layer": indicator_key},
+            }
+            for r in within
+            if r["lat"] is not None and r["lng"] is not None
+        ]
+        fc = {"type": "FeatureCollection", "features": features}
+        await self._cache.put(self.source_id, cache_key, fc, ttl=self._ttl)
+        return fc
+
+    async def pre_warm_for_places(self, place_ids: list[str]) -> None:
+        """Warm the dump once, then per-place counts. Driven by the pre_warmer
+        daemon on the source's daily cadence so user reads stay warm."""
+        await self._cached_dump()
+        for place_id in place_ids:
+            try:
+                await self.fetch_indicator(FOOD_BANKS_INDICATOR, place_id, None)
+            except Exception:
+                _log.exception("givefood pre_warm failed for place_id=%s", place_id)
