@@ -1,0 +1,115 @@
+"""Integration tests for GiveFoodAdapter (fake client + real PostGIS test DB)."""
+
+import pytest
+from sqlalchemy import text
+
+from soundings.adapters.givefood.adapter import (
+    FOOD_BANKS_INDICATOR,
+    GiveFoodAdapter,
+)
+from soundings.adapters.givefood.client import GiveFoodUnavailableError
+from soundings.db.engine import get_engine
+
+pytestmark = pytest.mark.integration
+
+
+async def _seed_place() -> None:
+    """One LTLA polygon: the unit square (0,0)-(1,1)."""
+    engine = get_engine()
+    async with engine.begin() as conn:
+        await conn.execute(text("DELETE FROM data.trend_point"))
+        await conn.execute(text("DELETE FROM data.indicator_value"))
+        await conn.execute(text("DELETE FROM cache.source_cache"))
+        await conn.execute(text("DELETE FROM geography.place_hierarchy"))
+        await conn.execute(text("DELETE FROM geography.place"))
+        await conn.execute(
+            text(
+                "INSERT INTO geography.place (id, type, code, name, geom) VALUES "
+                "('ltla24:FB1','ltla24','FB1','Foodland', "
+                "ST_GeomFromEWKT('SRID=4326;MULTIPOLYGON(((0 0,0 1,1 1,1 0,0 0)))'))"
+            )
+        )
+        await conn.execute(
+            text(
+                "INSERT INTO catalogue.source (id, label, publisher, publisher_url, "
+                "dataset_url, licence, mode, rate_limit) VALUES "
+                "('givefood','Give Food','Give Food','https://www.givefood.org.uk/', "
+                "'https://www.givefood.org.uk/api/2/docs/','attribution','passthrough','{}'::jsonb) "
+                "ON CONFLICT (id) DO NOTHING"
+            )
+        )
+
+
+class _FakeClient:
+    """Stub returning canned trimmed dump rows."""
+
+    def __init__(self, rows: list[dict]) -> None:
+        self._rows = rows
+        self.calls = 0
+
+    async def fetch_foodbanks(self) -> list[dict]:
+        self.calls += 1
+        return self._rows
+
+
+class _FailingClient:
+    async def fetch_foodbanks(self) -> list[dict]:
+        raise GiveFoodUnavailableError("boom")
+
+
+# Two inside the unit square, one outside (lng=5).
+_ROWS = [
+    {
+        "lat": 0.5,
+        "lng": 0.5,
+        "postcode": "A",
+        "lsoa": "E01000001",
+        "name": "Inside One",
+        "org": "Org",
+    },
+    {
+        "lat": 0.2,
+        "lng": 0.8,
+        "postcode": "B",
+        "lsoa": "E01000002",
+        "name": "Inside Two",
+        "org": "Org",
+    },
+    {"lat": 0.5, "lng": 5.0, "postcode": "C", "lsoa": "E01000003", "name": "Outside", "org": "Org"},
+]
+
+
+async def test_fetch_indicator_counts_in_boundary_only() -> None:
+    await _seed_place()
+    fake = _FakeClient(_ROWS)
+    adapter = GiveFoodAdapter(get_engine(), client=fake)
+    iv = await adapter.fetch_indicator(FOOD_BANKS_INDICATOR, "ltla24:FB1", None)
+    assert iv is not None
+    assert iv.value == 2.0  # the outside one is excluded
+    assert iv.unit == "count"
+    assert iv.source.source_id == "givefood"
+
+
+async def test_fetch_indicator_unknown_indicator_returns_none() -> None:
+    await _seed_place()
+    adapter = GiveFoodAdapter(get_engine(), client=_FakeClient(_ROWS))
+    assert await adapter.fetch_indicator("not.food_banks", "ltla24:FB1", None) is None
+
+
+async def test_fetch_indicator_second_call_uses_cache() -> None:
+    await _seed_place()
+    fake = _FakeClient(_ROWS)
+    adapter = GiveFoodAdapter(get_engine(), client=fake)
+    await adapter.fetch_indicator(FOOD_BANKS_INDICATOR, "ltla24:FB1", None)
+    await adapter.fetch_indicator(FOOD_BANKS_INDICATOR, "ltla24:FB1", None)
+    assert fake.calls == 1  # dump fetched once; count served from cache
+
+
+async def test_fetch_indicator_transport_failure_propagates_uncached() -> None:
+    await _seed_place()
+    adapter = GiveFoodAdapter(get_engine(), client=_FailingClient())
+    with pytest.raises(GiveFoodUnavailableError):
+        await adapter.fetch_indicator(FOOD_BANKS_INDICATOR, "ltla24:FB1", None)
+    # second call still raises -> nothing cached
+    with pytest.raises(GiveFoodUnavailableError):
+        await adapter.fetch_indicator(FOOD_BANKS_INDICATOR, "ltla24:FB1", None)
