@@ -47,6 +47,17 @@ Infrastructure indicators (infrastructure.*_count) are counts of OSM amenities
 within a place boundary. Coverage varies by area — some amenities may be
 missing or miscategorised in OpenStreetMap.
 
+When the user asks how many of a facility a place has, or to "show me"
+facilities — schools, food banks, GP practices, libraries, parks, hospitals,
+pharmacies, community centres, sports facilities — answer with get_indicators
+using the matching infrastructure.*_count key (e.g. infrastructure.food_banks_count,
+infrastructure.schools_count). Do NOT substitute a charity-register search
+(find_organisations_in_place) for an amenity count: that tool answers "which
+charities are registered here", which is a different question from "how many
+food banks operate here". If an amenity count is unavailable, say so
+explicitly rather than presenting charity results as if they were facility
+counts.
+
 - find_place: resolve a place name or postcode to a canonical geography ID
 - get_place_profile: baseline summary of a place across domains
 - get_indicators: fetch specific indicators for a place
@@ -55,7 +66,9 @@ missing or miscategorised in OpenStreetMap.
 - get_peer_distribution: get all peer values for an indicator at a place
   (use for distribution charts and scatter plots — not for simple comparisons)
 - find_organisations_in_place: find charities and civil society orgs in a place
+  (pass activity_filter cause keywords to narrow to a theme)
 - get_civil_society_profile: summary of the charity sector in a place
+  (pass keywords to focus counts + income on a cause, e.g. food poverty)
 - detect_insights: deterministic statistical signals (extreme
   percentiles, peer divergence, trend reversals)
 - compose_answer: terminal — compose the final answer from typed blocks
@@ -113,6 +126,15 @@ income, registrations) come from get_civil_society_profile and are NOT catalogue
 indicators — present them as text, a composition-chart (for income buckets),
 or an organisations block, and use a plain boundary map (no indicator_key)
 to show where a place is.
+
+When the question is about a specific cause or theme (e.g. "food poverty
+charities", "mental-health organisations"), pass cause keywords to
+get_civil_society_profile (keywords) and find_organisations_in_place
+(activity_filter) so the counts, income chart, and lists cover only relevant
+charities — not the entire sector. Supply several near-synonyms for recall.
+When you present a filtered profile, make the filter explicit in the chart
+title and narrative (e.g. "Food-poverty charities in X by income band", not
+"Charities in X"), and surface the profile's caveat about keyword matching.
 """
 
 

@@ -20,6 +20,17 @@ class GetCivilSocietyProfileInput(BaseModel):
             " resolves to this place via `data.organisation_operates_in`."
         )
     )
+    keywords: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Optional cause keywords to focus the profile on a theme. When set,"
+            " every count and the income distribution cover only charities whose"
+            " name or charitable objects match one of these terms"
+            " (case-insensitive substring). Supply several near-synonyms for"
+            " recall — e.g. for food poverty: ['food bank', 'food poverty',"
+            " 'hunger', 'foodbank', 'poverty']. Leave empty for the whole sector."
+        ),
+    )
 
 
 TOOL_NAME = "get_civil_society_profile"
@@ -46,6 +57,6 @@ async def get_civil_society_profile(
 ) -> CivilSocietyProfile:
     """Tool handler — delegates to the orchestrator method."""
     result: CivilSocietyProfile = await orchestrator.compute_civil_society_profile(
-        place_id=input.place_id
+        place_id=input.place_id, keywords=input.keywords
     )
     return result

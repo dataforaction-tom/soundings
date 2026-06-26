@@ -110,14 +110,29 @@ class IndicatorOrchestrator:
         *,
         timeout: float = DEFAULT_TIMEOUT,
     ) -> OrchestrationResult:
-        tasks = [self._fetch_one(key, place_id, period) for key in indicator_keys]
-        try:
-            outcomes = await asyncio.wait_for(
-                asyncio.gather(*tasks, return_exceptions=True),
-                timeout=timeout,
-            )
-        except TimeoutError:
-            outcomes = [TimeoutError("orchestrator soft budget exceeded")] * len(indicator_keys)
+        # Harvest each adapter independently so a single slow source (e.g. a
+        # live OSM/OpenAQ call) can't poison the whole batch. Wrapping the
+        # entire gather in one wait_for used to mark EVERY indicator —
+        # including fast DB-backed ones that had already resolved — as a
+        # TimeoutError once any adapter blew the budget. Instead we wait up to
+        # the budget, keep whatever finished, and cancel only the stragglers.
+        tasks = [
+            asyncio.ensure_future(self._fetch_one(key, place_id, period)) for key in indicator_keys
+        ]
+        done, pending = await asyncio.wait(tasks, timeout=timeout)
+        for task in pending:
+            task.cancel()
+        if pending:
+            # Let the cancellations settle so we don't leak warnings.
+            await asyncio.gather(*pending, return_exceptions=True)
+
+        outcomes: list[Any] = []
+        for task in tasks:
+            if task in done and not task.cancelled():
+                exc = task.exception()
+                outcomes.append(exc if exc is not None else task.result())
+            else:
+                outcomes.append(TimeoutError("orchestrator soft budget exceeded"))
 
         values: list[IndicatorValue] = []
         caveats: list[str] = []
@@ -647,6 +662,10 @@ class IndicatorOrchestrator:
 
         from soundings.contracts.source_ref import SourceRef
 
+        # Optional cause filter — same keyword semantics as the civil society
+        # profile (ILIKE over name + objects). Wrapped in parentheses so it ANDs
+        # with the whole place predicate, not just the trailing OR branch.
+        kw_sql, kw_params = self._keyword_filter_sql(activity_filter)
         async with self._engine.connect() as conn:
             rows = await conn.execute(
                 text(
@@ -656,12 +675,13 @@ class IndicatorOrchestrator:
                     FROM data.organisation o
                     LEFT JOIN data.organisation_operates_in oi
                         ON oi.organisation_id = o.id
-                    WHERE o.registered_address_place_id = :pid
-                        OR oi.place_id = :pid
-                    LIMIT :limit
-                """
+                    WHERE (o.registered_address_place_id = :pid
+                        OR oi.place_id = :pid)
+                    """  # noqa: S608
+                    f"{kw_sql}"
+                    " LIMIT :limit"
                 ),
-                {"pid": place_id, "limit": limit},
+                {"pid": place_id, "limit": limit, **kw_params},
             )
 
         now = datetime.now(TZ_UTC)
@@ -781,21 +801,51 @@ class IndicatorOrchestrator:
 
     # ----- compute_civil_society_profile (Phase 5 / civil society slice) -----
 
-    async def compute_civil_society_profile(self, place_id: str) -> CivilSocietyProfile:
+    @staticmethod
+    def _keyword_filter_sql(
+        keywords: list[str] | None, *, alias: str = "o"
+    ) -> tuple[str, dict[str, Any]]:
+        """Build an ILIKE-any cause filter over a charity's name + objects.
+
+        Returns an SQL fragment (prefixed with ' AND (...)') plus its bound
+        params, or ('', {}) when there are no usable keywords. The fragment is
+        fully parameterised — keywords come from the model, never interpolated.
+        """
+        if not keywords:
+            return "", {}
+        patterns = [f"%{k.strip()}%" for k in keywords if k and k.strip()]
+        if not patterns:
+            return "", {}
+        sql = (
+            f" AND ({alias}.name ILIKE ANY(:kw) "
+            f"OR array_to_string({alias}.classification, ' ') ILIKE ANY(:kw))"
+        )
+        return sql, {"kw": patterns}
+
+    async def compute_civil_society_profile(
+        self, place_id: str, keywords: list[str] | None = None
+    ) -> CivilSocietyProfile:
         """Aggregate `data.organisation` rows operating in `place_id`
-        into a civil society profile. Pure SQL — no upstream calls."""
+        into a civil society profile. Pure SQL — no upstream calls.
+
+        When `keywords` is given, the profile is restricted to charities whose
+        name or charitable objects match one of the terms (case-insensitive
+        substring) — e.g. ["food", "poverty"] for a food-poverty question.
+        """
+        kw_sql, kw_params = self._keyword_filter_sql(keywords)
         retrieved = datetime.now(tz=UTC)
         async with self._engine.connect() as conn:
             totals_row = (
                 await conn.execute(
                     text(
-                        "SELECT COUNT(*) AS total, "
+                        "SELECT COUNT(*) AS total, "  # noqa: S608
                         "       COUNT((o.raw->>'latest_income')::numeric) AS with_income "
                         "FROM data.organisation_operates_in oi "
                         "JOIN data.organisation o ON o.id = oi.organisation_id "
                         "WHERE oi.place_id = :pid"
+                        f"{kw_sql}"
                     ),
-                    {"pid": place_id},
+                    {"pid": place_id, **kw_params},
                 )
             ).first()
             total = int(totals_row.total) if totals_row else 0
@@ -804,7 +854,7 @@ class IndicatorOrchestrator:
             stats_row = (
                 await conn.execute(
                     text(
-                        "SELECT AVG((o.raw->>'latest_income')::numeric) AS mean, "
+                        "SELECT AVG((o.raw->>'latest_income')::numeric) AS mean, "  # noqa: S608
                         "       percentile_cont(0.5) WITHIN GROUP ("
                         "         ORDER BY (o.raw->>'latest_income')::numeric"
                         "       ) AS median "
@@ -812,8 +862,9 @@ class IndicatorOrchestrator:
                         "JOIN data.organisation o ON o.id = oi.organisation_id "
                         "WHERE oi.place_id = :pid "
                         "  AND (o.raw->>'latest_income') IS NOT NULL"
+                        f"{kw_sql}"
                     ),
-                    {"pid": place_id},
+                    {"pid": place_id, **kw_params},
                 )
             ).first()
             mean_income = (
@@ -842,8 +893,11 @@ class IndicatorOrchestrator:
                 "JOIN data.organisation o ON o.id = oi.organisation_id "
                 "WHERE oi.place_id = :pid "
                 "  AND (o.raw->>'latest_income') IS NOT NULL"
+                f"{kw_sql}"
             )
-            buckets_row = (await conn.execute(text(bucket_sql), {"pid": place_id})).first()
+            buckets_row = (
+                await conn.execute(text(bucket_sql), {"pid": place_id, **kw_params})
+            ).first()
             income_buckets = [
                 IncomeBucket(
                     label=label,
@@ -857,7 +911,7 @@ class IndicatorOrchestrator:
             cohort_rows = (
                 await conn.execute(
                     text(
-                        "WITH regs AS ( "
+                        "WITH regs AS ( "  # noqa: S608
                         "  SELECT EXTRACT(YEAR FROM "
                         "           (o.raw->>'date_of_registration')::date)::int AS y, "
                         "         COUNT(*) AS n "
@@ -865,6 +919,7 @@ class IndicatorOrchestrator:
                         "  JOIN data.organisation o ON o.id = oi.organisation_id "
                         "  WHERE oi.place_id = :pid "
                         "    AND (o.raw->>'date_of_registration') IS NOT NULL "
+                        f"{kw_sql}"
                         "  GROUP BY 1 "
                         "), rems AS ( "
                         "  SELECT EXTRACT(YEAR FROM (o.raw->>'date_of_removal')::date)::int AS y, "
@@ -873,6 +928,7 @@ class IndicatorOrchestrator:
                         "  JOIN data.organisation o ON o.id = oi.organisation_id "
                         "  WHERE oi.place_id = :pid "
                         "    AND (o.raw->>'date_of_removal') IS NOT NULL "
+                        f"{kw_sql}"
                         "  GROUP BY 1 "
                         ") "
                         "SELECT COALESCE(regs.y, rems.y) AS year, "
@@ -881,7 +937,7 @@ class IndicatorOrchestrator:
                         "FROM regs FULL OUTER JOIN rems ON regs.y = rems.y "
                         "ORDER BY year"
                     ),
-                    {"pid": place_id},
+                    {"pid": place_id, **kw_params},
                 )
             ).all()
             cohort = [
@@ -894,7 +950,16 @@ class IndicatorOrchestrator:
                 for r in cohort_rows
             ]
 
+        normalised_keywords = [k.strip() for k in (keywords or []) if k and k.strip()]
         caveats: list[str] = []
+        if normalised_keywords:
+            caveats.append(
+                "Filtered to charities whose name or charitable objects match: "
+                + ", ".join(normalised_keywords)
+                + ". Matching is keyword-based on free-text Charity Commission"
+                " objects, so it may miss charities that describe the same cause"
+                " differently or include loosely-related ones."
+            )
         if total > 0 and with_income < total:
             missing = total - with_income
             caveats.append(
@@ -916,6 +981,7 @@ class IndicatorOrchestrator:
             mean_income=mean_income,
             income_buckets=income_buckets,
             registration_cohort=cohort,
+            filter_keywords=normalised_keywords,
             sources=[source],
             caveats=caveats,
             partial=False,

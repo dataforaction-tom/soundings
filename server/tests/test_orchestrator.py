@@ -1,3 +1,4 @@
+import asyncio
 from datetime import UTC, datetime
 
 import pytest
@@ -59,6 +60,30 @@ class _AngryAdapter(LoaderAdapter):
         raise RuntimeError("upstream is on fire")
 
 
+class _SlowAdapter(LoaderAdapter):
+    """Simulates a live external adapter (OSM, OpenAQ) that hangs past the
+    orchestrator's soft budget."""
+
+    source_id = "test.fake.slow"
+
+    async def load(self, run_id: str | None = None) -> LoaderResult:
+        return LoaderResult(rows_written=0)
+
+    async def fetch_indicator(
+        self, indicator_key: str, place_id: str, period: str | None
+    ) -> IndicatorValue | None:
+        await asyncio.sleep(5)
+        return IndicatorValue(
+            place_id=place_id,
+            indicator=indicator_key,
+            value=1,
+            unit="things",
+            period=period or "latest",
+            source=_ref(self.source_id),
+            confidence="official",
+        )
+
+
 async def _ensure_indicator(source_id: str, key: str, available_at: list[str]) -> None:
     engine = get_engine()
     async with engine.begin() as conn:
@@ -103,6 +128,32 @@ async def test_orchestrator_returns_values_and_isolates_failures() -> None:
     assert len(result.caveats) >= 1
     assert any("test.fake.angry" in c or "test.indicator.beta" in c for c in result.caveats)
     assert result.partial is True
+
+
+async def test_orchestrator_preserves_fast_values_when_one_adapter_times_out() -> None:
+    # Regression: a single slow adapter must not poison fast, already-complete
+    # results. Previously the whole gather was wrapped in one wait_for, so any
+    # adapter exceeding the budget caused EVERY indicator — including seeded
+    # DB-backed ones — to be reported as TimeoutError.
+    engine = get_engine()
+    await _ensure_indicator("test.fake.happy", "test.indicator.fast", ["ltla24"])
+    await _ensure_indicator("test.fake.slow", "test.indicator.slow", ["ltla24"])
+
+    registry = AdapterRegistry(engine)
+    registry.register("test.fake.happy", lambda eng: _HappyAdapter(eng))
+    registry.register("test.fake.slow", lambda eng: _SlowAdapter(eng))
+
+    orchestrator = IndicatorOrchestrator(engine, registry)
+    result = await orchestrator.fetch(
+        indicator_keys=["test.indicator.fast", "test.indicator.slow"],
+        place_id="ltla24:E06000004",
+        period=None,
+        timeout=0.5,
+    )
+    # The fast value survives; only the slow one is dropped to a caveat.
+    assert [v.indicator for v in result.values] == ["test.indicator.fast"]
+    assert result.partial is True
+    assert any("test.indicator.slow" in c for c in result.caveats)
 
 
 async def test_orchestrator_marks_complete_when_all_succeed() -> None:

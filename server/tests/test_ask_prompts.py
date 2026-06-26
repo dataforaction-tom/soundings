@@ -126,3 +126,14 @@ def test_prompt_mentions_osm_amenity_counts():
     prompt = builder.build()
     assert "amenity" in prompt.lower() or "amenities" in prompt.lower()
     assert "openstreetmap" in prompt.lower() or "osm" in prompt.lower()
+
+
+def test_prompt_routes_facility_questions_to_amenity_counts():
+    # A "food banks / schools" question must use the infrastructure.*_count
+    # OSM amenity indicators, not a silent charity-register fallback.
+    prompt = SystemPromptBuilder(mode="open").build()
+    assert "food bank" in prompt.lower()
+    assert "infrastructure" in prompt.lower()
+    # The model is told not to silently substitute a charity search.
+    assert "find_organisations_in_place" in prompt
+    assert "explicit" in prompt.lower() or "say so" in prompt.lower()

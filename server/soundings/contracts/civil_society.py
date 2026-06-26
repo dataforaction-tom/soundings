@@ -57,6 +57,15 @@ class CivilSocietyProfile(BaseModel):
         default_factory=list,
         description="One row per year, oldest first; window controlled by the orchestrator.",
     )
+    filter_keywords: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Cause keywords the profile was filtered by, if any. Empty means the"
+            " profile covers every charity in the place. When set, all counts and"
+            " distributions reflect only charities whose name or charitable objects"
+            " match one of these keywords."
+        ),
+    )
     sources: list[SourceRef] = Field(default_factory=list)
     caveats: list[str] = Field(default_factory=list)
     partial: bool = Field(default=False)

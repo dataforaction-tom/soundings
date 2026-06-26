@@ -18,7 +18,13 @@ class FindOrganisationsInPlaceInput(BaseModel):
     place_id: str = Field(description="Canonical geography place ID (e.g. ltla24:E06000004)")
     activity_filter: list[str] | None = Field(
         default=None,
-        description="Filter by activity classification codes (currently ignored in v1)",
+        description=(
+            "Optional cause keywords. When set, only charities whose name or"
+            " charitable objects match one of these terms (case-insensitive"
+            " substring) are returned — e.g. ['food bank', 'food poverty',"
+            " 'hunger']. Supply several near-synonyms for recall. Leave unset"
+            " to return all organisations in the place."
+        ),
     )
     funded_only: bool = Field(
         default=False,

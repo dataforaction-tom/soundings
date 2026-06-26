@@ -77,6 +77,73 @@ async def _seed_six_charities() -> None:
             )
 
 
+async def _seed_classified_charities() -> None:
+    """Three charities operating in one place: two food/poverty causes, one art."""
+    import json
+
+    engine = get_engine()
+    now = datetime.now(tz=UTC)
+    async with engine.begin() as conn:
+        await conn.execute(
+            text(
+                "INSERT INTO geography.place (id, type, code, name) "
+                "VALUES ('ltla24:T02', 'ltla24', 'T02', 'Test Place 2')"
+            )
+        )
+        rows = [
+            ("f1", 8_000.0, ["Relief of poverty through a community food bank"]),
+            ("f2", 50_000.0, ["Tackling food poverty and hunger in the area"]),
+            ("u1", 30_000.0, ["Promotion of the arts and music"]),
+        ]
+        for cid, income, classification in rows:
+            raw = {
+                "name": cid.upper(),
+                "latest_income": income,
+                "date_of_registration": "2020-01-01",
+            }
+            await conn.execute(
+                text(
+                    "INSERT INTO data.organisation "
+                    "(id, name, classification, source_id, retrieved_at, raw) "
+                    "VALUES (:id, :n, :cls, 'charity_commission', :r, CAST(:raw AS jsonb))"
+                ),
+                {
+                    "id": cid,
+                    "n": cid.upper(),
+                    "cls": classification,
+                    "r": now,
+                    "raw": json.dumps(raw),
+                },
+            )
+            await conn.execute(
+                text(
+                    "INSERT INTO data.organisation_operates_in "
+                    "(organisation_id, place_id) VALUES (:o, 'ltla24:T02')"
+                ),
+                {"o": cid},
+            )
+
+
+async def test_compute_civil_society_profile_filters_by_keywords() -> None:
+    await _seed_classified_charities()
+    engine = get_engine()
+    orch = IndicatorOrchestrator(engine=engine, registry=AdapterRegistry(engine))
+
+    # Unfiltered: all three charities.
+    full = await orch.compute_civil_society_profile(place_id="ltla24:T02")
+    assert full.total_organisations == 3
+    assert full.filter_keywords == []
+
+    # Filtered to food/poverty causes: only the two matching charities, and the
+    # income distribution reflects only them.
+    filtered = await orch.compute_civil_society_profile(
+        place_id="ltla24:T02", keywords=["food", "poverty"]
+    )
+    assert filtered.total_organisations == 2
+    assert filtered.filter_keywords == ["food", "poverty"]
+    assert sum(b.count for b in filtered.income_buckets) == 2
+
+
 async def test_compute_civil_society_profile_aggregates_correctly() -> None:
     await _seed_six_charities()
     engine = get_engine()
