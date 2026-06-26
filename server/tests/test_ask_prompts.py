@@ -113,3 +113,16 @@ def test_prompt_notes_air_quality_is_point_sensor_data():
     prompt = builder.build()
     assert "point-sensor" in prompt.lower() or "point sensor" in prompt.lower()
     assert "interpolat" in prompt.lower()
+
+
+def test_prompt_mentions_infrastructure_domain():
+    builder = SystemPromptBuilder(mode="open")
+    prompt = builder.build()
+    assert "infrastructure" in prompt.lower()
+
+
+def test_prompt_mentions_osm_amenity_counts():
+    builder = SystemPromptBuilder(mode="open")
+    prompt = builder.build()
+    assert "amenity" in prompt.lower() or "amenities" in prompt.lower()
+    assert "openstreetmap" in prompt.lower() or "osm" in prompt.lower()

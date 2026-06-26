@@ -17,6 +17,7 @@ from soundings.adapters.ons_aps.adapter import OnsApsAdapter
 from soundings.adapters.ons_census2021.adapter import OnsCensus2021Adapter
 from soundings.adapters.ons_mid_year_estimates.adapter import OnsMidYearEstimatesAdapter
 from soundings.adapters.openaq.adapter import OpenAqAdapter
+from soundings.adapters.osm_overpass.adapter import OsmOverpassAdapter
 from soundings.adapters.police_uk.adapter import PoliceUkAdapter
 from soundings.adapters.postcodes_io.adapter import PostcodesIoAdapter
 from soundings.adapters.threesixtygiving import ThreeSixtyGivingAdapter
@@ -65,6 +66,7 @@ def build_adapter_registry(engine: object) -> AdapterRegistry:
     registry.register("police_uk", PoliceUkAdapter)
     registry.register("ons.aps", OnsApsAdapter)
     registry.register("openaq", OpenAqAdapter)
+    registry.register("osm_overpass", OsmOverpassAdapter)
     registry.register("charity_commission", CharityCommissionAdapter)
     registry.register("threesixtygiving", ThreeSixtyGivingAdapter)
     registry.register("find_that_charity", FindThatCharityAdapter)
