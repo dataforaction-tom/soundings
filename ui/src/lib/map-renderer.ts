@@ -61,6 +61,20 @@ function featureBounds(geojson: GeoJSON.GeoJSON): maplibregl.LngLatBoundsLike {
   return computeBounds(geojson);
 }
 
+/** [min, mid, max] of the finite values, for a choropleth colour ramp.
+ *  Falls back to [0, 0.5, 1] when there are no finite values. */
+export function colourDomain(
+  values: Array<number | null | undefined>,
+): [number, number, number] {
+  const finite = values.filter(
+    (v): v is number => typeof v === "number" && Number.isFinite(v),
+  );
+  if (finite.length === 0) return [0, 0.5, 1];
+  const min = Math.min(...finite);
+  const max = Math.max(...finite);
+  return [min, (min + max) / 2, max];
+}
+
 function computeBounds(geojson: GeoJSON.GeoJSON): maplibregl.LngLatBoundsLike {
   let minLng = Infinity;
   let minLat = Infinity;
@@ -201,6 +215,12 @@ export function renderChoroplethMap(
   // Default three-stop ramp: cream → green → navy.
   const stops: [string, string] = options.colourScale ?? [CREAM, NAVY];
 
+  // Derive the real domain from the feature values.
+  const values = featureCollection.features.map(
+    (f) => (f.properties?.[valueKey] as number | null | undefined),
+  );
+  const [domMin, domMid, domMax] = colourDomain(values);
+
   map.on("load", () => {
     map.addSource(sourceId, { type: "geojson", data: featureCollection });
 
@@ -213,11 +233,11 @@ export function renderChoroplethMap(
           "interpolate",
           ["linear"],
           ["get", valueKey],
-          0,
+          domMin,
           stops[0],
-          0.5,
+          domMid,
           ACCENT_GREEN,
-          1,
+          domMax,
           stops[1],
         ],
         "fill-opacity": 0.85,
@@ -280,6 +300,16 @@ export function renderChoroplethMap(
   });
 
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
+
+  // Add legend element.
+  const legend = document.createElement("div");
+  legend.className = "map-legend choropleth-legend";
+  legend.innerHTML =
+    `<span class="legend-label">${escapeHtml(options.label ?? valueKey)}</span>` +
+    `<span class="legend-gradient"></span>` +
+    `<span class="legend-min">${domMin.toLocaleString("en-GB")}</span>` +
+    `<span class="legend-max">${domMax.toLocaleString("en-GB")}</span>`;
+  container.appendChild(legend);
 
   return () => {
     popup.remove();
