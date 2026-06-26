@@ -56,6 +56,13 @@ from soundings.tools.get_indicators import (
 from soundings.tools.get_indicators import (
     tool_spec as get_indicators_spec,
 )
+from soundings.tools.get_peer_distribution import (
+    GetPeerDistributionInput,
+    get_peer_distribution,
+)
+from soundings.tools.get_peer_distribution import (
+    tool_spec as get_peer_dist_spec,
+)
 from soundings.tools.get_place_profile import (
     GetPlaceProfileInput,
     get_place_profile,
@@ -106,6 +113,7 @@ class ToolDispatcher:
             find_orgs_spec(),
             get_csp_spec(),
             detect_insights_spec(),
+            get_peer_dist_spec(),
             {
                 "name": TERMINAL_TOOL,
                 "description": COMPOSE_ANSWER_DESCRIPTION,
@@ -173,6 +181,7 @@ class ToolDispatcher:
             "find_organisations_in_place": self._handle_find_organisations,
             "get_civil_society_profile": self._handle_get_csp,
             "detect_insights": self._handle_detect_insights,
+            "get_peer_distribution": self._handle_get_peer_distribution,
         }
 
     # --- Non-terminal handlers -------------------------------------------
@@ -215,6 +224,11 @@ class ToolDispatcher:
     async def _handle_detect_insights(self, args: dict[str, Any]) -> dict[str, Any]:
         model = DetectInsightsInput.model_validate(args)
         result = await detect_insights(model, self._state.engine)
+        return result.model_dump(mode="json")
+
+    async def _handle_get_peer_distribution(self, args: dict[str, Any]) -> dict[str, Any]:
+        model = GetPeerDistributionInput.model_validate(args)
+        result = await get_peer_distribution(model, self._state.orchestrator)
         return result.model_dump(mode="json")
 
     @property

@@ -39,6 +39,14 @@ from soundings.tools.get_indicators import (
     get_indicators,
 )
 from soundings.tools.get_indicators import tool_spec as get_indicators_spec
+from soundings.tools.get_peer_distribution import (
+    GetPeerDistributionInput,
+    GetPeerDistributionOutput,
+    get_peer_distribution,
+)
+from soundings.tools.get_peer_distribution import (
+    tool_spec as get_peer_distribution_spec,
+)
 from soundings.tools.get_place_profile import (
     GetPlaceProfileInput,
     GetPlaceProfileOutput,
@@ -66,6 +74,7 @@ async def list_tools() -> dict[str, list[dict[str, object]]]:
             get_trend_spec(),
             find_orgs_spec(),
             get_civil_society_profile_spec(),
+            get_peer_distribution_spec(),
         ]
     }
 
@@ -114,3 +123,10 @@ async def http_get_civil_society_profile(
     request: Request,
 ) -> CivilSocietyProfile:
     return await get_civil_society_profile(input, request.app.state.orchestrator)
+
+
+@router.post("/get_peer_distribution", response_model=GetPeerDistributionOutput)
+async def http_get_peer_distribution(
+    input: GetPeerDistributionInput, request: Request
+) -> GetPeerDistributionOutput:
+    return await get_peer_distribution(input, request.app.state.orchestrator)

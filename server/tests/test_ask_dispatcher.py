@@ -37,6 +37,17 @@ class FakeOrchestrator:
     async def compute_civil_society_profile(self, **kwargs: Any) -> Any:
         return SimpleNamespace()
 
+    async def _enforce_level(self, indicator_key: str, place_id: str) -> None:
+        return None
+
+    async def _peer_values_loader(
+        self, *, indicator_key: str, peer_type: str, period: str | None
+    ) -> tuple[dict[str, float | None], str]:
+        return ({"ltla24:E06000047": 200000.0}, "2024")
+
+    async def _load_indicator_meta(self, indicator_key: str) -> dict[str, str] | None:
+        return {"unit": "people"}
+
 
 class _FakeConn:
     async def __aenter__(self) -> "_FakeConn":
@@ -78,6 +89,7 @@ def test_dispatcher_lists_tool_specs() -> None:
         "get_trend",
         "find_organisations_in_place",
         "get_civil_society_profile",
+        "get_peer_distribution",
         "compose_answer",
     ]
     for name in expected:
@@ -175,3 +187,31 @@ async def test_dispatch_drops_blocks_with_unknown_indicator() -> None:
     assert types == ["text", "indicator-card", "map"]
     assert blocks[1]["indicator_key"] == "population.total"
     assert blocks[2]["indicator_key"] is None  # map downgraded to boundary
+
+
+def test_dispatcher_has_get_peer_distribution_handler() -> None:
+    """get_peer_distribution is in _handlers so dispatch() can route to it."""
+    dispatcher = _make_dispatcher()
+    handlers = dispatcher._handlers
+    assert "get_peer_distribution" in handlers
+    assert callable(handlers["get_peer_distribution"])
+
+
+@pytest.mark.asyncio
+async def test_dispatcher_dispatch_get_peer_distribution() -> None:
+    """Dispatching get_peer_distribution returns the peer distribution payload."""
+    dispatcher = _make_dispatcher()
+    result = await dispatcher.dispatch(
+        "get_peer_distribution",
+        {
+            "indicator_key": "population.total",
+            "place_id": "ltla24:E06000047",
+        },
+    )
+    assert isinstance(result, dict)
+    assert result["indicator_key"] == "population.total"
+    assert result["place_id"] == "ltla24:E06000047"
+    assert result["focal_value"] == 200000.0
+    assert "peer_place_values" in result
+    assert result["peer_count"] == 1
+    assert result["unit"] == "people"
