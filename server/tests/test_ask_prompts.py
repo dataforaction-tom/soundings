@@ -53,3 +53,35 @@ def test_scope_guardrail_present():
 def test_invalid_mode_raises():
     with pytest.raises(ValueError):
         SystemPromptBuilder(mode="bad")  # type: ignore[arg-type]
+
+
+def test_prompt_mentions_distribution_chart():
+    builder = SystemPromptBuilder(mode="open")
+    prompt = builder.build()
+    assert "distribution-chart" in prompt
+
+
+def test_prompt_mentions_composition_chart():
+    builder = SystemPromptBuilder(mode="open")
+    prompt = builder.build()
+    assert "composition-chart" in prompt
+
+
+def test_prompt_mentions_scatter_plot():
+    builder = SystemPromptBuilder(mode="open")
+    prompt = builder.build()
+    assert "scatter-plot" in prompt
+
+
+def test_prompt_mentions_get_peer_distribution():
+    builder = SystemPromptBuilder(mode="open")
+    prompt = builder.build()
+    assert "get_peer_distribution" in prompt
+
+
+def test_prompt_has_chart_selection_guidance():
+    builder = SystemPromptBuilder(mode="open")
+    prompt = builder.build()
+    assert "Use distribution-chart" in prompt
+    assert "Use composition-chart" in prompt
+    assert "Use scatter-plot" in prompt
