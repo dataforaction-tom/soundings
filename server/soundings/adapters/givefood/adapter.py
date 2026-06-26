@@ -149,7 +149,7 @@ class GiveFoodAdapter(PassthroughAdapter):
             confidence="official",
         )
 
-    async def amenity_locations(self, indicator_key: str, place_id: str) -> dict | None:
+    async def amenity_locations(self, indicator_key: str, place_id: str) -> dict[str, Any] | None:
         """GeoJSON FeatureCollection of food-bank locations within a place."""
         if indicator_key != FOOD_BANKS_INDICATOR:
             return None
