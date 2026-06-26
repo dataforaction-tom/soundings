@@ -96,11 +96,18 @@ Block types for compose_answer:
   then reference both keys in the block)
 - organisations: a list of civil society organisations in a place
 - insight-callout: a severity-coloured callout for a notable signal
-- map: a map showing a place boundary, or a choropleth of peer places
-  coloured by an indicator value (requires indicator_key for choropleth).
-  An optional `overlay` field can add point data on top of the map
-  (air_quality, organisations, amenities). Use when the user asks about
-  specific facilities or monitoring in an area.
+- map: a map of a place. Three modes, chosen by fields:
+  * boundary — just place_id (use to show where a place is).
+  * choropleth — set indicator_key and granularity. Use granularity="sub_areas"
+    for a within-place heatmap when the indicator has sub-area data (the
+    deprivation.* family at LSOA, e.g. deprivation.imd.score); use
+    granularity="peers" (default) to colour other places and show how this one
+    ranks. "Where are the most deprived parts of X" → sub_areas.
+  * points — set overlay {source:"amenities", indicator_keys:[...]} to plot real
+    facility locations, colour-coded with a legend. Use for "where are the
+    food banks / schools" questions, e.g. indicator_keys:
+    ["infrastructure.food_banks_count","infrastructure.schools_count"]. Pair with
+    the matching infrastructure.*_count indicators when the user also wants counts.
 
 Chart selection guidance:
 - Use trend-chart when the question is about change over time for one place

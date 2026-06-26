@@ -137,3 +137,12 @@ def test_prompt_routes_facility_questions_to_amenity_counts():
     # The model is told not to silently substitute a charity search.
     assert "find_organisations_in_place" in prompt
     assert "explicit" in prompt.lower() or "say so" in prompt.lower()
+
+
+def test_prompt_teaches_three_map_modes():
+    prompt = SystemPromptBuilder(mode="open").build()
+    assert "granularity" in prompt
+    assert "sub_areas" in prompt
+    # points overlay for facility locations
+    assert "indicator_keys" in prompt
+    assert "where are" in prompt.lower()
