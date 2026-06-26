@@ -555,6 +555,266 @@
           }
         }
 
+        // distribution-chart -------------------------------------------------
+
+        interface PeerDistributionResponse {
+          indicator_key: string;
+          place_id: string;
+          focal_value: number | null;
+          peer_values: number[];
+          peer_count: number;
+          unit: string;
+          period: string;
+        }
+
+        async function renderDistributionChartBlock(
+          host: HTMLElement,
+          block: { type: string; [k: string]: unknown },
+          apiBase: string,
+        ) {
+          const indicatorKey = asString(block.indicator_key);
+          const caption = asStringOrUndef(block.caption);
+          const distPlaceId = asStringOrUndef(block.place_id) ?? placeId;
+          if (!indicatorKey) {
+            showBlockError(host, "Distribution chart missing indicator_key.");
+            return;
+          }
+          if (!distPlaceId) {
+            showBlockError(host, "Distribution chart missing place_id.");
+            return;
+          }
+          let dist: PeerDistributionResponse;
+          try {
+            dist = await postJSON<PeerDistributionResponse>(
+              "/v1/tools/get_peer_distribution",
+              { indicator_key: indicatorKey, place_id: distPlaceId },
+              apiBase,
+            );
+          } catch (err) {
+            showBlockError(
+              host,
+              "Could not load peer distribution: " +
+                (err instanceof Error ? err.message : String(err)),
+            );
+            return;
+          }
+          if (!dist.peer_values || dist.peer_values.length === 0) {
+            showBlockError(host, "No peer distribution data available.");
+            return;
+          }
+          const { renderDistributionChart } = await import("../lib/chart");
+          const svg = renderDistributionChart(
+            {
+              peer_values: dist.peer_values,
+              focal_value: dist.focal_value,
+              unit: dist.unit,
+              caption,
+            },
+            { containerWidth: host.clientWidth || 480 },
+          );
+          if (!svg) {
+            showBlockError(host, "No peer distribution data available.");
+            return;
+          }
+          const figure = document.createElement("figure");
+          figure.className = "distribution-chart-block";
+          const chartDiv = document.createElement("div");
+          chartDiv.className = "chart";
+          chartDiv.innerHTML = svg;
+          figure.appendChild(chartDiv);
+          if (caption) {
+            const figcaption = document.createElement("figcaption");
+            figcaption.textContent = caption;
+            figure.appendChild(figcaption);
+          }
+          host.appendChild(figure);
+        }
+
+        // composition-chart --------------------------------------------------
+
+        interface CompositionSegmentBlock {
+          label: string;
+          value: number;
+          colour?: string | null;
+        }
+
+        function asNumber(v: unknown): number {
+          return typeof v === "number" && Number.isFinite(v) ? v : 0;
+        }
+
+        function asSegments(v: unknown): CompositionSegmentBlock[] {
+          if (!Array.isArray(v)) return [];
+          return v
+            .map((s): CompositionSegmentBlock | null => {
+              if (typeof s !== "object" || s === null) return null;
+              const label =
+                typeof (s as Record<string, unknown>).label === "string"
+                  ? (s as Record<string, unknown>).label as string
+                  : "";
+              const value = asNumber((s as Record<string, unknown>).value);
+              const colourRaw = (s as Record<string, unknown>).colour;
+              const colour =
+                typeof colourRaw === "string" && colourRaw.length > 0
+                  ? colourRaw
+                  : undefined;
+              return { label, value, colour };
+            })
+            .filter((s): s is CompositionSegmentBlock => s !== null);
+        }
+
+        async function renderCompositionChartBlock(
+          host: HTMLElement,
+          block: { type: string; [k: string]: unknown },
+        ) {
+          const title = asString(block.title) || prettyKey(asString(block.indicator_key));
+          const caption = asStringOrUndef(block.caption);
+          const segments = asSegments(block.segments);
+          if (segments.length === 0) {
+            showBlockError(
+              host,
+              "Composition chart missing segments.",
+            );
+            return;
+          }
+          const { renderCompositionChart } = await import("../lib/chart");
+          const svg = renderCompositionChart(
+            { title, segments, caption },
+            { containerWidth: host.clientWidth || 480 },
+          );
+          if (!svg) {
+            showBlockError(host, "No composition data available.");
+            return;
+          }
+          const figure = document.createElement("figure");
+          figure.className = "composition-chart-block";
+          const chartDiv = document.createElement("div");
+          chartDiv.className = "chart";
+          chartDiv.innerHTML = svg;
+          figure.appendChild(chartDiv);
+          if (title) {
+            const h4 = document.createElement("h4");
+            h4.className = "composition-title";
+            h4.textContent = title;
+            figure.insertBefore(h4, figure.firstChild);
+          }
+          if (caption) {
+            const figcaption = document.createElement("figcaption");
+            figcaption.textContent = caption;
+            figure.appendChild(figcaption);
+          }
+          host.appendChild(figure);
+        }
+
+        // scatter-plot -------------------------------------------------------
+
+        interface ScatterPeerDistributionResponse {
+          indicator_key: string;
+          place_id: string;
+          focal_value: number | null;
+          peer_place_values: { place_id: string; value: number | null }[];
+          peer_count: number;
+          unit: string;
+          period: string;
+        }
+
+        interface ScatterPoint {
+          place_id: string;
+          x_value: number;
+          y_value: number;
+          is_focal: boolean;
+        }
+
+        async function renderScatterPlotBlock(
+          host: HTMLElement,
+          block: { type: string; [k: string]: unknown },
+          apiBase: string,
+        ) {
+          const xKey = asString(block.x_indicator_key);
+          const yKey = asString(block.y_indicator_key);
+          const caption = asStringOrUndef(block.caption);
+          const scatterPlaceId = asStringOrUndef(block.place_id) ?? placeId;
+          if (!xKey || !yKey) {
+            showBlockError(
+              host,
+              "Scatter plot missing x_indicator_key or y_indicator_key.",
+            );
+            return;
+          }
+          if (!scatterPlaceId) {
+            showBlockError(host, "Scatter plot missing place_id.");
+            return;
+          }
+          let xResp: ScatterPeerDistributionResponse;
+          let yResp: ScatterPeerDistributionResponse;
+          try {
+            [xResp, yResp] = await Promise.all([
+              postJSON<ScatterPeerDistributionResponse>(
+                "/v1/tools/get_peer_distribution",
+                { indicator_key: xKey, place_id: scatterPlaceId },
+                apiBase,
+              ),
+              postJSON<ScatterPeerDistributionResponse>(
+                "/v1/tools/get_peer_distribution",
+                { indicator_key: yKey, place_id: scatterPlaceId },
+                apiBase,
+              ),
+            ]);
+          } catch (err) {
+            showBlockError(
+              host,
+              "Could not load scatter data: " +
+                (err instanceof Error ? err.message : String(err)),
+            );
+            return;
+          }
+          const xMap = new Map<string, number | null>();
+          for (const p of xResp.peer_place_values ?? []) {
+            xMap.set(p.place_id, p.value);
+          }
+          const points: ScatterPoint[] = [];
+          for (const p of yResp.peer_place_values ?? []) {
+            const xv = xMap.get(p.place_id);
+            if (typeof xv !== "number" || typeof p.value !== "number") continue;
+            points.push({
+              place_id: p.place_id,
+              x_value: xv,
+              y_value: p.value,
+              is_focal: p.place_id === scatterPlaceId,
+            });
+          }
+          if (points.length === 0) {
+            showBlockError(host, "No scatter data available.");
+            return;
+          }
+          const { renderScatterPlot } = await import("../lib/chart");
+          const svg = renderScatterPlot(
+            {
+              points,
+              focal_place_id: scatterPlaceId,
+              x_label: prettyKey(xKey),
+              y_label: prettyKey(yKey),
+              caption,
+            },
+            { containerWidth: host.clientWidth || 480 },
+          );
+          if (!svg) {
+            showBlockError(host, "No scatter data available.");
+            return;
+          }
+          const figure = document.createElement("figure");
+          figure.className = "scatter-plot-block";
+          const chartDiv = document.createElement("div");
+          chartDiv.className = "chart";
+          chartDiv.innerHTML = svg;
+          figure.appendChild(chartDiv);
+          if (caption) {
+            const figcaption = document.createElement("figcaption");
+            figcaption.textContent = caption;
+            figure.appendChild(figcaption);
+          }
+          host.appendChild(figure);
+        }
+
         function renderBlock(block: { type: string; [k: string]: unknown }) {
           const host = document.createElement("div");
           host.className = "answer-block block-" + block.type;
@@ -610,6 +870,18 @@
             }
             case "organisations": {
               renderOrganisationsBlock(host, block, apiBase);
+              break;
+            }
+            case "distribution-chart": {
+              renderDistributionChartBlock(host, block, apiBase);
+              break;
+            }
+            case "composition-chart": {
+              renderCompositionChartBlock(host, block);
+              break;
+            }
+            case "scatter-plot": {
+              renderScatterPlotBlock(host, block, apiBase);
               break;
             }
             default: {
