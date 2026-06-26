@@ -17,6 +17,15 @@ const mode = url.searchParams.get("mode") ?? "summary";
 // with `SOUNDINGS_PUBLIC_API_BASE` only when the API is on a different public host.
 const apiBase =
   (typeof process !== "undefined" && process.env.SOUNDINGS_PUBLIC_API_BASE) || "";
+
+// Map tile URL for raster base layers. Defaults to the standard OSM tile
+// server; set SOUNDINGS_MAP_TILES_URL="" (empty) for tile-less maps (the
+// original local-first behaviour).
+const mapTilesUrl =
+  typeof process !== "undefined" &&
+  process.env.SOUNDINGS_MAP_TILES_URL !== undefined
+    ? process.env.SOUNDINGS_MAP_TILES_URL
+    : "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 ---
 
 <Base title={query ? `Ask: ${query}` : "Ask"}>
@@ -30,7 +39,7 @@ const apiBase =
   <AskBox placeId={placeId || undefined} />
 
   {query ? (
-    <div id="answer-surface" class="answer-surface" data-api-base={apiBase} data-query={query} data-mode={mode} data-place-id={placeId}>
+    <div id="answer-surface" class="answer-surface" data-api-base={apiBase} data-map-tiles={mapTilesUrl} data-query={query} data-mode={mode} data-place-id={placeId}>
       <p class="answer-status">Thinking…</p>
     </div>
   ) : (

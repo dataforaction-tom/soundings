@@ -16,8 +16,24 @@ const CREAM = "#faf9f6";
 const NAVY = "#1a2f4e";
 
 // Shared base-map options: no tile source (solid background via CSS), no
-// rotation, zoom controls in the bottom-right.
-function baseMapOptions(container: HTMLElement): maplibregl.MapOptions {
+// rotation, zoom controls in the bottom-right. When `tilesUrl` is provided, a
+// raster OSM base layer is added; otherwise the map renders tile-less (as
+// before) so existing tests and SSR keep working unchanged.
+function baseMapOptions(
+  container: HTMLElement,
+  tilesUrl?: string,
+): maplibregl.MapOptions {
+  const sources: Record<string, any> = {};
+  const layers: any[] = [];
+  if (tilesUrl) {
+    sources["base-tiles"] = {
+      type: "raster",
+      tiles: [tilesUrl],
+      tileSize: 256,
+      attribution: "© OpenStreetMap contributors",
+    };
+    layers.push({ id: "base", type: "raster", source: "base-tiles" });
+  }
   return {
     container,
     // Minimal blank style (no external tiles — local-first). `glyphs` must be
@@ -26,10 +42,10 @@ function baseMapOptions(container: HTMLElement): maplibregl.MapOptions {
     // the style load so the boundary layers are never added.
     style: {
       version: 8,
-      sources: {},
-      layers: [],
+      sources,
+      layers,
     },
-    attributionControl: false,
+    attributionControl: tilesUrl ? {} : false,
     dragRotate: false,
     touchZoomRotate: false,
     keyboard: false,
@@ -106,6 +122,7 @@ function computeBounds(geojson: GeoJSON.GeoJSON): maplibregl.LngLatBoundsLike {
 
 export interface RenderPlaceMapOptions {
   label?: string;
+  tilesUrl?: string;
 }
 
 /**
@@ -117,7 +134,9 @@ export function renderPlaceMap(
   geojson: GeoJSON.Feature,
   options: RenderPlaceMapOptions = {},
 ): () => void {
-  const map = new maplibregl.Map(baseMapOptions(container));
+  const map = new maplibregl.Map(
+    baseMapOptions(container, options.tilesUrl),
+  );
 
   const sourceId = "place";
   const fillId = "place-fill";
@@ -158,6 +177,7 @@ export interface RenderChoroplethMapOptions {
   /** Two-stop colour scale [low, high]. Default: cream → navy via green. */
   colourScale?: [string, string];
   label?: string;
+  tilesUrl?: string;
 }
 
 /**
@@ -171,7 +191,9 @@ export function renderChoroplethMap(
   valueKey: string,
   options: RenderChoroplethMapOptions = {},
 ): () => void {
-  const map = new maplibregl.Map(baseMapOptions(container));
+  const map = new maplibregl.Map(
+    baseMapOptions(container, options.tilesUrl),
+  );
 
   const sourceId = "choropleth";
   const fillId = "choropleth-fill";

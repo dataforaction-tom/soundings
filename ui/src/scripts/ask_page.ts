@@ -8,6 +8,7 @@
       const surface = document.getElementById("answer-surface")!;
       if (surface) {
         const apiBase = surface.dataset.apiBase ?? "";
+        const mapTilesUrl = surface.dataset.mapTiles ?? "";
         const mode = surface.dataset.mode || "summary";
         const placeId = surface.dataset.placeId || undefined;
         // Read the question from the surface's data attribute — NOT
@@ -530,13 +531,16 @@
               );
               renderChoroplethMap(container, fc, "value", {
                 label: prettyKey(indicatorKey),
+                tilesUrl: mapTilesUrl || undefined,
               });
             } else {
               const feature = await getJSON<GeoJSON.Feature>(
                 `/v1/place/${encodeURIComponent(placeId)}/geometry`,
                 apiBase,
               );
-              renderPlaceMap(container, feature);
+              renderPlaceMap(container, feature, {
+                tilesUrl: mapTilesUrl || undefined,
+              });
             }
           } catch (err) {
             container.remove();

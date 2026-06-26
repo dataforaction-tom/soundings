@@ -12,6 +12,11 @@ interface Props {
 const { featureCollection, valueKey, label, height = "300px" } = Astro.props;
 const fcStr = JSON.stringify(featureCollection);
 const labelStr = label ?? "";
+const mapTilesUrl =
+  typeof process !== "undefined" &&
+  process.env.SOUNDINGS_MAP_TILES_URL !== undefined
+    ? process.env.SOUNDINGS_MAP_TILES_URL
+    : "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 ---
 
 <div
@@ -19,6 +24,7 @@ const labelStr = label ?? "";
   style={`height: ${height}`}
   data-value-key={valueKey}
   data-label={labelStr}
+  data-map-tiles={mapTilesUrl}
 >
   <script type="application/json" data-geojson set:html={fcStr} />
 </div>
@@ -33,8 +39,9 @@ const labelStr = label ?? "";
       const fc = JSON.parse(jsonEl.textContent);
       const valueKey = container.dataset.valueKey || "value";
       const label = container.dataset.label || undefined;
+      const tilesUrl = container.dataset.mapTiles || undefined;
       const { renderChoroplethMap } = await import("../lib/map-renderer");
-      renderChoroplethMap(container, fc, valueKey, { label });
+      renderChoroplethMap(container, fc, valueKey, { label, tilesUrl });
     } catch (err) {
       console.error("ChoroplethMap init error:", err);
     }

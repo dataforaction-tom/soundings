@@ -11,12 +11,18 @@ interface Props {
 const { geojson, label, height = "300px" } = Astro.props;
 const geojsonStr = JSON.stringify(geojson);
 const labelStr = label ?? "";
+const mapTilesUrl =
+  typeof process !== "undefined" &&
+  process.env.SOUNDINGS_MAP_TILES_URL !== undefined
+    ? process.env.SOUNDINGS_MAP_TILES_URL
+    : "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 ---
 
 <div
   class="map-container"
   style={`height: ${height}`}
   data-label={labelStr}
+  data-map-tiles={mapTilesUrl}
 >
   <script type="application/json" data-geojson set:html={geojsonStr} />
 </div>
@@ -30,8 +36,9 @@ const labelStr = label ?? "";
     try {
       const geojson = JSON.parse(jsonEl.textContent);
       const label = container.dataset.label || undefined;
+      const tilesUrl = container.dataset.mapTiles || undefined;
       const { renderPlaceMap } = await import("../lib/map-renderer");
-      renderPlaceMap(container, geojson, { label });
+      renderPlaceMap(container, geojson, { label, tilesUrl });
     } catch (err) {
       console.error("PlaceMap init error:", err);
     }
