@@ -221,15 +221,12 @@ export function renderChoroplethMap(
   );
   const [domMin, domMid, domMax] = colourDomain(values);
 
-  map.on("load", () => {
-    map.addSource(sourceId, { type: "geojson", data: featureCollection });
-
-    map.addLayer({
-      id: fillId,
-      type: "fill",
-      source: sourceId,
-      paint: {
-        "fill-color": [
+  // When domain is degenerate (all values equal), MapLibre's interpolate requires
+  // strictly ascending stops, so use a solid colour instead.
+  const fillColor =
+    domMin === domMax
+      ? ACCENT_GREEN
+      : ([
           "interpolate",
           ["linear"],
           ["get", valueKey],
@@ -239,7 +236,17 @@ export function renderChoroplethMap(
           ACCENT_GREEN,
           domMax,
           stops[1],
-        ],
+        ] as unknown as maplibregl.ExpressionSpecification);
+
+  map.on("load", () => {
+    map.addSource(sourceId, { type: "geojson", data: featureCollection });
+
+    map.addLayer({
+      id: fillId,
+      type: "fill",
+      source: sourceId,
+      paint: {
+        "fill-color": fillColor,
         "fill-opacity": 0.85,
       },
     });
@@ -313,6 +320,7 @@ export function renderChoroplethMap(
 
   return () => {
     popup.remove();
+    legend.remove();
     map.remove();
   };
 }
