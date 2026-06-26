@@ -13,7 +13,7 @@ from soundings.adapters.osm_overpass.adapter import (
     METHODOLOGY_CAVEAT,
     OsmOverpassAdapter,
 )
-from soundings.adapters.osm_overpass.client import OsmOverpassClient
+from soundings.adapters.osm_overpass.client import OsmOverpassClient, OverpassUnavailableError
 from soundings.db.engine import get_engine
 
 pytestmark = pytest.mark.integration
@@ -261,3 +261,60 @@ async def test_amenity_locations_second_call_uses_cache() -> None:
     await adapter.amenity_locations("infrastructure.schools_count", "ltla24:E06000004")
     await adapter.amenity_locations("infrastructure.schools_count", "ltla24:E06000004")
     assert len(fake.calls) == 1  # second served from cache
+
+
+async def test_amenity_locations_no_bbox_returns_empty_collection() -> None:
+    """Place with no geometry should return empty FeatureCollection without calling upstream."""
+    engine = get_engine()
+    async with engine.begin() as conn:
+        await conn.execute(text("DELETE FROM geography.place"))
+        await conn.execute(
+            text(
+                "INSERT INTO geography.place (id, type, code, name, geom) "
+                "VALUES ('test:no-geom', 'ltla24', 'X1', 'NoGeom', NULL)"
+            ),
+        )
+        await conn.execute(
+            text(
+                "INSERT INTO catalogue.source (id, label, publisher, publisher_url, "
+                "dataset_url, licence, mode, rate_limit) VALUES "
+                "('osm_overpass', 'OSM', 'OSM', '', '', 'ODbL-1.0', 'passthrough', '{}'::jsonb) "
+                "ON CONFLICT (id) DO NOTHING"
+            )
+        )
+    fake = _FakeLocationsClient(
+        {("amenity", "school"): [{"lat": 54.7, "lng": -1.5, "name": "School"}]}
+    )
+    adapter = OsmOverpassAdapter(get_engine(), overpass_client=fake)
+    fc = await adapter.amenity_locations("infrastructure.schools_count", "test:no-geom")
+    assert fc == {"type": "FeatureCollection", "features": []}
+    assert len(fake.calls) == 0  # upstream never called
+
+
+async def test_amenity_locations_transport_failure_propagates_and_is_not_cached() -> None:
+    """Transport failure should propagate and not be cached as empty result."""
+
+    class _FailingLocationsClient(OsmOverpassClient):
+        """Client that raises on locations_by_tag."""
+
+        def __init__(self) -> None:
+            self.call_count = 0
+
+        async def locations_by_tag(self, tag_key, tag_value, bbox, *, max_results=1000):  # type: ignore[override]
+            self.call_count += 1
+            raise OverpassUnavailableError("boom")
+
+    await _seed_place()
+    failing = _FailingLocationsClient()
+    adapter = OsmOverpassAdapter(get_engine(), overpass_client=failing)
+
+    # First call should raise
+    with pytest.raises(OverpassUnavailableError):
+        await adapter.amenity_locations("infrastructure.schools_count", "ltla24:E06000004")
+
+    # Second call should also raise (proving it wasn't cached as empty)
+    with pytest.raises(OverpassUnavailableError):
+        await adapter.amenity_locations("infrastructure.schools_count", "ltla24:E06000004")
+
+    # Both calls should have hit upstream (not served from cache)
+    assert failing.call_count == 2
