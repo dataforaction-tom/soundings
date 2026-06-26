@@ -71,6 +71,18 @@ class _FakeOverpassClient(OsmOverpassClient):
         return self._counts.get((tag_key, tag_value), 0)
 
 
+class _FakeLocationsClient(OsmOverpassClient):
+    """Stub returning canned point lists per tag query."""
+
+    def __init__(self, points: dict[tuple[str, str], list[dict[str, object]]]) -> None:
+        self._points = points
+        self.calls: list[tuple[str, str]] = []
+
+    async def locations_by_tag(self, tag_key, tag_value, bbox, *, max_results=1000):  # type: ignore[override]
+        self.calls.append((tag_key, tag_value))
+        return self._points.get((tag_key, tag_value), [])
+
+
 async def test_fetch_indicator_single_tag_count() -> None:
     await _seed_place()
     fake = _FakeOverpassClient({("amenity", "school"): 12})
@@ -215,3 +227,37 @@ async def test_fetch_indicator_uses_period_when_provided() -> None:
     )
     assert iv is not None
     assert iv.period == "2026-06"
+
+
+async def test_amenity_locations_builds_feature_collection() -> None:
+    await _seed_place()
+    fake = _FakeLocationsClient(
+        {
+            ("amenity", "food_bank"): [{"lat": 54.77, "lng": -1.57, "name": "Durham Foodbank"}],
+            ("social_facility", "food_bank"): [{"lat": 54.70, "lng": -1.50, "name": "Pantry"}],
+        }
+    )
+    adapter = OsmOverpassAdapter(get_engine(), overpass_client=fake)
+    fc = await adapter.amenity_locations("infrastructure.food_banks_count", "ltla24:E06000004")
+
+    assert fc is not None and fc["type"] == "FeatureCollection"
+    assert len(fc["features"]) == 2
+    f0 = fc["features"][0]
+    assert f0["geometry"]["type"] == "Point"
+    assert f0["geometry"]["coordinates"] == [-1.57, 54.77]  # [lng, lat]
+    assert f0["properties"]["layer"] == "infrastructure.food_banks_count"
+
+
+async def test_amenity_locations_unknown_indicator_returns_none() -> None:
+    await _seed_place()
+    adapter = OsmOverpassAdapter(get_engine(), overpass_client=_FakeLocationsClient({}))
+    assert await adapter.amenity_locations("not.an.amenity", "ltla24:E06000004") is None
+
+
+async def test_amenity_locations_second_call_uses_cache() -> None:
+    await _seed_place()
+    fake = _FakeLocationsClient({("amenity", "school"): [{"lat": 54.7, "lng": -1.5, "name": "A"}]})
+    adapter = OsmOverpassAdapter(get_engine(), overpass_client=fake)
+    await adapter.amenity_locations("infrastructure.schools_count", "ltla24:E06000004")
+    await adapter.amenity_locations("infrastructure.schools_count", "ltla24:E06000004")
+    assert len(fake.calls) == 1  # second served from cache

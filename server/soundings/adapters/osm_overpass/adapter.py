@@ -115,6 +115,48 @@ class OsmOverpassAdapter(PassthroughAdapter):
             confidence="official",
         )
 
+    async def amenity_locations(self, indicator_key: str, place_id: str) -> dict | None:
+        """GeoJSON FeatureCollection of amenity point locations for one
+        indicator within a place. Cached under `osmgeo:{key}:{place_id}`.
+
+        Returns None for a non-amenity indicator; an empty FeatureCollection
+        when the place has no geometry or no matching amenities. A transport
+        failure propagates (not cached), like the count path.
+        """
+        tags = INDICATOR_TAGS.get(indicator_key)
+        if tags is None:
+            return None
+
+        cache_key = f"osmgeo:{indicator_key}:{place_id}"
+        cached = await self._cache.get(self.source_id, cache_key)
+        if isinstance(cached, dict):
+            return cached
+
+        bbox = await self._get_bbox(place_id)
+        if bbox is None:
+            return {"type": "FeatureCollection", "features": []}
+
+        seen: set[tuple[float, float]] = set()
+        features: list[dict[str, Any]] = []
+        for tag_dict in tags:
+            for k, v in tag_dict.items():
+                for pt in await self._overpass.locations_by_tag(k, v, bbox):
+                    key = (round(pt["lat"], 6), round(pt["lng"], 6))
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    features.append(
+                        {
+                            "type": "Feature",
+                            "geometry": {"type": "Point", "coordinates": [pt["lng"], pt["lat"]]},
+                            "properties": {"name": pt["name"], "layer": indicator_key},
+                        }
+                    )
+
+        fc = {"type": "FeatureCollection", "features": features}
+        await self._cache.put(self.source_id, cache_key, fc, ttl=self._ttl)
+        return fc
+
     async def pre_warm_for_places(self, place_ids: list[str]) -> None:
         """Populate the amenity-count cache for every OSM indicator across the
         given places, out-of-band of the orchestrator's soft budget.
