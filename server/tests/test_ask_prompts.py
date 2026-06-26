@@ -94,3 +94,22 @@ def test_prompt_mentions_map_overlay():
     assert "air_quality" in prompt
     assert "organisations" in prompt
     assert "amenities" in prompt
+
+
+def test_prompt_mentions_environment_domain():
+    builder = SystemPromptBuilder(mode="open")
+    prompt = builder.build()
+    assert "environment" in prompt.lower()
+
+
+def test_prompt_mentions_air_quality():
+    builder = SystemPromptBuilder(mode="open")
+    prompt = builder.build()
+    assert "air quality" in prompt.lower()
+
+
+def test_prompt_notes_air_quality_is_point_sensor_data():
+    builder = SystemPromptBuilder(mode="open")
+    prompt = builder.build()
+    assert "point-sensor" in prompt.lower() or "point sensor" in prompt.lower()
+    assert "interpolat" in prompt.lower()

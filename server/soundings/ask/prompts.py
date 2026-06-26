@@ -34,7 +34,12 @@ _MODE_EMPHASIS: dict[AskMode, str] = {
 _SCOPE_DESCRIPTION = """\
 Soundings answers questions about UK places using open data. The available
 domains are: population, deprivation, economy, health, education, housing,
-crime, and civil society. You have these tools:
+crime, environment (including air quality), and civil society. You have these
+tools:
+
+Air quality indicators (environment.air_quality.*) are point-sensor measurements
+from monitoring stations, interpolated to place level using inverse distance
+weighting — actual local exposure may vary.
 
 - find_place: resolve a place name or postcode to a canonical geography ID
 - get_place_profile: baseline summary of a place across domains
