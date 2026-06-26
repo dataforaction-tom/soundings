@@ -358,8 +358,9 @@ export function renderAmenityMap(
   const layers = Array.from(
     new Set(points.features.map((f) => String((f.properties ?? {}).layer ?? ""))),
   ).filter(Boolean);
+  const legendItems = amenityLegendItems(layers);
   const colourByLayer = new Map(
-    amenityLegendItems(layers).map((it, i) => [layers[i], it.colour]),
+    legendItems.map((it, i) => [layers[i], it.colour]),
   );
 
   const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false });
@@ -417,7 +418,7 @@ export function renderAmenityMap(
 
   const legend = document.createElement("div");
   legend.className = "map-legend amenity-legend";
-  legend.innerHTML = amenityLegendItems(layers)
+  legend.innerHTML = legendItems
     .map(
       (it) =>
         `<span class="legend-item"><span class="legend-swatch" style="background:${it.colour}"></span>${escapeHtml(it.label)}</span>`,
@@ -427,6 +428,7 @@ export function renderAmenityMap(
 
   return () => {
     popup.remove();
+    legend.remove();
     map.remove();
   };
 }
