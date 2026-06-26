@@ -117,6 +117,61 @@ class OsmOverpassClient:
 
         return _extract_total(payload)
 
+    async def locations_by_tag(
+        self,
+        tag_key: str,
+        tag_value: str,
+        bbox: tuple[float, float, float, float],
+        *,
+        max_results: int = 1000,
+    ) -> list[dict[str, Any]]:
+        """Fetch element coordinates (not just a count) for a tag in a bbox.
+
+        Emits `out center tags` so ways/relations carry a centroid. An empty
+        result is a valid 'none here' ([]); only transport/parse failure on
+        every endpoint raises OverpassUnavailableError.
+        """
+        south, west, north, east = bbox
+        bbox_str = f"{south},{west},{north},{east}"
+        query = (
+            f"[out:json][timeout:25];\n"
+            f"(\n"
+            f'  node["{tag_key}"="{tag_value}"]({bbox_str});\n'
+            f'  way["{tag_key}"="{tag_value}"]({bbox_str});\n'
+            f'  relation["{tag_key}"="{tag_value}"]({bbox_str});\n'
+            f");\n"
+            f"out center tags {max_results};\n"
+        )
+        payload = await self._post_payload(query)
+        return _extract_locations(payload, max_results)
+
+    async def _post_payload(self, query: str) -> Any:
+        """POST a query, returning parsed JSON from the first endpoint that
+        responds. Raises OverpassUnavailableError if all endpoints fail."""
+        last_error: Exception | None = None
+        for endpoint in (OVERPASS_PRIMARY, OVERPASS_FALLBACK):
+            try:
+                return await self._fetch_json(endpoint, query)
+            except (httpx.HTTPError, json.JSONDecodeError) as exc:
+                last_error = exc
+                continue
+        raise OverpassUnavailableError(f"all Overpass endpoints failed; last error: {last_error!r}")
+
+    async def _fetch_json(self, endpoint: str, query: str) -> Any:
+        """POST to one endpoint and return parsed JSON (raises on HTTP/JSON error)."""
+        async with self._limiter:
+            client = self._client or httpx.AsyncClient(timeout=60.0)
+            try:
+                response = await client.post(
+                    endpoint, data={"data": query}, headers=OVERPASS_HEADERS
+                )
+                response.raise_for_status()
+                payload: Any = response.json()
+            finally:
+                if self._owns_client:
+                    await client.aclose()
+        return payload
+
 
 def _extract_total(payload: Any) -> int | None:
     """Extract the total count from an Overpass count response."""
@@ -141,3 +196,33 @@ def _extract_total(payload: Any) -> int | None:
         except (TypeError, ValueError):
             return None
     return None
+
+
+def _extract_locations(payload: Any, max_results: int) -> list[dict[str, Any]]:
+    """Pull {lat, lng, name} points from an Overpass 'out center' response."""
+    out: list[dict[str, Any]] = []
+    if not isinstance(payload, dict):
+        return out
+    elements = payload.get("elements")
+    if not isinstance(elements, list):
+        return out
+    for el in elements:
+        if not isinstance(el, dict) or el.get("type") == "count":
+            continue
+        lat = el.get("lat")
+        lon = el.get("lon")
+        if lat is None or lon is None:
+            center = el.get("center")
+            if isinstance(center, dict):
+                lat = center.get("lat")
+                lon = center.get("lon")
+        if lat is None or lon is None:
+            continue
+        tags = el.get("tags") if isinstance(el.get("tags"), dict) else {}
+        name = tags.get("name")
+        out.append(
+            {"lat": float(lat), "lng": float(lon), "name": name if isinstance(name, str) else None}
+        )
+        if len(out) >= max_results:
+            break
+    return out

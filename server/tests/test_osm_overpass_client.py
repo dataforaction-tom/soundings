@@ -155,3 +155,66 @@ async def test_count_by_tag_returns_zero_on_unexpected_shape() -> None:
         count = await client.count_by_tag("amenity", "pharmacy", (50.0, -1.0, 51.0, 1.0))
 
     assert count == 0
+
+
+def _locations_payload() -> dict[str, object]:
+    # A node (direct lat/lon), a way (center), and one unnamed node.
+    return {
+        "version": 0.6,
+        "elements": [
+            {
+                "type": "node",
+                "id": 1,
+                "lat": 54.77,
+                "lon": -1.57,
+                "tags": {"name": "Durham Foodbank"},
+            },
+            {
+                "type": "way",
+                "id": 2,
+                "center": {"lat": 54.70, "lon": -1.50},
+                "tags": {"name": "St X Pantry"},
+            },
+            {"type": "node", "id": 3, "lat": 54.60, "lon": -1.40, "tags": {}},
+        ],
+    }
+
+
+async def test_locations_by_tag_parses_nodes_and_centers() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        del request
+        return httpx.Response(200, json=_locations_payload())
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as http:
+        client = OsmOverpassClient(http_client=http)
+        pts = await client.locations_by_tag("amenity", "food_bank", (54.5, -1.7, 54.9, -1.3))
+
+    assert len(pts) == 3
+    assert pts[0] == {"lat": 54.77, "lng": -1.57, "name": "Durham Foodbank"}
+    assert pts[1]["lat"] == 54.70 and pts[1]["lng"] == -1.50  # way centroid
+    assert pts[2]["name"] is None  # unnamed
+
+
+async def test_locations_by_tag_empty_elements_returns_list() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        del request
+        return httpx.Response(200, json={"version": 0.6, "elements": []})
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as http:
+        client = OsmOverpassClient(http_client=http)
+        pts = await client.locations_by_tag("amenity", "school", (54.5, -1.7, 54.9, -1.3))
+    assert pts == []  # valid "none here", not an error
+
+
+async def test_locations_by_tag_raises_when_all_endpoints_fail() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        del request
+        return httpx.Response(503, text="overloaded")
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as http:
+        client = OsmOverpassClient(http_client=http)
+        with pytest.raises(OverpassUnavailableError):
+            await client.locations_by_tag("amenity", "school", (54.5, -1.7, 54.9, -1.3))
