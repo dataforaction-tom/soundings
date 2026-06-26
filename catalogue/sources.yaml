@@ -160,3 +160,13 @@ sources:
     mode: passthrough
     ttl_hours: 1
     rate_limit: { rps: 4 }
+
+  - id: osm_overpass
+    label: OpenStreetMap (Overpass API)
+    publisher: OpenStreetMap contributors
+    publisher_url: https://www.openstreetmap.org/
+    dataset_url: https://overpass.atownsend.org.uk/api/interpreter
+    licence: ODbL-1.0
+    mode: passthrough
+    ttl_hours: 720
+    rate_limit: { rps: 2 }

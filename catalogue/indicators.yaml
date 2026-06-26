@@ -160,6 +160,15 @@ sources:
     refresh_cadence: "hourly"
     notes: "Aggregates global air quality monitoring data. UK coverage from DEFRA AURN network + local authority monitors. Point sensor data interpolated to place level."
 
+  osm_overpass:
+    label: "OpenStreetMap (Overpass API)"
+    publisher: "OpenStreetMap contributors"
+    publisher_url: "https://www.openstreetmap.org/"
+    dataset_url: "https://overpass.atownsend.org.uk/api/interpreter"
+    licence: "ODbL-1.0"
+    refresh_cadence: "monthly"
+    notes: "Amenity counts from OSM tag queries via Overpass API. Britain & Ireland regional instance. ODbL licence requires attribution."
+
 # -----------------------------------------------------------------------------
 # Indicators
 # -----------------------------------------------------------------------------
@@ -700,3 +709,96 @@ indicators:
     confidence: "modelled"
     caveats:
       - "Interpolated from nearby monitoring stations using inverse distance weighting. Actual local exposure may vary."
+
+  # ---------------------------------------------------------------------------
+  # Infrastructure (OSM Overpass)
+  # ---------------------------------------------------------------------------
+
+  - key: infrastructure.schools_count
+    label: "Schools"
+    description: "Count of schools (amenity=school) within the place boundary from OpenStreetMap."
+    unit: "count"
+    higher_is: null
+    source_id: "osm_overpass"
+    available_at: ["ltla24", "utla24"]
+    refresh_cadence: "monthly"
+    caveats:
+      - "Count from OpenStreetMap data. Coverage varies by area — some schools may be missing or miscategorised."
+
+  - key: infrastructure.hospitals_count
+    label: "Hospitals"
+    description: "Count of hospitals (amenity=hospital) within the place boundary from OpenStreetMap."
+    unit: "count"
+    higher_is: null
+    source_id: "osm_overpass"
+    available_at: ["ltla24", "utla24"]
+    refresh_cadence: "monthly"
+    caveats:
+      - "Count from OpenStreetMap data. Coverage varies by area."
+
+  - key: infrastructure.libraries_count
+    label: "Libraries"
+    description: "Count of libraries (amenity=library) within the place boundary from OpenStreetMap."
+    unit: "count"
+    higher_is: null
+    source_id: "osm_overpass"
+    available_at: ["ltla24", "utla24"]
+    refresh_cadence: "monthly"
+
+  - key: infrastructure.community_centres_count
+    label: "Community centres"
+    description: "Count of community centres (amenity=community_centre) within the place boundary from OpenStreetMap."
+    unit: "count"
+    higher_is: null
+    source_id: "osm_overpass"
+    available_at: ["ltla24", "utla24"]
+    refresh_cadence: "monthly"
+
+  - key: infrastructure.parks_count
+    label: "Parks"
+    description: "Count of parks (leisure=park) within the place boundary from OpenStreetMap."
+    unit: "count"
+    higher_is: null
+    source_id: "osm_overpass"
+    available_at: ["ltla24", "utla24"]
+    refresh_cadence: "monthly"
+
+  - key: infrastructure.pharmacies_count
+    label: "Pharmacies"
+    description: "Count of pharmacies (amenity=pharmacy) within the place boundary from OpenStreetMap."
+    unit: "count"
+    higher_is: null
+    source_id: "osm_overpass"
+    available_at: ["ltla24", "utla24"]
+    refresh_cadence: "monthly"
+
+  - key: infrastructure.gp_practices_count
+    label: "GP practices and clinics"
+    description: "Count of clinics and healthcare facilities (amenity=clinic, healthcare=clinic) within the place boundary from OpenStreetMap."
+    unit: "count"
+    higher_is: null
+    source_id: "osm_overpass"
+    available_at: ["ltla24", "utla24"]
+    refresh_cadence: "monthly"
+    caveats:
+      - "Includes amenity=clinic and healthcare=clinic tags. May not capture all GP practices, which are sometimes tagged differently."
+
+  - key: infrastructure.sports_facilities_count
+    label: "Sports facilities"
+    description: "Count of sports facilities (leisure=sports_centre, leisure=pitch, leisure=sports_hub) within the place boundary from OpenStreetMap."
+    unit: "count"
+    higher_is: null
+    source_id: "osm_overpass"
+    available_at: ["ltla24", "utla24"]
+    refresh_cadence: "monthly"
+
+  - key: infrastructure.food_banks_count
+    label: "Food banks"
+    description: "Count of food banks (amenity=food_bank, social_facility=food_bank) within the place boundary from OpenStreetMap."
+    unit: "count"
+    higher_is: null
+    source_id: "osm_overpass"
+    available_at: ["ltla24", "utla24"]
+    refresh_cadence: "monthly"
+    caveats:
+      - "Food bank tagging in OSM is inconsistent. May undercount actual provision."
