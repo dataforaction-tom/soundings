@@ -71,12 +71,17 @@ class InsightCalloutBlock(BaseModel):
     evidence: str
 
 
+class MapOverlay(BaseModel):
+    source: Literal["air_quality", "organisations", "amenities"]
+
+
 class MapBlock(BaseModel):
     type: Literal["map"]
     place_id: str
     indicator_key: str | None = None
     period: str | None = None
     caption: str | None = None
+    overlay: MapOverlay | None = None
 
 
 class DistributionChartBlock(BaseModel):

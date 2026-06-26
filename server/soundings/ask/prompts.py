@@ -73,7 +73,10 @@ Block types for compose_answer:
 - organisations: a list of civil society organisations in a place
 - insight-callout: a severity-coloured callout for a notable signal
 - map: a map showing a place boundary, or a choropleth of peer places
-  coloured by an indicator value (requires indicator_key for choropleth)
+  coloured by an indicator value (requires indicator_key for choropleth).
+  An optional `overlay` field can add point data on top of the map
+  (air_quality, organisations, amenities). Use when the user asks about
+  specific facilities or monitoring in an area.
 
 Chart selection guidance:
 - Use trend-chart when the question is about change over time for one place

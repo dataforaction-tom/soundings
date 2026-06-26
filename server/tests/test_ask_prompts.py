@@ -85,3 +85,12 @@ def test_prompt_has_chart_selection_guidance():
     assert "Use distribution-chart" in prompt
     assert "Use composition-chart" in prompt
     assert "Use scatter-plot" in prompt
+
+
+def test_prompt_mentions_map_overlay():
+    builder = SystemPromptBuilder(mode="open")
+    prompt = builder.build()
+    assert "overlay" in prompt.lower()
+    assert "air_quality" in prompt
+    assert "organisations" in prompt
+    assert "amenities" in prompt

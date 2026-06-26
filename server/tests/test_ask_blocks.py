@@ -13,6 +13,7 @@ from soundings.ask.blocks import (
     IndicatorCardBlock,
     InsightCalloutBlock,
     MapBlock,
+    MapOverlay,
     OrganisationsBlock,
     ScatterPlotBlock,
     TextBlock,
@@ -174,6 +175,36 @@ def test_map_block_discriminator():
     raw = {"type": "map", "place_id": "ltla24:E06000047"}
     b = _adapter.validate_python(raw)
     assert isinstance(b, MapBlock)
+
+
+def test_map_block_overlay_defaults_none():
+    b = MapBlock(type="map", place_id="ltla24:E06000047")
+    assert b.overlay is None
+
+
+def test_map_block_with_air_quality_overlay():
+    b = MapBlock(
+        type="map",
+        place_id="ltla24:E06000047",
+        overlay=MapOverlay(source="air_quality"),
+    )
+    assert b.overlay is not None
+    assert b.overlay.source == "air_quality"
+
+
+def test_map_block_with_organisations_overlay():
+    b = MapBlock(
+        type="map",
+        place_id="ltla24:E06000047",
+        overlay=MapOverlay(source="organisations"),
+    )
+    assert b.overlay is not None
+    assert b.overlay.source == "organisations"
+
+
+def test_map_overlay_rejects_bad_source():
+    with pytest.raises(ValidationError):
+        MapOverlay(source="unknown")  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------
