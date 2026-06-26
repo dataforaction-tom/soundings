@@ -182,29 +182,80 @@ def test_map_block_overlay_defaults_none():
     assert b.overlay is None
 
 
-def test_map_block_with_air_quality_overlay():
+def test_map_block_with_amenities_overlay():
     b = MapBlock(
         type="map",
         place_id="ltla24:E06000047",
-        overlay=MapOverlay(source="air_quality"),
+        overlay=MapOverlay(source="amenities", indicator_keys=["infrastructure.food_banks_count"]),
     )
     assert b.overlay is not None
-    assert b.overlay.source == "air_quality"
+    assert b.overlay.source == "amenities"
+    assert b.overlay.indicator_keys == ["infrastructure.food_banks_count"]
 
 
-def test_map_block_with_organisations_overlay():
+def test_map_block_with_multiple_indicator_keys():
     b = MapBlock(
         type="map",
         place_id="ltla24:E06000047",
-        overlay=MapOverlay(source="organisations"),
+        overlay=MapOverlay(
+            source="amenities",
+            indicator_keys=["infrastructure.food_banks_count", "infrastructure.leisure_centres"],
+        ),
     )
     assert b.overlay is not None
-    assert b.overlay.source == "organisations"
+    assert len(b.overlay.indicator_keys) == 2
 
 
 def test_map_overlay_rejects_bad_source():
     with pytest.raises(ValidationError):
         MapOverlay(source="unknown")  # type: ignore[arg-type]
+
+
+def test_map_block_accepts_granularity_and_amenity_overlay():
+    args = ComposeAnswerArgs.model_validate(
+        {
+            "blocks": [
+                {
+                    "type": "map",
+                    "place_id": "ltla24:E06000047",
+                    "indicator_key": "deprivation.imd.score",
+                    "granularity": "sub_areas",
+                },
+                {
+                    "type": "map",
+                    "place_id": "ltla24:E06000047",
+                    "overlay": {
+                        "source": "amenities",
+                        "indicator_keys": ["infrastructure.food_banks_count"],
+                    },
+                },
+            ]
+        }
+    )
+    assert args.blocks[0].granularity == "sub_areas"
+    assert args.blocks[1].overlay.indicator_keys == ["infrastructure.food_banks_count"]
+
+
+def test_map_block_granularity_defaults_to_peers():
+    args = ComposeAnswerArgs.model_validate(
+        {"blocks": [{"type": "map", "place_id": "ltla24:E06000047", "indicator_key": "x"}]}
+    )
+    assert args.blocks[0].granularity == "peers"
+
+
+def test_amenity_overlay_rejects_empty_indicator_keys():
+    with pytest.raises(ValidationError):
+        ComposeAnswerArgs.model_validate(
+            {
+                "blocks": [
+                    {
+                        "type": "map",
+                        "place_id": "ltla24:E06000047",
+                        "overlay": {"source": "amenities", "indicator_keys": []},
+                    }
+                ]
+            }
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -72,13 +72,17 @@ class InsightCalloutBlock(BaseModel):
 
 
 class MapOverlay(BaseModel):
-    source: Literal["air_quality", "organisations", "amenities"]
+    # v1: amenity point locations only. air_quality/organisations had no point
+    # data and were never implemented.
+    source: Literal["amenities"]
+    indicator_keys: list[str] = Field(min_length=1, max_length=6)
 
 
 class MapBlock(BaseModel):
     type: Literal["map"]
     place_id: str
     indicator_key: str | None = None
+    granularity: Literal["sub_areas", "peers"] = "peers"
     period: str | None = None
     caption: str | None = None
     overlay: MapOverlay | None = None
