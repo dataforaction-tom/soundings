@@ -15,5 +15,9 @@ htmlcov/
 # Environment
 .env
 
+# Node / Vitest
+node_modules/
+.vite/
+
 # Superpowers brainstorming mockups (local-only)
 .superpowers/
