@@ -85,7 +85,7 @@ async def test_orchestrator_streams_status_and_done() -> None:
     events, cb = _collect_events()
     state = _make_fake_state()
     dispatcher = _make_dispatcher(state)
-    prompt_builder = SystemPromptBuilder(mode="open")
+    prompt_builder = SystemPromptBuilder()
 
     # Claude first calls find_place, then compose_answer
     responses = [
@@ -152,7 +152,7 @@ async def test_orchestrator_emits_sources() -> None:
         )
     )
 
-    prompt_builder = SystemPromptBuilder(mode="open")
+    prompt_builder = SystemPromptBuilder()
 
     responses = [
         _FakeResponse(
@@ -186,7 +186,7 @@ async def test_orchestrator_respects_max_iterations() -> None:
     events, cb = _collect_events()
     state = _make_fake_state()
     dispatcher = _make_dispatcher(state)
-    prompt_builder = SystemPromptBuilder(mode="open")
+    prompt_builder = SystemPromptBuilder()
 
     # Claude keeps calling find_place forever
     infinite_responses = [
@@ -215,7 +215,7 @@ async def test_orchestrator_handles_no_tool_calls() -> None:
     events, cb = _collect_events()
     state = _make_fake_state()
     dispatcher = _make_dispatcher(state)
-    prompt_builder = SystemPromptBuilder(mode="open")
+    prompt_builder = SystemPromptBuilder()
 
     responses = [
         _FakeResponse([_FakeTextBlock("I can't help with that.")]),
@@ -254,7 +254,7 @@ async def test_orchestrator_tool_error_does_not_crash() -> None:
         side_effect=RuntimeError("DB connection failed")
     )
     dispatcher = _make_dispatcher(state)
-    prompt_builder = SystemPromptBuilder(mode="open")
+    prompt_builder = SystemPromptBuilder()
 
     responses = [
         _FakeResponse(

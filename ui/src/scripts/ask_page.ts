@@ -9,7 +9,6 @@
       if (surface) {
         const apiBase = surface.dataset.apiBase ?? "";
         const mapTilesUrl = surface.dataset.mapTiles ?? "";
-        const mode = surface.dataset.mode || "summary";
         const placeId = surface.dataset.placeId || undefined;
         // Read the question from the surface's data attribute — NOT
         // `querySelector("h1")`, which returns the layout's "Soundings" header
@@ -864,6 +863,147 @@
           host.appendChild(figure);
         }
 
+        // sub-area-table -----------------------------------------------------
+
+        interface SubAreaEntry {
+          place_id: string;
+          name: string;
+          value: number | null;
+          percentile?: number | null;
+        }
+
+        function asSubAreas(v: unknown): SubAreaEntry[] {
+          if (!Array.isArray(v)) return [];
+          return v
+            .map((entry): SubAreaEntry | null => {
+              if (typeof entry !== "object" || entry === null) return null;
+              const r = entry as Record<string, unknown>;
+              const place_id =
+                typeof r.place_id === "string" ? r.place_id : "";
+              const name = typeof r.name === "string" ? r.name : "";
+              const value =
+                typeof r.value === "number" && Number.isFinite(r.value)
+                  ? r.value
+                  : null;
+              const percentile =
+                typeof r.percentile === "number" &&
+                Number.isFinite(r.percentile)
+                  ? r.percentile
+                  : null;
+              return { place_id, name, value, percentile };
+            })
+            .filter((e): e is SubAreaEntry => e !== null);
+        }
+
+        function renderSubAreaTableBlock(
+          host: HTMLElement,
+          block: { type: string; [k: string]: unknown },
+        ) {
+          const subAreas = asSubAreas(block.sub_areas);
+          if (subAreas.length === 0) {
+            showBlockError(
+              host,
+              "Sub-area table missing sub_areas data.",
+            );
+            return;
+          }
+          const hasPercentile = subAreas.some(
+            (e) => e.percentile !== null && e.percentile !== undefined,
+          );
+          const period = asStringOrUndef(block.period);
+          const caption = asStringOrUndef(block.caption);
+          const parentValue =
+            typeof block.parent_value === "number" &&
+            Number.isFinite(block.parent_value)
+              ? (block.parent_value as number)
+              : null;
+          const parentLabel = asStringOrUndef(block.parent_label);
+
+          const container = document.createElement("div");
+          container.className =
+            "sub-area-table-block answer-block";
+
+          if (caption) {
+            const cap = document.createElement("p");
+            cap.className = "sub-area-caption";
+            cap.textContent = caption;
+            container.appendChild(cap);
+          }
+
+          const table = document.createElement("table");
+          table.className = "sub-area-table";
+          const thead = document.createElement("thead");
+          const headRow = document.createElement("tr");
+          const thName = document.createElement("th");
+          thName.textContent = "Neighbourhood";
+          headRow.appendChild(thName);
+          const thValue = document.createElement("th");
+          thValue.textContent = "Value";
+          headRow.appendChild(thValue);
+          if (hasPercentile) {
+            const thPct = document.createElement("th");
+            thPct.textContent = "Percentile";
+            headRow.appendChild(thPct);
+          }
+          thead.appendChild(headRow);
+          table.appendChild(thead);
+
+          const tbody = document.createElement("tbody");
+          for (const entry of subAreas) {
+            const tr = document.createElement("tr");
+            const tdName = document.createElement("td");
+            tdName.textContent = entry.name || entry.place_id;
+            tr.appendChild(tdName);
+            const tdValue = document.createElement("td");
+            tdValue.textContent = formatValue(entry.value);
+            tdValue.className = "num";
+            tr.appendChild(tdValue);
+            if (hasPercentile) {
+              const tdPct = document.createElement("td");
+              tdPct.className = "num";
+              tdPct.textContent =
+                entry.percentile !== null && entry.percentile !== undefined
+                  ? "p" + Math.round(entry.percentile)
+                  : "—";
+              tr.appendChild(tdPct);
+            }
+            tbody.appendChild(tr);
+          }
+          table.appendChild(tbody);
+
+          if (parentValue !== null) {
+            const tfoot = document.createElement("tfoot");
+            const tr = document.createElement("tr");
+            tr.className = "parent-row";
+            const tdLabel = document.createElement("td");
+            tdLabel.textContent =
+              parentLabel ?? "Parent average";
+            tr.appendChild(tdLabel);
+            const tdValue = document.createElement("td");
+            tdValue.textContent = formatValue(parentValue);
+            tdValue.className = "num";
+            tr.appendChild(tdValue);
+            if (hasPercentile) {
+              const tdPct = document.createElement("td");
+              tdPct.textContent = "";
+              tr.appendChild(tdPct);
+            }
+            tfoot.appendChild(tr);
+            table.appendChild(tfoot);
+          }
+
+          container.appendChild(table);
+
+          if (period) {
+            const periodP = document.createElement("p");
+            periodP.className = "sub-area-period text-muted text-small";
+            periodP.textContent = period;
+            container.appendChild(periodP);
+          }
+
+          host.appendChild(container);
+        }
+
         function renderBlock(block: { type: string; [k: string]: unknown }) {
           const host = document.createElement("div");
           host.className = "answer-block block-" + block.type;
@@ -933,6 +1073,10 @@
               renderScatterPlotBlock(host, block, apiBase);
               break;
             }
+            case "sub-area-table": {
+              renderSubAreaTableBlock(host, block);
+              break;
+            }
             default: {
               const ph = document.createElement("div");
               ph.className = "block-placeholder block-unknown";
@@ -992,7 +1136,7 @@
           surface.appendChild(div);
         }
 
-        const body: Record<string, unknown> = { query, mode };
+        const body: Record<string, unknown> = { query };
         if (placeId) body.place_id = placeId;
 
         // Clear the "Thinking…" status placeholder once first event arrives.

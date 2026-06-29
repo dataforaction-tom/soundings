@@ -197,6 +197,14 @@ def test_dispatcher_has_get_peer_distribution_handler() -> None:
     assert callable(handlers["get_peer_distribution"])
 
 
+def test_dispatcher_has_get_sub_areas_handler() -> None:
+    """get_sub_areas is in _handlers so dispatch() can route to it."""
+    dispatcher = _make_dispatcher()
+    handlers = dispatcher._handlers
+    assert "get_sub_areas" in handlers
+    assert callable(handlers["get_sub_areas"])
+
+
 @pytest.mark.asyncio
 async def test_dispatcher_dispatch_get_peer_distribution() -> None:
     """Dispatching get_peer_distribution returns the peer distribution payload."""
