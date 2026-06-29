@@ -1,7 +1,7 @@
 # State
 
-> Last updated: 2026-06-24
-> Status: **Phase 6 — ask interface built.** Server foundation + UI shipped; live test pending API key.
+> Last updated: 2026-06-29
+> Status: **Phase 6 — ask interface deepened.** Give Food food-bank source + neighbourhood-granularity ask improvements shipped on `feat/neighbourhood-granularity`; live test still pending API key.
 
 ## System State Diagram
 
@@ -75,6 +75,8 @@ stateDiagram-v2
 || **Phase 6 — New data sources** | 🔧 Planning | URL validation complete; priority: Ofcom, Ofsted, BEIS EPC, DEFRA Air, CQC, Land Registry, DfT. 50+ new indicators across 4 new domains (digital, environment, housing-extended, safety). |
 | **Ask interface — `/v1/ask` + `/ask` page** | ✅ Phase 6 (ask) | Claude tool-use loop over existing tools. SSE streaming. 4 modes (open/summary/compare/insight). detect_insights SQL detector. AskBox on homepage + place page. |
 | **Ask interface — live test** | ⏳ Pending | `@pytest.mark.live` test written; needs `ANTHROPIC_API_KEY` in GitHub Secrets for nightly CI. |
+| **Give Food food-bank source** | ✅ Phase 6 (ask) | `adapters/givefood/` (client + adapter): trims the national food-bank dump, counts via point-in-polygon, map points + pre-warming. Replaces the retired OSM food-bank tag. `get_amenities_geometry` now routes each indicator to the adapter that owns it (per catalogue `source_id`), so food banks come from Give Food while schools/GPs stay on OSM. |
+| **Neighbourhood granularity (ask)** | ✅ Phase 6 (ask) | New `get_sub_areas` tool returns LSOA/ward-level values for all children of a parent place in one call (with parent value for context) + `SubAreaTableBlock` answer block. `compare_places` gained `context_place_ids` (compare an LSOA against its LTLA average via `_build_context_comparison`, `is_context=True`, skips level enforcement). System prompt teaches Claude that "neighbourhood" = LSOA/ward. UI: AskBox + ask page + `ask_page.ts`. |
 
 Status markers
 
