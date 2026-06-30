@@ -9,11 +9,13 @@ function against the shared state, and returns ``model_dump(mode="json")``.
 not execute it — the orchestrator owns that step.
 """
 
+import logging
 from typing import Any
 
+from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import text
 
-from soundings.ask.blocks import ComposeAnswerArgs
+from soundings.ask.blocks import AnswerBlock, ComposeAnswerArgs
 from soundings.tools.compare_places import (
     ComparePlacesInput,
     compare_places,
@@ -85,6 +87,12 @@ from soundings.tools.get_trend import (
     tool_spec as get_trend_spec,
 )
 
+logger = logging.getLogger(__name__)
+
+# Validates a single block in isolation, so one malformed block can be dropped
+# without failing the whole answer (see _parse_compose_answer).
+_ANSWER_BLOCK_ADAPTER: TypeAdapter[Any] = TypeAdapter(AnswerBlock)
+
 TERMINAL_TOOL = "compose_answer"
 
 COMPOSE_ANSWER_DESCRIPTION = (
@@ -135,7 +143,31 @@ class ToolDispatcher:
         return tool_name == TERMINAL_TOOL
 
     def _parse_compose_answer(self, args: dict[str, Any]) -> ComposeAnswerArgs:
-        return ComposeAnswerArgs.model_validate(args)
+        """Parse the terminal compose_answer call, dropping blocks that fail
+        validation rather than failing the whole answer.
+
+        The model occasionally emits a block that violates a field constraint —
+        e.g. a compare-chart with a single place_id for "how does X compare to
+        peers?" (the chart needs at least two). Mirroring the trim-don't-reject
+        philosophy of `_enforce_caps` and `_sanitise_blocks`, an individually
+        invalid block is discarded so the rest of the answer still renders. If
+        nothing survives, raise so a fully broken answer fails loudly.
+        """
+        raw_blocks = args.get("blocks")
+        if not isinstance(raw_blocks, list):
+            # Malformed top-level payload — let the model surface its own error.
+            return ComposeAnswerArgs.model_validate(args)
+
+        valid: list[Any] = []
+        for raw in raw_blocks:
+            try:
+                valid.append(_ANSWER_BLOCK_ADAPTER.validate_python(raw))
+            except ValidationError:
+                block_type = raw.get("type") if isinstance(raw, dict) else None
+                logger.warning("Dropping invalid compose_answer block (type=%s)", block_type)
+        if not valid:
+            raise ValueError("compose_answer produced no valid blocks")
+        return ComposeAnswerArgs(blocks=valid)
 
     async def _known_keys(self) -> set[str]:
         """Valid indicator keys from the catalogue (fetched once, then cached)."""

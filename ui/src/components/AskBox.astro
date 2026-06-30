@@ -51,23 +51,7 @@ const examples = hasPlace ? examplesWithPlace : examplesNoPlace;
 </form>
 
 <script>
-  function initAskBox(root: HTMLElement) {
-    const chips = root.querySelectorAll<HTMLButtonElement>(".example-chip");
-    const qInput = root.querySelector<HTMLInputElement>("input[name='q']");
-    const form = root.querySelector<HTMLFormElement>(".ask-box");
-    if (!qInput || !form) return;
-
-    for (const chip of chips) {
-      chip.addEventListener("click", () => {
-        qInput.value = chip.dataset.example ?? "";
-        form.requestSubmit();
-      });
-    }
-  }
-
-  document
-    .querySelectorAll<HTMLElement>(".ask-box")
-    .forEach(initAskBox);
+  import "../scripts/ask_box";
 </script>
 
 <style>
