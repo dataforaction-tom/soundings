@@ -1,7 +1,10 @@
 # State
 
-> Last updated: 2026-06-29
-> Status: **Phase 6 — ask interface deepened.** Give Food food-bank source + neighbourhood-granularity ask improvements shipped on `feat/neighbourhood-granularity`; live test still pending API key.
+> Last updated: 2026-06-30
+> Status: **Phase 6 dual-track.** 6a (depth) shipped — ask interface, Give Food
+> food-bank source, neighbourhood granularity (merged from
+> `feat/neighbourhood-granularity`); ask live test still pending API key.
+> 6b (breadth — NDL data-source expansion) in planning.
 
 ## System State Diagram
 
@@ -20,12 +23,13 @@ stateDiagram-v2
     Phase4Build --> Phase4Done: blocks 0–F complete, tag v0.5.0-phase-4
     Phase4Done --> Phase5Build: phase 5 plan accepted
     Phase5Build --> Phase5Done: corpus release + doc pass
-    Phase5Done --> Phase6Build: phase 6 plan accepted
-    Phase6Build --> Phase6DataSources: URL validation + priority sources
-    Phase6DataSources --> Phase6Done: 50+ new indicators across 4 new domains
+    Phase5Done --> Phase6aDepth: phase 6 pivots to depth
+    Phase6aDepth --> Phase6aDone: ask interface + Give Food + neighbourhood granularity shipped
+    Phase6aDone --> Phase6bBreadth: NDL data-source expansion planned
+    Phase6bBreadth --> Phase6Done: ~75-85+ new indicators across 5-6 new domains
     Phase6Done --> [*]: not started
 
-    note right of Phase6Build: ← WE ARE HERE
+    note right of Phase6bBreadth: ← WE ARE HERE
 ```
 
 ## Component Status
@@ -72,7 +76,7 @@ stateDiagram-v2
 || **Phase 5 — First monthly corpus release** | ✅ Phase 5 | Published 2026-05-24; see `docs/corpus/`. |
 || **Phase 5 — Doc pass** | ✅ Phase 5 | DRIs, error messages, inline docs reviewed. |
 | **`get_civil_society_profile` tool + CivilSocietyPanel** | ✅ Phase 6 slice 1 | Total, income distribution + median/mean, registration cohort trend. CC loader extended to capture `latest_income`, `date_of_registration`, `date_of_removal`. |
-|| **Phase 6 — New data sources** | 🔧 Planning | URL validation complete; priority: Ofcom, Ofsted, BEIS EPC, DEFRA Air, CQC, Land Registry, DfT. 50+ new indicators across 4 new domains (digital, environment, housing-extended, safety). |
+|| **Phase 6b — New data sources (NDL)** | 🔧 Planning | NDL exploration complete (2026-06-29); priority: EPC, DEFRA Air, Land Registry (HPI + Price Paid), Ofsted, DfT, Ofcom, CQC. NDL also surfaced homelessness, dwelling stock, rents, transport connectivity, noise, woodlands. ~75–85+ new indicators across 5–6 new domains. |
 | **Ask interface — `/v1/ask` + `/ask` page** | ✅ Phase 6 (ask) | Claude tool-use loop over existing tools. SSE streaming. 4 modes (open/summary/compare/insight). detect_insights SQL detector. AskBox on homepage + place page. |
 | **Ask interface — live test** | ⏳ Pending | `@pytest.mark.live` test written; needs `ANTHROPIC_API_KEY` in GitHub Secrets for nightly CI. |
 | **Give Food food-bank source** | ✅ Phase 6 (ask) | `adapters/givefood/` (client + adapter): trims the national food-bank dump, counts via point-in-polygon, map points + pre-warming. Replaces the retired OSM food-bank tag. `get_amenities_geometry` now routes each indicator to the adapter that owns it (per catalogue `source_id`), so food banks come from Give Food while schools/GPs stay on OSM. |
