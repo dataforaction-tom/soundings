@@ -131,6 +131,42 @@ def test_dispatcher_compose_answer_rejects_invalid() -> None:
         dispatcher._parse_compose_answer(args)
 
 
+def test_parse_compose_answer_drops_one_bad_block_keeps_rest() -> None:
+    """A single malformed block (e.g. a compare-chart with one place_id, which
+    the model emits for 'how does X compare to peers?') must not nuke the whole
+    answer — it is dropped while valid blocks survive."""
+    dispatcher = _make_dispatcher()
+    args = {
+        "blocks": [
+            {"type": "text", "markdown": "Sheffield is in the 70th percentile."},
+            {
+                "type": "compare-chart",
+                "indicator_key": "population.total",
+                "place_ids": ["ltla24:E08000019"],  # only 1 — below min_length=2
+            },
+        ]
+    }
+    parsed = dispatcher._parse_compose_answer(args)
+    assert [b.type for b in parsed.blocks] == ["text"]
+
+
+def test_parse_compose_answer_raises_when_all_blocks_invalid() -> None:
+    """If nothing survives validation, surface a clear error rather than an
+    empty answer (preserves the all-garbage failure case)."""
+    dispatcher = _make_dispatcher()
+    args = {
+        "blocks": [
+            {
+                "type": "compare-chart",
+                "indicator_key": "population.total",
+                "place_ids": ["ltla24:E08000019"],
+            }
+        ]
+    }
+    with pytest.raises(ValueError):
+        dispatcher._parse_compose_answer(args)
+
+
 @pytest.mark.asyncio
 async def test_dispatcher_dispatch_find_place() -> None:
     dispatcher = _make_dispatcher()
