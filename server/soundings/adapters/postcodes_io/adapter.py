@@ -128,15 +128,23 @@ class PostcodesIoAdapter(PassthroughAdapter):
         return response.json()
 
     async def upsert_postcode(self, postcode: str) -> PostcodeLookup | None:
-        """Look up the postcode and upsert the result into geography.postcode."""
+        """Look up the postcode and upsert the result into geography.postcode.
+
+        Applies the same FK-tolerant filtering as `bulk_upsert`: a partial
+        geography spine (e.g. this project drops the MSOA layer) means some
+        place references have no `geography.place` row, so NULL those out
+        rather than letting the upsert FK-fail.
+        """
         result = await self.lookup(postcode)
         if result is None:
             return None
         normalised = _normalise_postcode(postcode)
+        valid_place_ids = await self._fetch_known_place_ids(set(result.place_id_references()))
+        filtered = result.with_fk_safe(valid_place_ids)
         async with self._engine.begin() as conn:
-            await conn.execute(_upsert_postcode_stmt(normalised, result))
-        result.postcode = normalised
-        return result
+            await conn.execute(_upsert_postcode_stmt(normalised, filtered))
+        filtered.postcode = normalised
+        return filtered
 
     async def bulk_upsert(self, postcodes: list[str]) -> dict[str, PostcodeLookup | None]:
         """Resolve up to N postcodes via postcodes.io's bulk endpoint.
