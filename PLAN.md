@@ -60,7 +60,19 @@ to `main`.
         prompt teaches LSOA/ward = "neighbourhood"; UI updates.
         Plan: `docs/plans/2026-06-26-neighbourhood-granularity-plan.md`.
 - [ ] **Phase 6b (breadth)** — New data sources via the National Data Library.
-      **Planning underway.**
+      **In progress.**
+  - [x] Companies House — aggregates-only bulk loader (Economy depth).
+        `adapters/companies_house/` (streaming CSV client + per-LTLA
+        aggregation). 3 indicators: `economy.active_companies_count`,
+        `economy.active_companies_per_1000`, `economy.new_incorporations_12m`.
+        Bulk carve-out (API has no area filter — same as Charity Commission);
+        reuses the shared `postcodes_io.resolver`. Live schema smoke green.
+        Plan: `docs/plans/2026-06-30-companies-house-loader-plan.md`.
+  - [ ] Green spaces — OS Open Greenspace (parks/area) + FoE tree canopy
+        (licence to verify). Next.
+  - [ ] Follow-up: load ONS NSPL/ONSPD bulk once to pre-warm
+        `geography.postcode` — speeds up Companies House and every other
+        postcode-based loader.
 
 ## Phase 6a: Depth — beautiful presentation, narrative, natural-language query
 
