@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { colourDomain, amenityLayerLabel, amenityLegendItems } from "../map-renderer";
+import {
+  colourDomain,
+  amenityLayerLabel,
+  amenityLegendItems,
+  hasFiniteValues,
+  rankFractions,
+} from "../map-renderer";
 import { PALETTE } from "../chart";
 
 describe("colourDomain", () => {
@@ -17,6 +23,31 @@ describe("colourDomain", () => {
 
   it("handles a single value (min === max)", () => {
     expect(colourDomain([7])).toEqual([7, 7, 7]);
+  });
+});
+
+describe("hasFiniteValues", () => {
+  it("is false when no value is a finite number", () => {
+    expect(hasFiniteValues([null, undefined, NaN])).toBe(false);
+    expect(hasFiniteValues([])).toBe(false);
+  });
+  it("is true when at least one value is finite", () => {
+    expect(hasFiniteValues([null, 3, undefined])).toBe(true);
+  });
+});
+
+describe("rankFractions", () => {
+  it("maps smallest→0 and largest→1, preserving order", () => {
+    expect(rankFractions([10, 30, 20])).toEqual([0, 1, 0.5]);
+  });
+  it("returns null for non-finite entries and spreads the rest", () => {
+    expect(rankFractions([5, null, 15, 25])).toEqual([0, null, 0.5, 1]);
+  });
+  it("gives a single finite value a mid rank", () => {
+    expect(rankFractions([null, 42])).toEqual([null, 0.5]);
+  });
+  it("returns all-null when there are no finite values", () => {
+    expect(rankFractions([null, undefined])).toEqual([null, null]);
   });
 });
 
