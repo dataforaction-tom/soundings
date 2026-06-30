@@ -1,35 +1,8 @@
 """System prompt builder for the ask orchestrator.
 
-Modes are knobs on the system prompt — they all use the same /v1/ask
-endpoint and the same answer renderer. The mode is a per-request hint;
-the model is allowed to flex if the user's free text expresses a different
-intent.
+A single system prompt is used for all questions — the model infers intent
+from the user's free text and picks the appropriate tools and block types.
 """
-
-from typing import Literal
-
-AskMode = Literal["open", "summary", "compare", "insight"]
-
-_MODE_EMPHASIS: dict[AskMode, str] = {
-    "open": (
-        "You are a generalist. Pick whichever tools fit the question. Be thorough but concise."
-    ),
-    "summary": (
-        "Emphasise breadth across all available domains. Aim for one "
-        "indicator card per major domain. Close each section with a short "
-        "narrative paragraph."
-    ),
-    "compare": (
-        "Always include at least one compare-chart block. Ground your "
-        "narrative in percentile framing. Resolve peers via compare_places' "
-        "same-type peer universe."
-    ),
-    "insight": (
-        "Lead with the deterministic signals from detect_insights. "
-        "Include one insight-callout per signal, ordered by severity. "
-        "Your narrative explains the 'so what' for each signal."
-    ),
-}
 
 _SCOPE_DESCRIPTION = """\
 Soundings answers questions about UK places using open data. The available
@@ -47,6 +20,17 @@ Infrastructure indicators (infrastructure.*_count) are counts of OSM amenities
 within a place boundary. Coverage varies by area — some amenities may be
 missing or miscategorised in OpenStreetMap.
 
+Geography levels: indicators are available at different geography levels.
+Most indicators work at ltla24 (Local Authority District) level. Some
+indicators are also available at lsoa21 (Lower Layer Super Output Area —
+small neighbourhoods of ~1,500 people) and msoa21 (Middle Layer Super
+Output Area). Ward-level (ward24) data is available for a subset of
+indicators (Census population, health, education, housing). When a user says
+"neighbourhood", "local area", or "small area", they likely mean LSOA
+level — use find_place and prefer lsoa21 matches when the question is
+about neighbourhood-scale analysis. Check the indicator available_at before
+calling get_indicators at a non-LTLA level — if it is not available, say so.
+
 When the user asks how many of a facility a place has, or to "show me"
 facilities — schools, food banks, GP practices, libraries, parks, hospitals,
 pharmacies, community centres, sports facilities — answer with get_indicators
@@ -58,13 +42,26 @@ food banks operate here". If an amenity count is unavailable, say so
 explicitly rather than presenting charity results as if they were facility
 counts.
 
-- find_place: resolve a place name or postcode to a canonical geography ID
+- find_place: resolve a place name or postcode to a canonical geography ID.
+  Pass geography_types to filter (e.g. ["lsoa21"] for neighbourhood-scale,
+  ["ltla24"] for district-scale). For "neighbourhood" questions, prefer
+  lsoa21 matches. Postcodes resolve to all containing levels — use the
+  most granular one that has indicators available.
 - get_place_profile: baseline summary of a place across domains
 - get_indicators: fetch specific indicators for a place
-- compare_places: compare a place against peers (percentile, rank, absolute, rate)
+- compare_places: compare a place against peers (percentile, rank, absolute, rate).
+  Pass context_place_ids to include parent-level places as context rows
+  (e.g. compare two LSOAs with their LTLA as context: place_ids=['lsoa21:A',
+  'lsoa21:B'], context_place_ids=['ltla24:X']). Use for 'how do these
+  neighbourhoods compare to each other and to the district average?'
 - get_trend: fetch a time series for an indicator at a place
 - get_peer_distribution: get all peer values for an indicator at a place
   (use for distribution charts and scatter plots — not for simple comparisons)
+- get_sub_areas: get all sub-area (LSOA/neighbourhood) values for an indicator
+  within a parent place. Use for 'most deprived neighbourhoods in X' or
+  'show me neighbourhood-level [indicator] in X'. Returns each child's
+  value plus the parent's own value for context. Pair with a sub_areas map
+  (granularity='sub_areas') to show the geographic distribution.
 - find_organisations_in_place: find charities and civil society orgs in a place
   (pass activity_filter cause keywords to narrow to a theme)
 - get_civil_society_profile: summary of the charity sector in a place
@@ -77,6 +74,26 @@ If a question is out of scope (weather, news, opinions, advice, anything not
 answerable by the tools above), respond with a single text block explaining
 what Soundings can help with and suggest the user try summarising a place or
 comparing two.
+
+Infer the user's intent from their question — there are no explicit modes:
+- Summary questions ("tell me about X", "overview of X") → breadth across
+  domains, one indicator card per major domain, close each section with a
+  short narrative paragraph.
+- Compare questions ("how does X compare to Y", "X vs its peers") → call
+  compare_places, include at least one compare-chart block, ground your
+  narrative in percentile framing.
+- Insight questions ("what's unusual about X", "surprise me") → call
+  detect_insights, lead with one insight-callout per signal ordered by
+  severity, explain the 'so what'.
+- Distribution questions ("where does X sit", "how typical is X") → call
+  get_peer_distribution and include a distribution-chart block.
+- Neighbourhood questions ('most deprived neighbourhoods in X',
+  'show me [indicator] by neighbourhood') → call get_sub_areas for the
+  parent place, include a sub_areas choropleth map, and list the most
+  extreme sub-areas with their values.
+- Neighbourhood comparison ('how do these neighbourhoods compare',
+  'compare LSOAs in X') → call compare_places with the LSOA place_ids
+  and the parent LTLA as a context_place_id.
 """
 
 _BLOCK_GUIDANCE = """\
@@ -108,6 +125,11 @@ Block types for compose_answer:
     food banks / schools" questions, e.g. indicator_keys:
     ["infrastructure.food_banks_count","infrastructure.schools_count"]. Pair with
     the matching infrastructure.*_count indicators when the user also wants counts.
+- sub-area-table: a table of sub-area (neighbourhood) values within a parent
+  place. Use after calling get_sub_areas — the block carries the sub_areas
+  data inline. Pair with a sub_areas choropleth map for the geographic view.
+  Sort by value (most extreme first) so the user sees the standout
+  neighbourhoods without scrolling.
 
 Chart selection guidance:
 - Use trend-chart when the question is about change over time for one place
@@ -146,18 +168,13 @@ title and narrative (e.g. "Food-poverty charities in X by income band", not
 
 
 class SystemPromptBuilder:
-    """Builds the system prompt with mode-specific emphasis and optional
-    pinned-place context."""
+    """Builds the system prompt with optional pinned-place context."""
 
     def __init__(
         self,
-        mode: AskMode = "open",
         place_name: str | None = None,
         place_id: str | None = None,
     ) -> None:
-        if mode not in _MODE_EMPHASIS:
-            raise ValueError(f"Invalid mode: {mode}")
-        self.mode = mode
         self.place_name = place_name
         self.place_id = place_id
 
@@ -167,8 +184,6 @@ class SystemPromptBuilder:
             " UK places using open data.",
             "",
             _SCOPE_DESCRIPTION,
-            "",
-            f"Mode: {self.mode}. {_MODE_EMPHASIS[self.mode]}",
             "",
             _BLOCK_GUIDANCE,
         ]

@@ -30,6 +30,9 @@ class ComparePlacesInput(BaseModel):
     indicators: list[str]
     comparison_basis: ComparisonBasis = "percentile"
     period: str | None = None
+    # Context places (e.g. parent LTLA) shown alongside peers for reference;
+    # they do not participate in peer ranking.
+    context_place_ids: list[str] = Field(default_factory=list)
 
 
 class ComparePlacesOutput(BaseModel):
@@ -65,6 +68,7 @@ async def compare_places(
         indicators=input.indicators,
         basis=input.comparison_basis,
         period=input.period,
+        context_place_ids=input.context_place_ids,
     )
     return ComparePlacesOutput(
         results=result.comparisons,

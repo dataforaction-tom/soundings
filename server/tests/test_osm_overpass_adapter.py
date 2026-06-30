@@ -233,19 +233,25 @@ async def test_amenity_locations_builds_feature_collection() -> None:
     await _seed_place()
     fake = _FakeLocationsClient(
         {
-            ("amenity", "food_bank"): [{"lat": 54.77, "lng": -1.57, "name": "Durham Foodbank"}],
-            ("social_facility", "food_bank"): [{"lat": 54.70, "lng": -1.50, "name": "Pantry"}],
+            ("amenity", "library"): [{"lat": 54.77, "lng": -1.57, "name": "Durham Library"}],
         }
     )
     adapter = OsmOverpassAdapter(get_engine(), overpass_client=fake)
-    fc = await adapter.amenity_locations("infrastructure.food_banks_count", "ltla24:E06000004")
+    fc = await adapter.amenity_locations("infrastructure.libraries_count", "ltla24:E06000004")
 
     assert fc is not None and fc["type"] == "FeatureCollection"
-    assert len(fc["features"]) == 2
+    assert len(fc["features"]) == 1
     f0 = fc["features"][0]
-    assert f0["geometry"]["type"] == "Point"
-    assert f0["geometry"]["coordinates"] == [-1.57, 54.77]  # [lng, lat]
-    assert f0["properties"]["layer"] == "infrastructure.food_banks_count"
+    assert f0["geometry"]["coordinates"] == [-1.57, 54.77]
+    assert f0["properties"]["layer"] == "infrastructure.libraries_count"
+
+
+async def test_osm_no_longer_serves_food_banks() -> None:
+    await _seed_place()
+    adapter = OsmOverpassAdapter(get_engine(), overpass_client=_FakeOverpassClient({}))
+    assert (
+        await adapter.fetch_indicator("infrastructure.food_banks_count", "ltla24:E06000004", None)
+    ) is None
 
 
 async def test_amenity_locations_unknown_indicator_returns_none() -> None:

@@ -1,7 +1,8 @@
 # Plan
 
-> Last updated: 2026-05-25
-> Status: **Phase 5 complete.** Phase 6 — new data sources (planning underway).
+> Last updated: 2026-06-30
+> Status: **Phase 5 complete.** Phase 6 runs as two tracks — **6a (depth)
+> shipping**, **6b (breadth) in planning**.
 
 ## Objective
 
@@ -45,25 +46,57 @@ to `main`.
 - [x] Phase 5 — First monthly corpus release, doc pass. **Complete.**
 - [x] UI Design — Apply Good Ship branding, new design system. **Complete.**
 - [x] Phase 6 — Civil society profile slice (`get_civil_society_profile` tool + panel). Follow-ups: funder rollup, map, ask interface.
-- [x] Ask interface — `/v1/ask` endpoint with Claude tool-use loop, SSE streaming, `detect_insights`, `SystemPromptBuilder`, `AskOrchestrator`, `ToolDispatcher`, block schema. `/ask` page with `AskBox` + `answer_stream.ts`. MCP registration. 12 commits, 40+ tests. Live test pending API key in CI.
-- [ ] Phase 6 — New data sources. **Planning underway.**
+- [x] **Phase 6a (depth)** — Deepen what we have rather than adding sources.
+  - [x] Ask interface — `/v1/ask` endpoint with Claude tool-use loop, SSE
+        streaming, `detect_insights`, `SystemPromptBuilder`, `AskOrchestrator`,
+        `ToolDispatcher`, block schema. `/ask` page with `AskBox` +
+        `answer_stream.ts`. MCP registration. Live test pending API key in CI.
+  - [x] Give Food food banks — `adapters/givefood/` (client + adapter) replacing
+        the retired OSM food-bank tag; point-in-polygon counts, map points,
+        pre-warming. `get_amenities_geometry` routes each indicator to the
+        adapter that owns it. Plan: `docs/plans/2026-06-26-givefood-foodbanks.md`.
+  - [x] Neighbourhood granularity — `get_sub_areas` tool + `SubAreaTableBlock`;
+        `compare_places` `context_place_ids` for cross-level comparison; system
+        prompt teaches LSOA/ward = "neighbourhood"; UI updates.
+        Plan: `docs/plans/2026-06-26-neighbourhood-granularity-plan.md`.
+- [ ] **Phase 6b (breadth)** — New data sources via the National Data Library.
+      **Planning underway.**
 
-## Phase 6: Data Source Expansion
+## Phase 6a: Depth — beautiful presentation, narrative, natural-language query
 
-See `docs/plans/2026-05-24-phase-6-data-sources-plan.md` for detailed plan.
+Shipped. The pivot (2026-05-31) reoriented Phase 6 away from breadth-first
+source expansion toward deepening the data we already hold: a natural-language
+ask interface, richer presentation, and finer (neighbourhood) granularity.
+Delivered on `feat/neighbourhood-granularity` (ask interface, Give Food food
+banks, LSOA/ward granularity). Remaining follow-up: enable the `@pytest.mark.live`
+ask test in nightly CI once `ANTHROPIC_API_KEY` is in GitHub Secrets.
 
-**Goal:** Expand beyond 8 core domains with high-value neighbourhood data.
+## Phase 6b: Breadth — Data Source Expansion (NDL)
 
-**Priority sources (URL validation complete):**
-|| # | Source | New Domain | Indicators | Status |
-||---|--------|------------|------------|--------|
-|| 1 | Ofcom Connected Nations | Digital | 6 | ⚠️ Redirects |
-|| 2 | Ofsted | Education | 4 | ⚠️ Changed |
-|| 3 | BEIS Energy Performance | Housing (EPC) | 8 | ✅ Works |
-|| 4 | DEFRA Air Quality | Environment | 6 | ✅ API key needed |
-|| 5 | CQC Care Quality | Health | 4 | ✅ Works |
-|| 6 | Land Registry | Housing | 8 | ✅ Works |
-|| 7 | DfT Road Safety | Safety | 5 | ✅ Works |
+See `docs/plans/2026-05-24-phase-6-data-sources-plan.md` for the detailed,
+NDL-revised plan.
+
+**Goal:** Expand beyond 8 core domains with high-value neighbourhood data,
+sourcing through the rebranded National Data Library (data.gov.uk) where listed.
+
+**Revised priority sources (NDL exploration, 2026-06-29):**
+|| # | Source | New Domain | NDL Listed? | Status |
+||---|--------|------------|-------------|--------|
+|| 1 | BEIS Energy Performance (EPC) | Housing | ✅ Land & property | Download verified |
+|| 2 | DEFRA Air Quality | Environment | ✅ Environment | New AURN CSV URL |
+|| 3 | Land Registry (HPI + Price Paid) | Housing | ✅ Land & property (×2) | URLs verified |
+|| 4 | Ofsted (schools + early years) | Education | ✅ People (×2) | Access via NDL |
+|| 5 | DfT Road Safety | Safety | ✅ Transport | Access via NDL |
+|| 6 | Ofcom Connected Nations | Digital | ❌ Not in NDL | Direct URL needed |
+|| 7 | CQC Care Quality | Health | ❌ Not in NDL | Direct from CQC |
+
+**New sources surfaced by NDL (not in original plan):** homelessness, dwelling
+stock & vacancies, rents & lettings, transport connectivity, road/rail noise,
+forest & woodlands, pupil attendance, social mobility, water quality,
+food hygiene ratings.
+
+**Revised target:** ~75–85+ new indicators across 5–6 new domains
+(digital, environment, housing-extended, safety, transport, + social).
 
 **UK-wide deprivation (additional):**
 || Source | Coverage | Status |
@@ -71,8 +104,7 @@ See `docs/plans/2026-05-24-phase-6-data-sources-plan.md` for detailed plan.
 || Scottish IMD | Scotland | ✅ Works (2020v2) |
 || Welsh IMD 2025 | Wales | ⚠️ ODS 404s |
 || NI Deprivation | N. Ireland | ✅ Works |
-
-**Target:** 50+ new indicators across 4 new domains (digital, environment, housing-extended, safety)
+|| NDL Deprivation sub-topic | UK-wide? | ✅ Listed — needs investigation |
 
 ## Decisions Made
 
@@ -96,6 +128,8 @@ See `docs/plans/2026-05-24-phase-6-data-sources-plan.md` for detailed plan.
 | UI uses `linkedom` for SSR DOM polyfill | `@observablehq/plot` calls `document.createElement` internally; Node SSR has no native `document`. linkedom is lighter than jsdom and ships a spec-shaped DOM that Plot is happy with. | 2026-05-12 |
 | Phase 3 Block E onwards lands as squash-merged PRs | First three phases shipped as direct commits to `main`. From PR #1 onwards each block of Phase 3 is a feature branch + squashed PR — matches the global "always work on a branch" rule. | 2026-05-12 |
 | Phase 6 data source validation approach | URL validation first, then TDD implementation per adapter. Priority ordered by API stability: EPC/Land Registry → DEFRA → CQC → DfT. | 2026-05-24 |
+| Phase 6 pivots to depth-first | Stop breadth-first source expansion; deepen the data we hold via a natural-language ask interface, richer presentation, and neighbourhood granularity. | 2026-05-31 |
+| Phase 6 runs as two tracks | 6a (depth) shipped — ask interface, Give Food food banks, LSOA/ward granularity. 6b (breadth) resumes source expansion via the National Data Library. Depth shipped first; breadth is the next track. | 2026-06-30 |
 
 ## Open Questions
 

@@ -1,6 +1,6 @@
 """HTTP route for /v1/ask — the natural-language ask interface.
 
-POST /v1/ask with {query, place_id?, mode?} → SSE stream of events.
+POST /v1/ask with {query, place_id?} → SSE stream of events.
 """
 
 import asyncio
@@ -13,7 +13,7 @@ from pydantic import BaseModel
 
 from soundings.ask.dispatcher import ToolDispatcher
 from soundings.ask.orchestrator import AskOrchestrator
-from soundings.ask.prompts import AskMode, SystemPromptBuilder
+from soundings.ask.prompts import SystemPromptBuilder
 from soundings.core.config import get_settings
 
 router = APIRouter(prefix="/v1")
@@ -22,7 +22,6 @@ router = APIRouter(prefix="/v1")
 class AskInput(BaseModel):
     query: str
     place_id: str | None = None
-    mode: AskMode = "open"
 
 
 @router.post("/ask")
@@ -50,7 +49,6 @@ async def ask(input: AskInput, request: Request) -> StreamingResponse:
             place_name = row.name
 
     prompt_builder = SystemPromptBuilder(
-        mode=input.mode,
         place_name=place_name,
         place_id=input.place_id,
     )

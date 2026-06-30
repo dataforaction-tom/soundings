@@ -16,6 +16,8 @@ from soundings.ask.blocks import (
     MapOverlay,
     OrganisationsBlock,
     ScatterPlotBlock,
+    SubAreaEntry,
+    SubAreaTableBlock,
     TextBlock,
     TrendChartBlock,
 )
@@ -429,3 +431,69 @@ def test_scatter_plot_block_discriminator():
     }
     b = _adapter.validate_python(raw)
     assert isinstance(b, ScatterPlotBlock)
+
+
+# ---------------------------------------------------------------------------
+# SubAreaTableBlock
+# ---------------------------------------------------------------------------
+
+
+def test_sub_area_table_block_exists():
+    sub_areas = [
+        SubAreaEntry(
+            place_id="lsoa21:E01012587", name="Stockton Central", value=42.5, percentile=72.3
+        ),
+        SubAreaEntry(place_id="lsoa21:E01012588", name="Stockton North", value=38.1),
+    ]
+    b = SubAreaTableBlock(
+        type="sub-area-table",
+        parent_place_id="ltla24:E06000047",
+        indicator_key="deprivation.imd.score",
+        sub_areas=sub_areas,
+        parent_value=35.2,
+        period="2019",
+        caption="IMD scores for Stockton neighbourhoods",
+    )
+    assert b.type == "sub-area-table"
+    assert b.parent_place_id == "ltla24:E06000047"
+    assert b.indicator_key == "deprivation.imd.score"
+    assert len(b.sub_areas) == 2
+    assert b.sub_areas[0].name == "Stockton Central"
+    assert b.sub_areas[0].value == 42.5
+    assert b.sub_areas[0].percentile == 72.3
+    assert b.sub_areas[1].percentile is None
+    assert b.parent_value == 35.2
+    assert b.period == "2019"
+    assert b.caption == "IMD scores for Stockton neighbourhoods"
+
+
+def test_sub_area_table_in_answer_block_union():
+    args = ComposeAnswerArgs.model_validate(
+        {
+            "blocks": [
+                {"type": "text", "markdown": "Neighbourhood breakdown:"},
+                {
+                    "type": "sub-area-table",
+                    "parent_place_id": "ltla24:E06000047",
+                    "indicator_key": "deprivation.imd.score",
+                    "sub_areas": [
+                        {"place_id": "lsoa21:E01012587", "name": "Central", "value": 42.5},
+                        {"place_id": "lsoa21:E01012588", "name": "North"},
+                    ],
+                    "parent_value": 35.2,
+                    "period": "2019",
+                },
+            ]
+        }
+    )
+    assert len(args.blocks) == 2
+    sat = args.blocks[1]
+    assert isinstance(sat, SubAreaTableBlock)
+    assert sat.parent_place_id == "ltla24:E06000047"
+    assert sat.indicator_key == "deprivation.imd.score"
+    assert len(sat.sub_areas) == 2
+    assert sat.sub_areas[0].value == 42.5
+    assert sat.sub_areas[1].value is None
+    assert sat.parent_value == 35.2
+    assert sat.period == "2019"
+    assert sat.caption is None

@@ -219,7 +219,7 @@ def _extract_locations(payload: Any, max_results: int) -> list[dict[str, Any]]:
         if lat is None or lon is None:
             continue
         tags = el.get("tags") if isinstance(el.get("tags"), dict) else {}
-        name = tags.get("name")
+        name = tags.get("name") if isinstance(tags, dict) else None
         out.append(
             {"lat": float(lat), "lng": float(lon), "name": name if isinstance(name, str) else None}
         )

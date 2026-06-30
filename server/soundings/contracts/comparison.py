@@ -30,3 +30,6 @@ class Comparison(BaseModel):
     source: SourceRef
     methodology_note: str | None = None
     caveats: list[str] = Field(default_factory=list)
+    # Context places are shown for reference (e.g. parent LTLA alongside
+    # LSOA peers) but do not participate in peer ranking.
+    is_context: bool = False

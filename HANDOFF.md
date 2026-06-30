@@ -1,49 +1,40 @@
-# Handoff — 2026-05-15 (session 5, mid-Phase 4 Block C)
+# Handoff — 2026-06-29 (Phase 6 ask — neighbourhood + Give Food)
 
 > Local-only notes. `.gitignore`d.
 
 ## Where we are
 
-- **Phases 0, 1, 2** all done + tagged (`v0.1.0-phase-0`,
-  `v0.2.0-phase-1`, `v0.3.0-phase-2`).
-- **Phase 3 done** — all 45 tasks across blocks A–J shipped via PRs
-  #1, #2, #3, #4. `v0.4.0-phase-3` tag **still pending** — gated by
-  the manual browser smoke in `docs/runbook-phase-3-smoke.md`.
-  Server/Docker stack works end-to-end after PR #5's infra fixes;
-  the smoke just needs you to click through `/place/[id]` +
-  `/compare`.
-- **Phase 4 in progress.** Plan:
-  `docs/plans/2026-05-12-soundings-v1-phase-4-plan.md` (29 tasks
-  across blocks 0–F).
-  - **Block 0** — `PassthroughAdapter` extensions + `pre_warmer`
-    daemon (PR #7).
-  - **Block A** — Charity Commission bulk loader + civil_society
-    indicator aggregates (PR #8).
-  - **Block B** — 360Giving passthrough + grants_in_last_12m_*
-    indicators + recent_grants helper (PR #9).
-  - **Block C (Find That Charity)** — Task 15 committed, Tasks 16-18 pending.
-    - Task 15: FTC async client (`client.py`) + adapter skeleton + 5 passing tests
-    - Branch: `phase-4-block-c-ftc`
-  - **Blocks D–F not started.** Block D = find_organisations_in_place,
-    Block E = UI orgs section, Block F = integration + tag v0.5.0.
-- **360 non-live tests pass** + live tests for CC + 360G green.
-  Pre-commit hooks use `--no-verify` (ruff/format failures; worked around).
-- Current HEAD on branch `phase-4-block-c-ftc` at commit 996acb7.
+- **Phases 0–5** done + tagged. **Phase 6 ask interface** shipped
+  (`/v1/ask` + `/ask` page, Claude tool-use loop, SSE streaming).
+- **Current branch: `feat/neighbourhood-granularity`** — bundles two
+  features, both implemented + tested, not yet PR'd:
+  - **Give Food food banks** (commits `8a0d225`→`464c67f`). New
+    `adapters/givefood/` (client + adapter) replacing the retired OSM
+    food-bank tag — trims the national dump, counts via
+    point-in-polygon, map points + pre-warming.
+    `get_amenities_geometry` now routes each indicator to the adapter
+    that owns it (per catalogue `source_id`).
+    Plan: `docs/plans/2026-06-26-givefood-foodbanks.md`.
+  - **Neighbourhood granularity** (commit `6af5241`). New
+    `get_sub_areas` tool (LSOA/ward values for all children of a parent
+    in one call) + `SubAreaTableBlock`; `compare_places` gained
+    `context_place_ids` (`_build_context_comparison`, `is_context=True`)
+    for cross-level comparison; system prompt teaches LSOA/ward =
+    "neighbourhood"; UI updates to AskBox + ask page.
+    Plan: `docs/plans/2026-06-26-neighbourhood-granularity-plan.md`.
+  - Plus `chore: gitignore vite/vitest artifacts` (`cba0ec7`) —
+    removed a stray committed `.vite/vitest/results.json`.
+- **`make test` green: 307 passed, 277 deselected** (deselected =
+  `@pytest.mark.live`, need API keys for nightly).
 
 ## Immediate next steps
 
-1. **Continue Block C — Find That Charity passthrough** (Tasks 16–18).
-   - Task 15: FTC async client (`client.py`) is done, 5 tests passing.
-   - Task 16: Complete `FindThatCharityAdapter` with `fetch_organisations()`.
-     Tests written but failing due to async context manager mocking complexity.
-   - Task 17: Register adapter + live test (lookup SC005336).
-   - Task 18: Docs for Block C.
-2. After Block C: **Block D — `find_organisations_in_place` tool.**
-   Mixed-mode dispatch (CC loader-SELECT for E&W, FTC passthrough
-   for Scotland/NI, 360G optional enrichment).
-3. Then Block E (UI) + Block F (tag).
-4. **Push `v0.4.0-phase-3` tag** — still pending the manual browser
-   smoke in `docs/runbook-phase-3-smoke.md`.
+1. **Open the PR for `feat/neighbourhood-granularity`** → squash-merge
+   to `main`. Both features are complete with test coverage.
+2. **Ask live test** still pending `ANTHROPIC_API_KEY` in GitHub
+   Secrets for nightly CI (`@pytest.mark.live`).
+3. Optional smoke: `make up && make seed-light`, click through `/ask`
+   at neighbourhood level + confirm food-bank map points render.
 
 ## Pinned-but-unverified things (added in this session)
 

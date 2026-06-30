@@ -64,7 +64,6 @@ async def test_ask_summary_returns_text_and_indicator_blocks() -> None:
                 json={
                     "query": "Summarise Stockton-on-Tees",
                     "place_id": "ltla24:E06000004",
-                    "mode": "summary",
                 },
             )
     assert response.status_code == 200

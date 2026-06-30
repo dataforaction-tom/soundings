@@ -7,7 +7,6 @@ export const prerender = false;
 const url = new URL(Astro.request.url);
 const query = (url.searchParams.get("q") ?? "").trim();
 const placeId = url.searchParams.get("place_id") ?? "";
-const mode = url.searchParams.get("mode") ?? "summary";
 
 // Browser-facing base for the streaming /v1/ask + block-data fetches. These run
 // in the visitor's browser, so they must NOT use the internal `SOUNDINGS_API_BASE`
@@ -39,7 +38,7 @@ const mapTilesUrl =
   <AskBox placeId={placeId || undefined} />
 
   {query ? (
-    <div id="answer-surface" class="answer-surface" data-api-base={apiBase} data-map-tiles={mapTilesUrl} data-query={query} data-mode={mode} data-place-id={placeId}>
+    <div id="answer-surface" class="answer-surface" data-api-base={apiBase} data-map-tiles={mapTilesUrl} data-query={query} data-place-id={placeId}>
       <p class="answer-status">Thinking…</p>
     </div>
   ) : (
@@ -365,6 +364,55 @@ const mapTilesUrl =
     }
     #answer-surface .choropleth-legend .legend-min { float: left; }
     #answer-surface .choropleth-legend .legend-max { float: right; }
+    /* sub-area-table */
+    .sub-area-table-block {
+      margin-bottom: var(--space-lg);
+    }
+    .sub-area-table-block .sub-area-caption {
+      margin: 0 0 var(--space-sm);
+      font-size: var(--font-size-sm);
+      color: var(--color-text-light);
+    }
+    .sub-area-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius);
+      overflow: hidden;
+      font-size: var(--font-size-sm);
+    }
+    .sub-area-table th,
+    .sub-area-table td {
+      padding: var(--space-sm) var(--space-md);
+      text-align: left;
+      border-bottom: 1px solid var(--color-border-light);
+    }
+    .sub-area-table thead th {
+      background: var(--color-bg);
+      font-weight: var(--font-weight-medium);
+      color: var(--color-primary);
+    }
+    .sub-area-table td.num {
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+    }
+    .sub-area-table th:last-child,
+    .sub-area-table td:last-child {
+      text-align: right;
+    }
+    .sub-area-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+    .sub-area-table .parent-row td {
+      background: var(--color-bg);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text);
+      border-top: 2px solid var(--color-border);
+    }
+    .sub-area-table-block .sub-area-period {
+      margin: var(--space-xs) 0 0;
+    }
     .answer-error {
       background: #fee2e2;
       color: #991b1b;

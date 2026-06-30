@@ -185,7 +185,7 @@ indicators:
     unit: "people"
     higher_is: null
     source_id: "ons.mid_year_estimates"
-    available_at: ["lsoa21", "msoa21", "ltla24", "utla24", "region", "country"]
+    available_at: ["lsoa21", "msoa21", "ward24", "ltla24", "utla24", "region", "country"]
     refresh_cadence: "annual"
     caveats:
       - "Mid-year estimates are revised after each Census. Older years may be rebased."
@@ -200,7 +200,7 @@ indicators:
     unit: "people per km²"
     higher_is: null
     source_id: "ons.mid_year_estimates"
-    available_at: ["lsoa21", "msoa21", "ltla24", "utla24", "region", "country"]
+    available_at: ["lsoa21", "msoa21", "ward24", "ltla24", "utla24", "region", "country"]
     refresh_cadence: "annual"
     related_keys:
       - "population.total"
@@ -211,7 +211,7 @@ indicators:
     unit: "people"
     higher_is: null
     source_id: "ons.mid_year_estimates"
-    available_at: ["lsoa21", "msoa21", "ltla24", "utla24", "region", "country"]
+    available_at: ["lsoa21", "msoa21", "ward24", "ltla24", "utla24", "region", "country"]
     refresh_cadence: "annual"
 
   - key: population.age_structure.over_65
@@ -220,7 +220,7 @@ indicators:
     unit: "people"
     higher_is: null
     source_id: "ons.mid_year_estimates"
-    available_at: ["lsoa21", "msoa21", "ltla24", "utla24", "region", "country"]
+    available_at: ["lsoa21", "msoa21", "ward24", "ltla24", "utla24", "region", "country"]
     refresh_cadence: "annual"
 
   - key: population.ethnicity.non_white_british_share
@@ -229,7 +229,7 @@ indicators:
     unit: "proportion"
     higher_is: null
     source_id: "ons.census2021"
-    available_at: ["lsoa21", "msoa21", "ltla24", "utla24", "region", "country"]
+    available_at: ["lsoa21", "msoa21", "ward24", "ltla24", "utla24", "region", "country"]
     refresh_cadence: "decennial"
     caveats:
       - "Ethnic group categories changed between censuses. Comparisons across decades require care."
@@ -241,7 +241,7 @@ indicators:
     unit: "households"
     higher_is: null
     source_id: "ons.census2021"
-    available_at: ["lsoa21", "msoa21", "ltla24", "utla24", "region", "country"]
+    available_at: ["lsoa21", "msoa21", "ward24", "ltla24", "utla24", "region", "country"]
     refresh_cadence: "decennial"
 
   - key: population.households.lone_parent_share
@@ -250,7 +250,7 @@ indicators:
     unit: "proportion"
     higher_is: null
     source_id: "ons.census2021"
-    available_at: ["lsoa21", "msoa21", "ltla24", "utla24", "region", "country"]
+    available_at: ["lsoa21", "msoa21", "ward24", "ltla24", "utla24", "region", "country"]
     refresh_cadence: "decennial"
 
   # ---------------------------------------------------------------------------
@@ -461,7 +461,7 @@ indicators:
     unit: "proportion"
     higher_is: "worse"
     source_id: "ons.census2021"
-    available_at: ["lsoa21", "msoa21", "ltla24", "utla24", "region", "country"]
+    available_at: ["lsoa21", "msoa21", "ward24", "ltla24", "utla24", "region", "country"]
     refresh_cadence: "decennial"
 
   - key: health.under_75_mortality.preventable
@@ -519,7 +519,7 @@ indicators:
     unit: "proportion"
     higher_is: "worse"
     source_id: "ons.census2021"
-    available_at: ["lsoa21", "msoa21", "ltla24", "utla24", "region", "country"]
+    available_at: ["lsoa21", "msoa21", "ward24", "ltla24", "utla24", "region", "country"]
     refresh_cadence: "decennial"
 
   # ---------------------------------------------------------------------------
@@ -561,7 +561,7 @@ indicators:
     unit: "proportion"
     higher_is: null
     source_id: "ons.census2021"
-    available_at: ["lsoa21", "msoa21", "ltla24", "utla24", "region", "country"]
+    available_at: ["lsoa21", "msoa21", "ward24", "ltla24", "utla24", "region", "country"]
     refresh_cadence: "decennial"
 
   - key: housing.overcrowding_share
@@ -570,7 +570,7 @@ indicators:
     unit: "proportion"
     higher_is: "worse"
     source_id: "ons.census2021"
-    available_at: ["lsoa21", "msoa21", "ltla24", "utla24", "region", "country"]
+    available_at: ["lsoa21", "msoa21", "ward24", "ltla24", "utla24", "region", "country"]
     refresh_cadence: "decennial"
 
   # ---------------------------------------------------------------------------
@@ -794,11 +794,11 @@ indicators:
 
   - key: infrastructure.food_banks_count
     label: "Food banks"
-    description: "Count of food banks (amenity=food_bank, social_facility=food_bank) within the place boundary from OpenStreetMap."
+    description: "Count of food bank distribution locations within the place boundary, from Give Food (givefood.org.uk)."
     unit: "count"
     higher_is: null
-    source_id: "osm_overpass"
+    source_id: "givefood"
     available_at: ["ltla24", "utla24"]
-    refresh_cadence: "monthly"
+    refresh_cadence: "daily"
     caveats:
-      - "Food bank tagging in OSM is inconsistent. May undercount actual provision."
+      - "Food bank locations from Give Food, updated daily. Counts distribution locations whose coordinates fall within the place boundary."

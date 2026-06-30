@@ -157,7 +157,6 @@ def build_mcp_server(state: Any | None = None) -> FastMCP:
     async def _ask(
         query: str,
         place_id: str | None = None,
-        mode: str = "open",
     ) -> dict[str, Any]:
         """Ask a natural-language question about a UK place."""
         if state is None:
@@ -187,7 +186,6 @@ def build_mcp_server(state: Any | None = None) -> FastMCP:
                 place_name = row.name
 
         prompt_builder = SystemPromptBuilder(
-            mode=mode,  # type: ignore[arg-type]
             place_name=place_name,
             place_id=place_id,
         )

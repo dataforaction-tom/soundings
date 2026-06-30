@@ -6,6 +6,23 @@ interface Props {
 
 const { placeId, placeName } = Astro.props;
 const hasPlace = Boolean(placeId);
+
+// Example questions — these fill the input and submit, teaching the user
+// what kinds of questions work.  The model infers intent from the text.
+const examplesWithPlace = [
+  "Summarise this place",
+  "How does it compare to peers?",
+  "What are the most deprived neighbourhoods here?",
+  "Where are the food banks?",
+];
+
+const examplesNoPlace = [
+  "Summarise Stockton-on-Tees",
+  "How does Sheffield compare to peers?",
+  "Most deprived neighbourhoods in Middlesbrough",
+  "Where are the food banks in Leeds?",
+];
+const examples = hasPlace ? examplesWithPlace : examplesNoPlace;
 ---
 
 <form class="ask-box" method="get" action="/ask">
@@ -24,52 +41,26 @@ const hasPlace = Boolean(placeId);
     <button type="submit" class="ask-submit">Ask</button>
   </div>
 
-  <fieldset class="mode-chips" aria-label="Answer mode">
-    <legend class="mode-legend">Mode</legend>
-    <button type="button" class="mode-chip is-active" data-mode="summary">
-      Summary
-    </button>
-    <button type="button" class="mode-chip" data-mode="compare">
-      Compare
-    </button>
-    <button type="button" class="mode-chip" data-mode="insight">
-      Surprise me
-    </button>
-    <input type="hidden" name="mode" value="summary" class="mode-input" />
-  </fieldset>
+  <div class="example-chips" role="group" aria-label="Example questions">
+    {examples.map((q) => (
+      <button type="button" class="example-chip" data-example={q}>
+        {q}
+      </button>
+    ))}
+  </div>
 </form>
 
 <script>
-  const placeholders: Record<string, string> = {
-    summary: "Summarise this place — population, deprivation, key indicators…",
-    compare: "Compare this place against its peers…",
-    insight: "Surprise me — show me something unexpected about this place…",
-  };
-
   function initAskBox(root: HTMLElement) {
-    const chips = root.querySelectorAll<HTMLButtonElement>(".mode-chip");
-    const input = root.querySelector<HTMLInputElement>(".mode-input");
+    const chips = root.querySelectorAll<HTMLButtonElement>(".example-chip");
     const qInput = root.querySelector<HTMLInputElement>("input[name='q']");
     const form = root.querySelector<HTMLFormElement>(".ask-box");
-    if (!input || !form) return;
-
-    const placeId = form.querySelector<HTMLInputElement>(
-      "input[name='place_id']",
-    );
+    if (!qInput || !form) return;
 
     for (const chip of chips) {
       chip.addEventListener("click", () => {
-        for (const c of chips) c.classList.remove("is-active");
-        chip.classList.add("is-active");
-        const mode = chip.dataset.mode ?? "summary";
-        input.value = mode;
-        if (qInput) qInput.placeholder = placeholders[mode] ?? placeholders.summary!;
-
-        // Auto-submit when a place is already selected and the user has
-        // typed a question, so mode switching feels instant on a place page.
-        if (placeId && qInput && qInput.value.trim().length > 0) {
-          form.requestSubmit();
-        }
+        qInput.value = chip.dataset.example ?? "";
+        form.requestSubmit();
       });
     }
   }
@@ -97,22 +88,13 @@ const hasPlace = Boolean(placeId);
   .ask-submit {
     padding: var(--space-md) var(--space-xl);
   }
-  .mode-chips {
-    border: none;
-    padding: 0;
-    margin: 0;
+  .example-chips {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-sm);
     align-items: center;
   }
-  .mode-legend {
-    font-size: var(--font-size-sm);
-    color: var(--color-muted);
-    margin-right: var(--space-sm);
-    padding: 0;
-  }
-  .mode-chip {
+  .example-chip {
     display: inline-flex;
     align-items: center;
     padding: var(--space-sm) var(--space-md);
@@ -125,20 +107,8 @@ const hasPlace = Boolean(placeId);
     cursor: pointer;
     transition: background-color 0.15s ease, border-color 0.15s ease;
   }
-  .mode-chip:hover {
+  .example-chip:hover {
     background: var(--color-bg);
     border-color: var(--color-accent);
-  }
-  .mode-chip.is-active {
-    background: var(--color-accent);
-    color: white;
-    border-color: var(--color-accent);
-  }
-  .mode-chip.is-active:hover {
-    background: var(--color-accent-hover);
-    border-color: var(--color-accent-hover);
-  }
-  .mode-input {
-    display: none;
   }
 </style>

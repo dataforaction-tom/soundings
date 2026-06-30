@@ -216,13 +216,14 @@ class IndicatorOrchestrator:
         indicators: list[str],
         basis: ComparisonBasis = "percentile",
         period: str | None = None,
+        context_place_ids: list[str] | None = None,
     ) -> CompareResult:
         comparisons: list[Comparison] = []
         sources: list[SourceRef] = []
         caveats: list[str] = []
         partial = False
 
-        if not place_ids:
+        if not place_ids and not context_place_ids:
             return CompareResult(comparisons=[], sources=[], caveats=[], partial=False)
         peer_type, _, _ = place_ids[0].partition(":")
 
@@ -247,6 +248,22 @@ class IndicatorOrchestrator:
                 partial = True
                 caveats.append(f"{indicator_key}: no values returned for peer universe")
                 continue
+
+            # Build a separate Comparison for context places (e.g. parent
+            # LTLA alongside LSOA peers). Context places skip level
+            # enforcement, carry no percentile/rank, and are flagged
+            # is_context=True so consumers can render them as reference.
+            if context_place_ids:
+                ctx_comparison = await self._build_context_comparison(
+                    indicator_key=indicator_key,
+                    context_place_ids=context_place_ids,
+                    period=period,
+                    peer_comparison=comparison,
+                )
+                if ctx_comparison is not None:
+                    comparisons.append(ctx_comparison)
+                    sources.append(ctx_comparison.source)
+
             comparisons.append(comparison)
             sources.append(comparison.source)
             caveats.extend(ind_caveats)
@@ -256,6 +273,54 @@ class IndicatorOrchestrator:
             sources=self._dedup_sources(sources),
             caveats=caveats,
             partial=partial,
+        )
+
+    async def _build_context_comparison(
+        self,
+        *,
+        indicator_key: str,
+        context_place_ids: list[str],
+        period: str | None,
+        peer_comparison: Comparison,
+    ) -> Comparison | None:
+        """Fetch values for context places (skipping level enforcement).
+
+        Context places sit outside the peer universe — their value is shown
+        for reference alongside the ranked peers. Errors (indicator not
+        available at that level, adapter failure, etc.) are swallowed
+        silently because context is informational, not critical.
+        """
+        context_values: list[ComparisonValue] = []
+        source_ref = peer_comparison.source
+        for cid in context_place_ids:
+            try:
+                adapter = await self._registry.adapter_for_indicator(indicator_key)
+                result: IndicatorValue | None = await adapter.fetch_indicator(
+                    indicator_key, cid, period
+                )
+            except Exception:  # noqa: S112 — context is best-effort, swallow
+                continue
+            if result is None:
+                continue
+            context_values.append(
+                ComparisonValue(
+                    place_id=cid,
+                    value=result.value,
+                    rank=None,
+                    percentile=None,
+                )
+            )
+            source_ref = result.source
+        if not context_values:
+            return None
+        return Comparison(
+            indicator=indicator_key,
+            unit=peer_comparison.unit,
+            period=peer_comparison.period,
+            values=context_values,
+            source=source_ref,
+            caveats=[],
+            is_context=True,
         )
 
     async def _compare_one(

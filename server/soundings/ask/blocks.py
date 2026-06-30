@@ -116,6 +116,23 @@ class ScatterPlotBlock(BaseModel):
     caption: str | None = None
 
 
+class SubAreaEntry(BaseModel):
+    place_id: str
+    name: str
+    value: float | None = None
+    percentile: float | None = None
+
+
+class SubAreaTableBlock(BaseModel):
+    type: Literal["sub-area-table"]
+    parent_place_id: str
+    indicator_key: str
+    sub_areas: list[SubAreaEntry]
+    parent_value: float | None = None
+    period: str | None = None
+    caption: str | None = None
+
+
 AnswerBlock = Annotated[
     TextBlock
     | IndicatorCardBlock
@@ -126,7 +143,8 @@ AnswerBlock = Annotated[
     | MapBlock
     | DistributionChartBlock
     | CompositionChartBlock
-    | ScatterPlotBlock,
+    | ScatterPlotBlock
+    | SubAreaTableBlock,
     Field(discriminator="type"),
 ]
 

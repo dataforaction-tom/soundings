@@ -46,10 +46,6 @@ INDICATOR_TAGS: dict[str, list[dict[str, str]]] = {
         {"leisure": "pitch"},
         {"leisure": "sports_hub"},
     ],
-    "infrastructure.food_banks_count": [
-        {"amenity": "food_bank"},
-        {"social_facility": "food_bank"},
-    ],
 }
 
 
@@ -115,7 +111,7 @@ class OsmOverpassAdapter(PassthroughAdapter):
             confidence="official",
         )
 
-    async def amenity_locations(self, indicator_key: str, place_id: str) -> dict | None:
+    async def amenity_locations(self, indicator_key: str, place_id: str) -> dict[str, Any] | None:
         """GeoJSON FeatureCollection of amenity point locations for one
         indicator within a place. Cached under `osmgeo:{key}:{place_id}`.
 
