@@ -415,6 +415,40 @@ indicators:
     available_at: ["ltla24", "utla24", "westminster_constituency_24", "region", "country"]
     refresh_cadence: "monthly"
 
+  - key: economy.active_companies_count
+    label: "Active companies"
+    description: "Count of companies on the live register with a registered office in the area."
+    unit: "companies"
+    higher_is: null
+    source_id: "companies_house"
+    available_at: ["ltla24", "utla24"]
+    refresh_cadence: "monthly"
+    caveats:
+      - "Counted by registered-office postcode, which may differ from where a company trades."
+      - "Live register only; dissolved companies are excluded from the free data product."
+
+  - key: economy.active_companies_per_1000
+    label: "Active companies per 1,000 residents"
+    description: "Active companies per 1,000 resident population (registered-office basis)."
+    unit: "per 1,000 population"
+    higher_is: null
+    source_id: "companies_house"
+    available_at: ["ltla24", "utla24"]
+    refresh_cadence: "monthly"
+    caveats:
+      - "Registered-office basis; not a measure of business activity or employment."
+
+  - key: economy.new_incorporations_12m
+    label: "New company incorporations (last 12 months)"
+    description: "Companies incorporated in the 12 months to the snapshot date, by registered-office area."
+    unit: "companies"
+    higher_is: null
+    source_id: "companies_house"
+    available_at: ["ltla24", "utla24"]
+    refresh_cadence: "monthly"
+    caveats:
+      - "Derived from IncorporationDate within the live-register snapshot; companies incorporated then dissolved within the window are not counted."
+
   # ---------------------------------------------------------------------------
   # Health and wellbeing (Fingertips selection)
   # ---------------------------------------------------------------------------

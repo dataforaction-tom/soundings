@@ -16,6 +16,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from soundings.adapters.charity_commission.loader import CharityCommissionLoader
+from soundings.adapters.companies_house.loader import CompaniesHouseLoader
 from soundings.adapters.mhclg_imd2025.aggregation import aggregate_imd_to_ltla
 from soundings.adapters.mhclg_imd2025.loader import MhclgImd2019Loader, MhclgImd2025Loader
 from soundings.adapters.ons_census2021.loader import OnsCensus2021Loader
@@ -63,6 +64,9 @@ def build_source_registry(engine: AsyncEngine) -> dict[str, LoaderCallable]:
     async def _charity_commission() -> None:
         await CharityCommissionLoader(engine).load()
 
+    async def _companies_house() -> None:
+        await CompaniesHouseLoader(engine).load()
+
     return {
         "ons.geography": _geography,
         "ons.mid_year_estimates": _mye,
@@ -70,6 +74,7 @@ def build_source_registry(engine: AsyncEngine) -> dict[str, LoaderCallable]:
         "mhclg.imd2025": _imd2025,
         "mhclg.imd2019": _imd2019,
         "charity_commission": _charity_commission,
+        "companies_house": _companies_house,
     }
 
 
