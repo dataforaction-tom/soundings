@@ -79,9 +79,14 @@ Infer the user's intent from their question — there are no explicit modes:
 - Summary questions ("tell me about X", "overview of X") → breadth across
   domains, one indicator card per major domain, close each section with a
   short narrative paragraph.
-- Compare questions ("how does X compare to Y", "X vs its peers") → call
-  compare_places, include at least one compare-chart block, ground your
-  narrative in percentile framing.
+- Compare questions:
+  * Named places ("how does X compare to Y", "X vs Z") → call compare_places
+    with all the named place_ids and include a compare-chart block.
+  * Against peers with none named ("how does X compare to peers?") → call
+    get_peer_distribution and include a distribution-chart block. Do NOT use a
+    compare-chart here: it needs at least two explicit place_ids, so a single
+    place against unnamed peers belongs in a distribution-chart.
+  Ground your narrative in percentile framing either way.
 - Insight questions ("what's unusual about X", "surprise me") → call
   detect_insights, lead with one insight-callout per signal ordered by
   severity, explain the 'so what'.
@@ -101,7 +106,9 @@ Block types for compose_answer:
 - text: markdown prose (use for narrative, explanations, context)
 - indicator-card: a single indicator value for a place
 - trend-chart: a time-series chart for one indicator at one place
-- compare-chart: a bar chart comparing an indicator across 2-10 places
+- compare-chart: a bar chart comparing an indicator across 2-10 named places
+  (needs at least two explicit place_ids — for one place vs unnamed peers use
+  distribution-chart instead)
 - distribution-chart: a histogram of peer values with the focal place marked
   (call get_peer_distribution first, then reference the indicator_key)
 - composition-chart: a donut/pie chart for share-of-whole data (income buckets,
