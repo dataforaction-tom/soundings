@@ -68,11 +68,24 @@ to `main`.
         Bulk carve-out (API has no area filter — same as Charity Commission);
         reuses the shared `postcodes_io.resolver`. Live schema smoke green.
         Plan: `docs/plans/2026-06-30-companies-house-loader-plan.md`.
-  - [ ] Green spaces — OS Open Greenspace (parks/area) + FoE tree canopy
-        (licence to verify). Next.
+  - [x] Green spaces — **FoE Green Space Consolidated** loader (Environment).
+        LSOA + LTLA: `area_per_capita`, `access_pct`, `garden_area_per_capita`,
+        `deprivation_score`. OGL/OPL via the FoE near-you portal; FK-tolerant
+        (2011→2021 LSOA drift). Second LSOA-level dataset after deprivation.
+        Bundled with map fixes (peers period, rank colouring, no-data,
+        adapter registration). Plan: `docs/plans/2026-06-30-green-spaces-plan.md`.
+  - [ ] Green spaces (deferred to map epic) — OS Open Greenspace site polygons
+        + Woodland Opportunity. Their payoff is the map overlay; built with the
+        interactive-map epic, not as standalone loaders.
   - [ ] Follow-up: load ONS NSPL/ONSPD bulk once to pre-warm
         `geography.postcode` — speeds up Companies House and every other
         postcode-based loader.
+
+- [ ] **Interactive map** (depth) — one shared MapLibre component (inline +
+      explorer page): click popups/side panel, combined point+choropleth layers,
+      switchable geography levels. Spec:
+      `docs/specs/2026-07-01-interactive-map-design.md`. 6 increments; OS Open
+      Greenspace + Woodland fold in here.
 
 ## Phase 6a: Depth — beautiful presentation, narrative, natural-language query
 

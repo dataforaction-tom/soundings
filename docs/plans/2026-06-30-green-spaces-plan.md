@@ -1,9 +1,22 @@
 # Green Spaces — Implementation Plan
 
 **Date:** 2026-06-30
-**Status:** Draft — for build
+**Status:** Partially shipped (2026-07-01). **FoE Green Space loader shipped.**
+OS Open Greenspace + Woodland Opportunity **descoped** from this bundle and
+moved to the interactive-map epic (`docs/specs/2026-07-01-interactive-map-design.md`).
 **Parent:** PLAN.md — Phase 6b (breadth, NDL data-source expansion)
 **Track:** Second Phase 6b source group. New domain: **Environment** (greenspace).
+
+## Descope note (2026-07-01)
+
+On inspecting the FoE workbook it proved comprehensive — LSOA + LA green-space
+area per capita, access %, garden area per capita, and deprivation score. That
+covers the substantive green-space indicators. OS Open Greenspace's incremental
+indicator value (function counts, site-area %) is modest and partly redundant
+with FoE + OSM; its real payoff is authoritative **site polygons** for a map
+overlay. So Build A (OS Open Greenspace) and Build C (Woodland) are deferred to
+the interactive-map epic, where the polygons are actually used. Only the FoE
+loader ships in this bundle.
 
 ## Objective
 
