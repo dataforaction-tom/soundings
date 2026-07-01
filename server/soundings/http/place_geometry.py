@@ -95,10 +95,15 @@ async def get_peer_geometry(
                             p.name,
                             iv.value
                         FROM geography.place p
-                        LEFT JOIN data.indicator_value iv
-                            ON iv.place_id = p.id
-                            AND iv.indicator_key = :indicator
-                            AND iv.period = :period
+                        LEFT JOIN LATERAL (
+                            SELECT v.value
+                            FROM data.indicator_value v
+                            WHERE v.place_id = p.id
+                              AND v.indicator_key = :indicator
+                              AND (COALESCE(:period, v.period) = v.period)
+                            ORDER BY v.period DESC
+                            LIMIT 1
+                        ) iv ON TRUE
                         WHERE p.type = :place_type
                             AND p.id <> :place_id
                     ),

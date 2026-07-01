@@ -1,10 +1,10 @@
 # State
 
-> Last updated: 2026-06-30
-> Status: **Phase 6 dual-track.** 6a (depth) shipped — ask interface, Give Food
-> food-bank source, neighbourhood granularity (merged from
-> `feat/neighbourhood-granularity`); ask live test still pending API key.
-> 6b (breadth — NDL data-source expansion) in planning.
+> Last updated: 2026-07-01
+> Status: **Phase 6 dual-track.** 6a (depth) shipped. 6b (breadth) shipping —
+> Companies House (Economy) merged; FoE green-space (Environment) + ask map
+> serving/rendering fixes on `feat/green-spaces-loader`. Next: interactive-map
+> epic (spec written) — OS Open Greenspace + Woodland fold in there.
 
 ## System State Diagram
 
@@ -78,6 +78,9 @@ stateDiagram-v2
 | **`get_civil_society_profile` tool + CivilSocietyPanel** | ✅ Phase 6 slice 1 | Total, income distribution + median/mean, registration cohort trend. CC loader extended to capture `latest_income`, `date_of_registration`, `date_of_removal`. |
 || **Phase 6b — New data sources (NDL)** | 🔧 In progress | NDL exploration complete (2026-06-29); priority: EPC, DEFRA Air, Land Registry (HPI + Price Paid), Ofsted, DfT, Ofcom, CQC. NDL also surfaced homelessness, dwelling stock, rents, transport connectivity, noise, woodlands. ~75–85+ new indicators across 5–6 new domains. |
 | **Companies House loader (Economy)** | ✅ Phase 6b | Aggregates-only bulk loader. `adapters/companies_house/` (streaming CSV client + per-LTLA aggregation). Writes `economy.active_companies_count`, `economy.active_companies_per_1000`, `economy.new_incorporations_12m`. Bulk carve-out (REST API has no area filter — same as CC); reuses shared `postcodes_io.resolver`. Live schema smoke green. **Follow-up:** load ONS NSPL bulk once to pre-warm `geography.postcode` for all postcode-based loaders. |
+| **FoE green-space loader (Environment)** | ✅ Phase 6b | `adapters/foe_green_space/` — xlsx loader over FoE Green Space Consolidated v2.1. LSOA + LTLA: `environment.greenspace.{area_per_capita,access_pct,garden_area_per_capita,deprivation_score}`. OGL/OPL; FK-tolerant (2011→2021 LSOA). **Second LSOA-level dataset** — lights up green-space neighbourhood choropleths. Loaded into dev; verified live. OS Open Greenspace + Woodland deferred to the map epic. |
+| **Ask map serving + rendering fixes** | ✅ Phase 6b | (1) registered `companies_house` + `foe.green_space` read adapters (orchestrator couldn't serve either — also fixes merged CH); regression test guards it. (2) peers choropleth defaults to latest period. (3) rank/quantile choropleth colouring + graceful no-data render. (4) prompt steers choropleths to per-area indicators, OSM→points. |
+| **Interactive map epic** | 🔧 Spec | `docs/specs/2026-07-01-interactive-map-design.md` — shared MapLibre component (inline + explorer): click popups/side panel, combined layers, level switch. 6 increments; OS Open Greenspace + Woodland fold in here. |
 | **Ask interface — `/v1/ask` + `/ask` page** | ✅ Phase 6 (ask) | Claude tool-use loop over existing tools. SSE streaming. 4 modes (open/summary/compare/insight). detect_insights SQL detector. AskBox on homepage + place page. |
 | **Ask interface — live test** | ⏳ Pending | `@pytest.mark.live` test written; needs `ANTHROPIC_API_KEY` in GitHub Secrets for nightly CI. |
 | **Give Food food-bank source** | ✅ Phase 6 (ask) | `adapters/givefood/` (client + adapter): trims the national food-bank dump, counts via point-in-polygon, map points + pre-warming. Replaces the retired OSM food-bank tag. `get_amenities_geometry` now routes each indicator to the adapter that owns it (per catalogue `source_id`), so food banks come from Give Food while schools/GPs stay on OSM. |

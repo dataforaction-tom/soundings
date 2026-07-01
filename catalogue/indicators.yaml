@@ -745,6 +745,50 @@ indicators:
       - "Interpolated from nearby monitoring stations using inverse distance weighting. Actual local exposure may vary."
 
   # ---------------------------------------------------------------------------
+  # Green space (Friends of the Earth consolidated data; OS Open Greenspace)
+  # ---------------------------------------------------------------------------
+
+  - key: environment.greenspace.area_per_capita
+    label: "Green/open space per person"
+    description: "Publicly accessible green and open space area per resident (unbuffered), from Friends of the Earth's consolidated green-space dataset."
+    unit: "m² per person"
+    higher_is: "better"
+    source_id: "foe.green_space"
+    available_at: ["lsoa21", "ltla24", "utla24"]
+    refresh_cadence: "every 2-3 years"
+    caveats:
+      - "Neighbourhood figures use 2011 LSOA boundaries; a small number of LSOAs that changed in 2021 are unmatched."
+
+  - key: environment.greenspace.access_pct
+    label: "Population with green space access"
+    description: "Percentage of the populated area within reach of publicly accessible green or open space."
+    unit: "proportion"
+    higher_is: "better"
+    source_id: "foe.green_space"
+    available_at: ["lsoa21", "ltla24", "utla24"]
+    refresh_cadence: "every 2-3 years"
+    caveats:
+      - "Neighbourhood figures use 2011 LSOA boundaries; a small number of LSOAs that changed in 2021 are unmatched."
+
+  - key: environment.greenspace.garden_area_per_capita
+    label: "Private garden space per person"
+    description: "Private garden area per resident."
+    unit: "m² per person"
+    higher_is: "better"
+    source_id: "foe.green_space"
+    available_at: ["ltla24", "utla24"]
+    refresh_cadence: "every 2-3 years"
+
+  - key: environment.greenspace.deprivation_score
+    label: "Green space deprivation score"
+    description: "Friends of the Earth's composite green-space deprivation score (higher = more deprived of green space)."
+    unit: "score"
+    higher_is: "worse"
+    source_id: "foe.green_space"
+    available_at: ["ltla24", "utla24"]
+    refresh_cadence: "every 2-3 years"
+
+  # ---------------------------------------------------------------------------
   # Infrastructure (OSM Overpass)
   # ---------------------------------------------------------------------------
 

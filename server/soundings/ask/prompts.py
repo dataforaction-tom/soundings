@@ -122,14 +122,20 @@ Block types for compose_answer:
 - insight-callout: a severity-coloured callout for a notable signal
 - map: a map of a place. Three modes, chosen by fields:
   * boundary — just place_id (use to show where a place is).
-  * choropleth — set indicator_key and granularity. Use granularity="sub_areas"
-    for a within-place heatmap when the indicator has sub-area data (the
-    deprivation.* family at LSOA, e.g. deprivation.imd.score); use
-    granularity="peers" (default) to colour other places and show how this one
-    ranks. "Where are the most deprived parts of X" → sub_areas.
+  * choropleth — set indicator_key and granularity. ONLY use a choropleth for
+    indicators with stored per-area data: deprivation.*, environment.greenspace.*,
+    economy.active_companies_*/new_incorporations_12m, and population.*. These
+    colour reliably across areas. Use granularity="sub_areas" for a within-place
+    LSOA heatmap when the indicator has LSOA data (deprivation.* and
+    environment.greenspace.area_per_capita/access_pct), e.g. "where are the most
+    deprived parts of X" or "greenspace by neighbourhood"; use granularity="peers"
+    (default) to colour other places and show how this one ranks.
+    Do NOT choropleth infrastructure.* (OSM counts), environment.air_quality.*,
+    or crime indicators — they have no per-area choropleth data and render blank.
   * points — set overlay {source:"amenities", indicator_keys:[...]} to plot real
-    facility locations, colour-coded with a legend. Use for "where are the
-    food banks / schools" questions, e.g. indicator_keys:
+    facility locations, colour-coded with a legend. This is the ONLY correct map
+    for infrastructure.* (OSM) data. Use for "where are the food banks / schools /
+    parks" questions, e.g. indicator_keys:
     ["infrastructure.food_banks_count","infrastructure.schools_count"]. Pair with
     the matching infrastructure.*_count indicators when the user also wants counts.
 - sub-area-table: a table of sub-area (neighbourhood) values within a parent
@@ -151,8 +157,12 @@ Chart selection guidance:
 Limits: max 20 blocks total, max 10 visual blocks (everything except text).
 Always interleave text with visual blocks — never put all charts at the end.
 Use a map block when the user asks about geography, boundaries, or visual
-comparisons across places. A map with indicator_key renders a choropleth
-showing how the place compares to its peers.
+comparisons across places. A choropleth map needs a per-area indicator
+(deprivation.*, environment.greenspace.*, economy.active_companies_*,
+population.*) — for a "compare these places" question, pick the choropleth-able
+indicator most relevant to the question (e.g. greenspace → use
+environment.greenspace.area_per_capita, not infrastructure parks counts). For
+OSM facility counts use the points overlay, and if no map adds value, omit it.
 
 Indicator keys: indicator-card, trend-chart, compare-chart, distribution-chart,
 scatter-plot, and choropleth maps require an `indicator_key` that actually

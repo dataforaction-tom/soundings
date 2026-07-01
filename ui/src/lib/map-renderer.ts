@@ -15,6 +15,46 @@ import { PALETTE } from "./chart";
 const ACCENT_GREEN = "#4a7c59";
 const CREAM = "#faf9f6";
 const NAVY = "#1a2f4e";
+// Neutral fill for choropleths with no data — avoids painting a misleading
+// dark uniform map (and a fake 0→1 legend) when no feature has a value, e.g.
+// a peer choropleth of a passthrough indicator not stored per-area.
+const NO_DATA_FILL = "#e4e1da";
+
+/** True when at least one value is a finite number. Drives whether a
+ *  choropleth renders a real colour ramp or degrades to a neutral map. */
+export function hasFiniteValues(
+  values: Array<number | null | undefined>,
+): boolean {
+  return values.some((v) => typeof v === "number" && Number.isFinite(v));
+}
+
+/** Map each value to its rank position in [0, 1] (smallest → 0, largest → 1),
+ *  preserving input order; non-finite entries map to null. Used to colour
+ *  choropleths by rank/quantile instead of raw value, so heavily-skewed
+ *  indicators still render with even contrast. */
+export function rankFractions(
+  values: Array<number | null | undefined>,
+): Array<number | null> {
+  const out: Array<number | null> = values.map(() => null);
+  const finite = values
+    .map((v, i) => ({ v, i }))
+    .filter(
+      (x): x is { v: number; i: number } =>
+        typeof x.v === "number" && Number.isFinite(x.v),
+    );
+  const n = finite.length;
+  if (n === 0) return out;
+  if (n === 1) {
+    out[finite[0].i] = 0.5;
+    return out;
+  }
+  finite
+    .sort((a, b) => a.v - b.v)
+    .forEach((x, pos) => {
+      out[x.i] = pos / (n - 1);
+    });
+  return out;
+}
 
 // Shared base-map options: no tile source (solid background via CSS), no
 // rotation, zoom controls in the bottom-right. When `tilesUrl` is provided, a
@@ -216,28 +256,47 @@ export function renderChoroplethMap(
   // Default three-stop ramp: cream → green → navy.
   const stops: [string, string] = options.colourScale ?? [CREAM, NAVY];
 
-  // Derive the real domain from the feature values.
+  // Real value domain (for the legend) + rank-normalised colour input.
   const values = featureCollection.features.map(
     (f) => (f.properties?.[valueKey] as number | null | undefined),
   );
-  const [domMin, domMid, domMax] = colourDomain(values);
+  const [domMin, , domMax] = colourDomain(values);
+  const hasData = hasFiniteValues(values);
 
-  // When domain is degenerate (all values equal), MapLibre's interpolate requires
-  // strictly ascending stops, so use a solid colour instead.
-  const fillColor =
-    domMin === domMax
-      ? ACCENT_GREEN
-      : ([
-          "interpolate",
-          ["linear"],
-          ["get", valueKey],
-          domMin,
-          stops[0],
-          domMid,
-          ACCENT_GREEN,
-          domMax,
-          stops[1],
-        ] as unknown as maplibregl.ExpressionSpecification);
+  // Colour by rank, not raw value: geographic indicators are often heavily
+  // skewed (one rural outlier dwarfs the rest), so a linear value ramp crushes
+  // most areas into a single shade. Rank/quantile colouring spreads contrast
+  // evenly. Each feature carries its rank in [0,1] as `__rank`.
+  const ranks = rankFractions(values);
+  const RANK_KEY = "__rank";
+  featureCollection.features.forEach((f, i) => {
+    if (f.properties && ranks[i] != null) {
+      f.properties[RANK_KEY] = ranks[i];
+    }
+  });
+
+  // No data anywhere → neutral fill (no misleading ramp). Otherwise interpolate
+  // on rank; features without a value fall back to the neutral fill.
+  const fillColor = (
+    !hasData
+      ? NO_DATA_FILL
+      : [
+          "case",
+          ["==", ["typeof", ["get", RANK_KEY]], "number"],
+          [
+            "interpolate",
+            ["linear"],
+            ["get", RANK_KEY],
+            0,
+            stops[0],
+            0.5,
+            ACCENT_GREEN,
+            1,
+            stops[1],
+          ],
+          NO_DATA_FILL,
+        ]
+  ) as unknown as maplibregl.ExpressionSpecification;
 
   map.on("load", () => {
     map.addSource(sourceId, { type: "geojson", data: featureCollection });
@@ -248,7 +307,7 @@ export function renderChoroplethMap(
       source: sourceId,
       paint: {
         "fill-color": fillColor,
-        "fill-opacity": 0.85,
+        "fill-opacity": hasData ? 0.85 : 0.3,
       },
     });
 
@@ -309,15 +368,18 @@ export function renderChoroplethMap(
 
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
 
-  // Add legend element.
+  // Add legend element — only when there's real data to scale (an empty/no-data
+  // choropleth shouldn't show a misleading gradient).
   const legend = document.createElement("div");
-  legend.className = "map-legend choropleth-legend";
-  legend.innerHTML =
-    `<span class="legend-label">${escapeHtml(options.label ?? valueKey)}</span>` +
-    `<span class="legend-gradient"></span>` +
-    `<span class="legend-min">${domMin.toLocaleString("en-GB")}</span>` +
-    `<span class="legend-max">${domMax.toLocaleString("en-GB")}</span>`;
-  container.appendChild(legend);
+  if (hasData) {
+    legend.className = "map-legend choropleth-legend";
+    legend.innerHTML =
+      `<span class="legend-label">${escapeHtml(options.label ?? valueKey)}</span>` +
+      `<span class="legend-gradient"></span>` +
+      `<span class="legend-min">${domMin.toLocaleString("en-GB")}</span>` +
+      `<span class="legend-max">${domMax.toLocaleString("en-GB")}</span>`;
+    container.appendChild(legend);
+  }
 
   return () => {
     popup.remove();
