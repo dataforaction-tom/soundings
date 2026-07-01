@@ -158,7 +158,7 @@ async def get_peer_geometry(
 def _percentile_from_rank(rank: int | None, n: int) -> float | None:
     """`(n - rank) / (n - 1) * 100`. Top = 100, bottom = 0.
     Undefined when n <= 1 or value is missing."""
-    if rank is None or n is None or n <= 1:
+    if rank is None or n is None or n <= 1 or rank > n:
         return None
     return (n - rank) / (n - 1) * 100.0
 
