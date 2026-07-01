@@ -223,6 +223,76 @@ async def get_children_geometry(
     return {"type": "FeatureCollection", "features": features}
 
 
+@router.get("/geographies/{place_type}/geometry")
+async def get_geographies_geometry(
+    request: Request,
+    place_type: str,
+    indicator: str = Query(...),
+    period: str | None = Query(default=None),
+    large: bool = Query(default=False),
+) -> dict[str, object]:
+    """GeoJSON FeatureCollection of ALL places of `place_type`, coloured by an
+    indicator (value + percentile). The national counterpart to
+    `peers/geometry` (which is relative to one place). Latest period per place
+    when `period` is omitted. Large layers (lsoa21) require `large=true`."""
+    if place_type == "lsoa21" and not large:
+        raise HTTPException(
+            status_code=422,
+            detail="lsoa21 is a large layer; pass large=true to confirm",
+        )
+    engine = request.app.state.engine
+    async with engine.connect() as conn:
+        rows = (
+            await conn.execute(
+                text(
+                    """
+                    WITH area_values AS (
+                        SELECT p.id, p.name, iv.value
+                        FROM geography.place p
+                        LEFT JOIN LATERAL (
+                            SELECT v.value
+                            FROM data.indicator_value v
+                            WHERE v.place_id = p.id
+                              AND v.indicator_key = :indicator
+                              AND (COALESCE(:period, v.period) = v.period)
+                            ORDER BY v.period DESC
+                            LIMIT 1
+                        ) iv ON TRUE
+                        WHERE p.type = :place_type
+                    ),
+                    ranked AS (
+                        SELECT av.*,
+                               RANK() OVER (ORDER BY av.value DESC NULLS LAST) AS rank,
+                               COUNT(av.value) OVER () AS n_with_values
+                        FROM area_values av
+                    )
+                    SELECT r.id, r.name, r.value, r.rank, r.n_with_values,
+                           ST_AsGeoJSON(ST_Simplify(p.geom, 0.005)) AS geojson
+                    FROM ranked r
+                    JOIN geography.place p ON p.id = r.id
+                    """
+                ),
+                {"place_type": place_type, "indicator": indicator, "period": period},
+            )
+        ).all()
+
+    features: list[dict[str, object]] = []
+    for r in rows:
+        features.append(
+            {
+                "type": "Feature",
+                "geometry": _parse_geojson(r.geojson),
+                "properties": {
+                    "id": r.id,
+                    "name": r.name,
+                    "value": float(r.value) if r.value is not None else None,
+                    "percentile": _percentile_from_rank(r.rank, r.n_with_values),
+                },
+            }
+        )
+    return {"type": "FeatureCollection", "features": features}
+
+
 @router.get("/place/{place_id}/amenities/geometry")
 async def get_amenities_geometry(
     request: Request,

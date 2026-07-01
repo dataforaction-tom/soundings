@@ -231,7 +231,46 @@ async def test_get_peers_geometry_404_for_missing_place() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Task 3: GET /v1/place/{place_id}/children/geometry
+# Task 3: GET /v1/geographies/{place_type}/geometry
+# ---------------------------------------------------------------------------
+
+
+async def test_geographies_geometry_returns_all_areas_of_type() -> None:
+    await _seed_places_with_geometry()
+    async with app.router.lifespan_context(app):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            response = await ac.get(
+                "/v1/geographies/ltla24/geometry",
+                params={"indicator": "population.total", "period": "2024"},
+            )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["type"] == "FeatureCollection"
+    # ALL ltla24 places (not peers-of-one) — nothing excluded.
+    ids = {f["properties"]["id"] for f in body["features"]}
+    assert ids == {"ltla24:E06000001", "ltla24:E06000004", "ltla24:E06000005"}
+    by_id = {f["properties"]["id"]: f["properties"] for f in body["features"]}
+    assert by_id["ltla24:E06000004"]["value"] == 200
+    # Darlington has no geom → geometry null but still present.
+    darlington = next(f for f in body["features"] if f["properties"]["id"] == "ltla24:E06000005")
+    assert darlington["geometry"] is None
+
+
+async def test_geographies_geometry_defaults_to_latest_period_when_omitted() -> None:
+    await _seed_places_with_geometry()
+    async with app.router.lifespan_context(app):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            response = await ac.get(
+                "/v1/geographies/ltla24/geometry",
+                params={"indicator": "population.total"},  # no period
+            )
+    assert response.status_code == 200, response.text
+    by_id = {f["properties"]["id"]: f["properties"] for f in response.json()["features"]}
+    assert by_id["ltla24:E06000004"]["value"] == 200
+
+
+# ---------------------------------------------------------------------------
+# Task 4: GET /v1/place/{place_id}/children/geometry
 # ---------------------------------------------------------------------------
 
 
@@ -303,7 +342,7 @@ async def test_children_geometry_empty_for_indicator_without_subarea_data() -> N
 
 
 # ---------------------------------------------------------------------------
-# Task 4: GET /v1/place/{place_id}/amenities/geometry
+# Task 5: GET /v1/place/{place_id}/amenities/geometry
 # ---------------------------------------------------------------------------
 
 
@@ -325,7 +364,7 @@ async def test_amenities_geometry_merges_layers(monkeypatch: pytest.MonkeyPatch)
 
 
 # ---------------------------------------------------------------------------
-# Task 5: source-aware routing
+# Task 6: source-aware routing
 # ---------------------------------------------------------------------------
 
 
