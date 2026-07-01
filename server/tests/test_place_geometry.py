@@ -388,6 +388,23 @@ async def test_geographies_geometry_null_percentile_for_missing_values() -> None
     assert by_id["ltla24:E06000012"]["percentile"] is None
 
 
+async def test_geographies_geometry_guards_large_lsoa_layer() -> None:
+    """Guard: place_type=lsoa21 returns 422 without large=true, 200 with it."""
+    await _seed_parent_with_lsoa_children()
+    async with app.router.lifespan_context(app):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            blocked = await ac.get(
+                "/v1/geographies/lsoa21/geometry",
+                params={"indicator": "deprivation.imd.score"},
+            )
+            allowed = await ac.get(
+                "/v1/geographies/lsoa21/geometry",
+                params={"indicator": "deprivation.imd.score", "large": "true"},
+            )
+    assert blocked.status_code == 422
+    assert allowed.status_code == 200
+
+
 # ---------------------------------------------------------------------------
 # Task 4: GET /v1/place/{place_id}/children/geometry
 # ---------------------------------------------------------------------------
