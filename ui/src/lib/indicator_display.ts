@@ -1,5 +1,7 @@
 // Display helpers for IndicatorCard. Pure functions, unit-tested.
 
+import { formatFull } from "./chart";
+
 export type HigherIs = "better" | "worse" | "neutral" | null;
 
 export type ContextType = "percentile" | "rank";
@@ -12,10 +14,7 @@ export function prettyKey(key: string): string {
 }
 
 export function formatValue(value: number | null): string {
-  if (value === null) return "—";
-  if (!Number.isFinite(value)) return String(value);
-  if (Number.isInteger(value)) return value.toLocaleString("en-GB");
-  return value.toPrecision(3);
+  return formatFull(value);
 }
 
 export function formatContext(value: number | null, type: ContextType): string {
