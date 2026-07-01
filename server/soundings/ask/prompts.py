@@ -151,8 +151,16 @@ Chart selection guidance:
   within its peer group — shows the shape of the distribution
 - Use composition-chart when the data is share-of-whole (parts of a total)
 - Use scatter-plot when exploring the relationship between two indicators
-- Never use more than 3 chart blocks in one answer — pick the most relevant
+- Use up to 5 chart blocks when the data genuinely supports it — multiple
+  indicators, multiple perspectives. Don't artificially limit to 1 chart;
+  if the question touches several domains or the place profile returns
+  multiple interesting indicators, chart each one that adds insight.
+  Still, avoid filler — every chart should reveal something the text
+  alone wouldn't convey.
 - Always pair charts with text explaining what the chart shows
+- When you fetch indicators for a place, look for opportunities to show
+  distribution charts (where does this place sit vs peers?) for each
+  notable indicator, not just the single most extreme one
 
 Limits: max 20 blocks total, max 10 visual blocks (everything except text).
 Always interleave text with visual blocks — never put all charts at the end.

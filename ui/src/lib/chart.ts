@@ -67,15 +67,43 @@ interface BarPoint {
   label: string;
 }
 
+// --- Shared number formatting -------------------------------------------
+// No scientific notation anywhere. Two modes:
+//   formatFull  — full precision, locale-aware grouping (for tooltips, tables)
+//   formatShort — compact labels for axis ticks and bar labels (12.5k, 1.2M)
+// Both handle null/NaN gracefully and never emit "1e-7" or similar.
+
+export function formatFull(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "—";
+  if (!Number.isFinite(value)) return "—";
+  if (Number.isInteger(value)) return value.toLocaleString("en-GB");
+  const abs = Math.abs(value);
+  if (abs === 0) return "0";
+  if (abs >= 1000) return value.toLocaleString("en-GB", { maximumFractionDigits: 1 });
+  if (abs >= 1) return value.toLocaleString("en-GB", { maximumFractionDigits: 2 });
+  if (abs >= 0.01) return value.toLocaleString("en-GB", { maximumFractionDigits: 3 });
+  if (abs >= 0.0001) return value.toLocaleString("en-GB", { maximumFractionDigits: 5 });
+  return value.toLocaleString("en-GB", { maximumFractionDigits: 8 });
+}
+
 function formatShort(value: number): string {
-  // Compact human-readable label: 196k, 1.5M, 0.14, 12.5
   const abs = Math.abs(value);
   if (abs >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
   if (abs >= 10_000) return `${Math.round(value / 1000)}k`;
   if (abs >= 1000) return `${(value / 1000).toFixed(1)}k`;
-  if (abs >= 10) return Math.round(value).toString();
-  if (abs >= 1) return value.toFixed(1);
-  return value.toFixed(3);
+  if (abs >= 10) return Math.round(value).toLocaleString("en-GB");
+  if (abs >= 1) return value.toLocaleString("en-GB", { maximumFractionDigits: 1 });
+  if (abs >= 0.01) return value.toLocaleString("en-GB", { maximumFractionDigits: 2 });
+  return value.toLocaleString("en-GB", { maximumFractionDigits: 4 });
+}
+
+// Tick formatter for Plot axes — avoids scientific notation from d3 defaults.
+function makeTickFormat(): (d: unknown) => string {
+  return (d: unknown) => {
+    const n = typeof d === "number" ? d : Number(d);
+    if (!Number.isFinite(n)) return "";
+    return formatShort(n);
+  };
 }
 
 function makeBasisLabel(v: ComparisonValue, basis: ComparisonBasis): string {
@@ -147,12 +175,13 @@ export function renderCompareBars(
   bars = [...bars].sort((a, b) => b.value - a.value);
   const width = opts.containerWidth ?? opts.width ?? COMPARE_DEFAULTS.width;
   const { height } = COMPARE_DEFAULTS;
+  const tickFmt = makeTickFormat();
   const node = Plot.plot({
     width,
     height,
     marginTop: 20,
     marginRight: 12,
-    marginBottom: 36,
+    marginBottom: 48,
     marginLeft: 60,
     style: {
       background: "transparent",
@@ -160,13 +189,14 @@ export function renderCompareBars(
       fontFamily: "system-ui, sans-serif",
     },
     x: { label: null, tickRotate: -25 },
-    y: { grid: true, label: comparison.unit, nice: true },
+    y: { grid: true, label: comparison.unit, nice: true, tickFormat: tickFmt },
     marks: [
       Plot.barY(bars, {
         x: "place_id",
         y: "value",
         // Cycle through PALETTE so each bar can be distinguished.
         fill: (d: BarPoint, i: number) => PALETTE[i % PALETTE.length],
+        title: (d: BarPoint) => `${d.place_id}: ${formatFull(d.value)} ${comparison.unit}`,
       }),
       Plot.text(bars, {
         x: "place_id",
@@ -224,21 +254,22 @@ export function renderIncomeBuckets(
   if (buckets.length === 0) return "";
   const width = opts.containerWidth ?? opts.width ?? 480;
   const height = opts.height ?? 200;
+  const tickFmt = makeTickFormat();
   const node = Plot.plot({
     width,
     height,
     marginTop: 16,
     marginRight: 12,
     marginBottom: 36,
-    marginLeft: 48,
+    marginLeft: 56,
     x: { label: "Annual income band", tickRotate: -15 },
-    y: { grid: true, label: "Charities", nice: true },
+    y: { grid: true, label: "Charities", nice: true, tickFormat: tickFmt },
     marks: [
       Plot.barY(buckets, { x: "label", y: "count", fill: "#4a7c59" }),
       Plot.text(buckets, {
         x: "label",
         y: "count",
-        text: (d: IncomeBucket) => String(d.count),
+        text: (d: IncomeBucket) => d.count.toLocaleString("en-GB"),
         dy: -6,
         fontSize: 11,
         fill: "#333",
@@ -255,19 +286,26 @@ export function renderRegistrationTrend(
   if (cohort.length === 0) return "";
   const width = opts.containerWidth ?? opts.width ?? 480;
   const height = opts.height ?? 180;
+  const tickFmt = makeTickFormat();
   const node = Plot.plot({
     width,
     height,
     marginTop: 16,
     marginRight: 12,
     marginBottom: 32,
-    marginLeft: 40,
+    marginLeft: 48,
     x: { label: null, tickFormat: (d: unknown) => String(d) },
-    y: { grid: true, label: "Net new charities", nice: true },
+    y: { grid: true, label: "Net new charities", nice: true, tickFormat: tickFmt },
     marks: [
       Plot.ruleY([0]),
       Plot.lineY(cohort, { x: "year", y: "net", stroke: "#4a7c59", strokeWidth: 1.5 }),
-      Plot.dot(cohort, { x: "year", y: "net", r: 2.5, fill: "#4a7c59" }),
+      Plot.dot(cohort, {
+        x: "year",
+        y: "net",
+        r: 2.5,
+        fill: "#4a7c59",
+        title: (d: RegistrationCohort) => `${d.year}: ${formatFull(d.net)} net (${formatFull(d.registered)} registered, ${formatFull(d.removed)} removed)`,
+      }),
     ],
   });
   return svgWithA11y(node, "Registration trend", "Line chart of net new charity registrations by year.");
@@ -300,23 +338,30 @@ export function renderTrendChart(
   }
   const width = opts.containerWidth ?? opts.width ?? TREND_CHART_DEFAULTS.width;
   const height = opts.height ?? TREND_CHART_DEFAULTS.height;
+  const tickFmt = makeTickFormat();
   const node = Plot.plot({
     width,
     height,
     marginTop: 16,
     marginRight: 16,
     marginBottom: 36,
-    marginLeft: 48,
+    marginLeft: 56,
     style: {
       background: "transparent",
       fontSize: "12px",
       fontFamily: "system-ui, sans-serif",
     },
     x: { type: "point", label: "Period", tickFormat: (d: unknown) => String(d) },
-    y: { grid: true, label: input.unit, nice: true },
+    y: { grid: true, label: input.unit, nice: true, tickFormat: tickFmt },
     marks: [
       Plot.line(chartPoints, { x: "period", y: "value", strokeWidth: 2, stroke: PALETTE[0] }),
-      Plot.dot(chartPoints, { x: "period", y: "value", r: 3, fill: PALETTE[0] }),
+      Plot.dot(chartPoints, {
+        x: "period",
+        y: "value",
+        r: 3,
+        fill: PALETTE[0],
+        title: (d: ChartPoint) => `${d.period}: ${formatFull(d.value)} ${input.unit}`,
+      }),
     ],
   });
   return svgWithA11y(
@@ -332,6 +377,7 @@ export interface DistributionChartInput {
   peer_values: number[];
   focal_value: number | null;
   unit: string;
+  peer_count?: number;
   caption?: string | null;
 }
 
@@ -342,41 +388,114 @@ export function renderDistributionChart(
   if (input.peer_values.length === 0) return "";
 
   const width = opts.containerWidth ?? opts.width ?? 480;
-  const height = opts.height ?? 220;
+  const height = opts.height ?? 240;
 
   const data = input.peer_values.map((v) => ({ value: v }));
+  const tickFmt = makeTickFormat();
+  const peerCount = input.peer_count ?? input.peer_values.length;
+
+  // Compute bin metadata for the description.
+  const sorted = [...input.peer_values].sort((a, b) => a - b);
+  const min = sorted[0]!;
+  const max = sorted[sorted.length - 1]!;
+  const range = max - min;
+  const binCount = Math.min(10, Math.max(5, Math.ceil(Math.sqrt(input.peer_values.length))));
+  const binWidth = range > 0 ? range / binCount : 1;
+  const bins = new Array(binCount).fill(0) as number[];
+  for (const v of input.peer_values) {
+    const idx = range > 0
+      ? Math.min(binCount - 1, Math.floor((v - min) / binWidth))
+      : 0;
+    bins[idx]!++;
+  }
+
+  // Build marks array.
+  const marks = [
+    Plot.rectY(
+      data,
+      Plot.binX(
+        { y: "count" },
+        {
+          x: "value",
+          fill: "#1a2f4e",
+          fillOpacity: 0.6,
+        } as Record<string, unknown>,
+      ),
+    ),
+  ];
+
+  // Focal value: green vertical line + text annotation with the value.
+  if (input.focal_value !== null) {
+    const focalFmt = formatFull(input.focal_value);
+    marks.push(
+      Plot.ruleX([input.focal_value], {
+        stroke: "#4a7c59",
+        strokeWidth: 2.5,
+      }),
+      // Annotation text showing the focal place's value at the top of the line.
+      Plot.text([input.focal_value], {
+        x: input.focal_value,
+        y: height - 36,
+        text: [`This place: ${focalFmt}`],
+        fontSize: 11,
+        fill: "#4a7c59",
+        fontWeight: "bold",
+        textAnchor: "end",
+        dx: -4,
+        dy: -2,
+      }),
+    );
+  }
+
+  // Peer count annotation in upper right.
+  marks.push(
+    Plot.text([peerCount], {
+      x: width - 16,
+      y: 20,
+      text: [`${peerCount} peer places`],
+      fontSize: 11,
+      fill: "#6b7280",
+      textAnchor: "end",
+    }),
+  );
 
   const node = Plot.plot({
     width,
     height,
-    marginTop: 16,
+    marginTop: 28,
     marginRight: 16,
-    marginBottom: 36,
-    marginLeft: 48,
+    marginBottom: 40,
+    marginLeft: 56,
     style: {
       background: "transparent",
       fontSize: "12px",
       fontFamily: "system-ui, sans-serif",
     },
-    x: { label: input.unit, nice: true },
-    y: { grid: true, label: "Peer places", nice: true },
-    marks: [
-      Plot.rectY(
-        data,
-        // Plot's TS types don't allow fill/fillOpacity in the second binX arg,
-        // but the runtime accepts it. Cast to suppress the type error.
-        Plot.binX({ y: "count" }, { x: "value", fill: "#1a2f4e", fillOpacity: 0.6 } as Record<string, unknown>),
-      ),
-      ...(input.focal_value !== null
-        ? [Plot.ruleX([input.focal_value], { stroke: "#4a7c59", strokeWidth: 2.5 })]
-        : []),
-    ],
+    x: {
+      label: input.unit,
+      nice: true,
+      tickFormat: tickFmt,
+    },
+    y: {
+      grid: true,
+      label: "Number of places",
+      nice: true,
+      tickFormat: (d: unknown) => {
+        const n = typeof d === "number" ? d : Number(d);
+        return Number.isInteger(n) ? String(n) : "";
+      },
+    },
+    marks,
   });
+
+  const focalDesc = input.focal_value !== null
+    ? ` Focal place value: ${formatFull(input.focal_value)}.`
+    : "";
 
   return svgWithA11y(
     node,
     "Distribution chart",
-    `Histogram of peer values for ${input.unit}${input.caption ? ": " + input.caption : ""}.`,
+    `Histogram of ${peerCount} peer places for ${input.unit}.${focalDesc}${input.caption ? " " + input.caption : ""}`,
   );
 }
 
@@ -511,7 +630,7 @@ export function renderCompositionChart(
     text.setAttribute("font-size", "12");
     text.setAttribute("font-family", "system-ui, sans-serif");
     text.setAttribute("fill", "#2d2d2d");
-    text.textContent = `${s.label} — ${formatShort(s.value)} (${pct}%)`;
+    text.textContent = `${s.label} — ${formatFull(s.value)} (${pct}%)`;
     root.appendChild(text);
   });
 
@@ -551,6 +670,7 @@ export function renderScatterPlot(
   const peerPoints = input.points.filter((p) => !p.is_focal);
   const focalPoints = input.points.filter((p) => p.is_focal);
 
+  const tickFmt = makeTickFormat();
   const node = Plot.plot({
     width,
     height,
@@ -563,8 +683,8 @@ export function renderScatterPlot(
       fontSize: "12px",
       fontFamily: "system-ui, sans-serif",
     },
-    x: { label: input.x_label, nice: true },
-    y: { label: input.y_label, grid: true, nice: true },
+    x: { label: input.x_label, nice: true, tickFormat: tickFmt },
+    y: { label: input.y_label, grid: true, nice: true, tickFormat: tickFmt },
     marks: [
       Plot.dot(peerPoints, {
         x: "x_value",
@@ -572,6 +692,7 @@ export function renderScatterPlot(
         fill: "#1a2f4e",
         fillOpacity: 0.4,
         r: 4,
+        title: (d: ScatterPoint) => `${formatFull(d.x_value)} × ${formatFull(d.y_value)}`,
       }),
       Plot.dot(focalPoints, {
         x: "x_value",
@@ -580,6 +701,7 @@ export function renderScatterPlot(
         r: 7,
         stroke: "#faf9f6",
         strokeWidth: 1.5,
+        title: (d: ScatterPoint) => `This place: ${formatFull(d.x_value)} × ${formatFull(d.y_value)}`,
       }),
     ],
   });

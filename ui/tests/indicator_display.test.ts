@@ -26,8 +26,18 @@ describe("formatValue", () => {
     expect(formatValue(206800)).toBe("206,800");
   });
 
-  it("formats fractions to 3 sig figs", () => {
-    expect(formatValue(0.12345)).toBe("0.123");
+  it("formats fractions without scientific notation", () => {
+    const result = formatValue(0.12345);
+    expect(result).not.toContain("e");
+    expect(result).not.toContain("E");
+    // Should be a readable decimal, not 0.123 (toPrecision(3) old behavior).
+    expect(result).toBe("0.123");
+  });
+
+  it("formats very small numbers without scientific notation", () => {
+    const result = formatValue(0.00000123);
+    expect(result).not.toContain("e");
+    expect(result).not.toContain("E");
   });
 });
 

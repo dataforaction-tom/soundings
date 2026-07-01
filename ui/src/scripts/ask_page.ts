@@ -91,9 +91,15 @@
 
         function formatValue(value: number | null): string {
           if (value === null) return "—";
-          if (!Number.isFinite(value)) return String(value);
+          if (!Number.isFinite(value)) return "—";
           if (Number.isInteger(value)) return value.toLocaleString("en-GB");
-          return value.toPrecision(3);
+          const abs = Math.abs(value);
+          if (abs === 0) return "0";
+          if (abs >= 1000) return value.toLocaleString("en-GB", { maximumFractionDigits: 1 });
+          if (abs >= 1) return value.toLocaleString("en-GB", { maximumFractionDigits: 2 });
+          if (abs >= 0.01) return value.toLocaleString("en-GB", { maximumFractionDigits: 3 });
+          if (abs >= 0.0001) return value.toLocaleString("en-GB", { maximumFractionDigits: 5 });
+          return value.toLocaleString("en-GB", { maximumFractionDigits: 8 });
         }
 
         function prettyKey(key: string): string {
@@ -656,6 +662,7 @@
               peer_values: dist.peer_values,
               focal_value: dist.focal_value,
               unit: dist.unit,
+              peer_count: dist.peer_count,
               caption,
             },
             { containerWidth: host.clientWidth || 480 },
