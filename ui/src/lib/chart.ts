@@ -381,6 +381,20 @@ export interface DistributionChartInput {
   caption?: string | null;
 }
 
+/** X-axis domain for a distribution histogram: the peer value range extended
+ *  to include the focal value. Pins the axis to the data so annotation marks
+ *  (which are positioned by frame anchor, not data) can never widen it — the
+ *  bug that stretched proportion charts to a 0–900 axis. */
+export function distributionXDomain(
+  peerValues: number[],
+  focal: number | null,
+): [number, number] {
+  const all = focal !== null ? [...peerValues, focal] : [...peerValues];
+  const min = Math.min(...all);
+  const max = Math.max(...all);
+  return min === max ? [min - 0.5, max + 0.5] : [min, max];
+}
+
 export function renderDistributionChart(
   input: DistributionChartInput,
   opts: { containerWidth?: number; width?: number; height?: number } = {},
@@ -432,30 +446,33 @@ export function renderDistributionChart(
         stroke: "#4a7c59",
         strokeWidth: 2.5,
       }),
-      // Annotation text showing the focal place's value at the top of the line.
+      // Annotation showing the focal place's value near the top of the line.
+      // frameAnchor pins it vertically to the frame (not a data-y), so it
+      // never widens the y-domain; x stays the focal data value.
       Plot.text([input.focal_value], {
         x: input.focal_value,
-        y: height - 36,
+        frameAnchor: "top",
         text: [`This place: ${focalFmt}`],
         fontSize: 11,
         fill: "#4a7c59",
         fontWeight: "bold",
         textAnchor: "end",
         dx: -4,
-        dy: -2,
+        dy: 10,
       }),
     );
   }
 
   // Peer count annotation in upper right.
+  // Frame-anchored (not data-positioned) so it never widens the x-domain —
+  // the bug that stretched proportion charts to a 0–900 axis.
   marks.push(
-    Plot.text([peerCount], {
-      x: width - 16,
-      y: 20,
-      text: [`${peerCount} peer places`],
+    Plot.text([`${peerCount} peer places`], {
+      frameAnchor: "top-right",
+      dx: -4,
+      dy: 8,
       fontSize: 11,
       fill: "#6b7280",
-      textAnchor: "end",
     }),
   );
 
@@ -475,6 +492,7 @@ export function renderDistributionChart(
       label: input.unit,
       nice: true,
       tickFormat: tickFmt,
+      domain: distributionXDomain(input.peer_values, input.focal_value),
     },
     y: {
       grid: true,

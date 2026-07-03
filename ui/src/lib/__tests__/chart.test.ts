@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 // Do NOT mock dom-polyfill — Observable Plot needs the linkedom DOM it installs.
 // happy-dom alone doesn't provide document.documentElement in the way Plot expects.
 import "../dom-polyfill";
-import { PALETTE, formatFull, renderDistributionChart, renderCompositionChart, renderScatterPlot } from "../chart";
+import { PALETTE, formatFull, renderDistributionChart, renderCompositionChart, renderScatterPlot, distributionXDomain } from "../chart";
 
 // ---------------------------------------------------------------------------
 // formatFull
@@ -91,6 +91,39 @@ describe("renderDistributionChart", () => {
     expect(result).toContain("<svg");
     expect(result).toContain("</svg>");
     expect(result.length).toBeGreaterThan(100);
+  });
+
+  it("pins the x-domain to the peer data, extended to the focal value", () => {
+    // Proportion data (0..1). Regression: annotation marks must NOT widen the
+    // axis to ~0–900 (the peer-count label bug).
+    expect(distributionXDomain([0.1, 0.3, 0.67, 0.014], 0.157)).toEqual([0.014, 0.67]);
+    // Focal below the peer range extends the domain down to it.
+    expect(distributionXDomain([0.2, 0.5], 0.05)).toEqual([0.05, 0.5]);
+    // Degenerate (all equal) gets padded so Plot has a non-zero domain.
+    expect(distributionXDomain([0.3, 0.3], 0.3)).toEqual([-0.2, 0.8]);
+    // No focal → just the peer range.
+    expect(distributionXDomain([10, 20, 30], null)).toEqual([10, 30]);
+  });
+
+  it("renders proportion distributions without an inflated axis", () => {
+    // The rendered SVG axis ticks must stay within the data range (< 1),
+    // not stretch to hundreds because of a frame-anchored annotation.
+    const svg = renderDistributionChart(
+      {
+        peer_values: [0.014, 0.11, 0.16, 0.26, 0.5, 0.668],
+        focal_value: 0.157,
+        peer_count: 290,
+        unit: "proportion",
+        caption: "access",
+      },
+      { containerWidth: 900 },
+    );
+    // The x-axis label text nodes are the tick values; none should be >= 5.
+    const ticks = [...svg.matchAll(/>([0-9]+(?:\.[0-9]+)?)</g)]
+      .map((m) => Number(m[1]))
+      .filter((n) => Number.isFinite(n));
+    const bigTicks = ticks.filter((n) => n >= 5 && n !== 290);
+    expect(bigTicks).toEqual([]);
   });
 
   it("renders histogram bars (rectY + binX)", () => {
