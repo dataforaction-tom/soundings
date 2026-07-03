@@ -6,7 +6,27 @@ import {
   hasFiniteValues,
   rankFractions,
   placePopupHtml,
+  buildAmenityLegend,
 } from "../map-renderer";
+
+describe("buildAmenityLegend", () => {
+  it("renders one toggle button per layer with its layer id and swatch", () => {
+    const el = buildAmenityLegend(
+      [
+        { label: "Food banks", colour: "#111" },
+        { label: "Schools", colour: "#222" },
+      ],
+      ["amenity-infrastructure.food_banks_count", "amenity-infrastructure.schools_count"],
+    );
+    const buttons = el.querySelectorAll("button.legend-toggle");
+    expect(buttons.length).toBe(2);
+    expect(buttons[0]!.getAttribute("data-layer-id")).toBe(
+      "amenity-infrastructure.food_banks_count",
+    );
+    expect(el.innerHTML).toContain("Food banks");
+    expect(el.innerHTML).toContain("background:#222");
+  });
+});
 
 describe("placePopupHtml", () => {
   it("includes name, label:value and a View place link with an encoded href", () => {

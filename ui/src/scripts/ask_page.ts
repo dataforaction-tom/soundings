@@ -530,10 +530,49 @@
             const { renderPlaceMap, renderChoroplethMap, renderAmenityMap } =
               await import("../lib/map-renderer");
 
-            // 1) amenity points take precedence when an overlay is present.
-            if (overlay?.source === "amenities") {
-              const keys = asStringArray(overlay.indicator_keys);
-              if (keys.length === 0) {
+            const amenityKeys =
+              overlay?.source === "amenities" ? asStringArray(overlay.indicator_keys) : [];
+
+            // Choropleth features: sub-area (LSOA) with a peers fallback when the
+            // indicator has no sub-area data, otherwise the peer view.
+            const fetchChoroplethFc = async (): Promise<GeoJSON.FeatureCollection> => {
+              const q =
+                `?indicator=${encodeURIComponent(indicatorKey!)}` +
+                (period ? `&period=${encodeURIComponent(period)}` : "");
+              if (granularity === "sub_areas") {
+                const fc = await getJSON<GeoJSON.FeatureCollection>(
+                  `/v1/place/${encodeURIComponent(mapPlaceId)}/children/geometry${q}`,
+                  apiBase,
+                );
+                if (fc.features && fc.features.length > 0) return fc;
+              }
+              return getJSON<GeoJSON.FeatureCollection>(
+                `/v1/place/${encodeURIComponent(mapPlaceId)}/peers/geometry${q}`,
+                apiBase,
+              );
+            };
+
+            const fetchAmenityPoints = (): Promise<GeoJSON.FeatureCollection> =>
+              getJSON<GeoJSON.FeatureCollection>(
+                `/v1/place/${encodeURIComponent(mapPlaceId)}/amenities/geometry` +
+                  `?indicators=${encodeURIComponent(amenityKeys.join(","))}`,
+                apiBase,
+              );
+
+            if (indicatorKey && overlay?.source === "amenities" && amenityKeys.length > 0) {
+              // 1) combined choropleth + amenity points.
+              const [fc, points] = await Promise.all([
+                fetchChoroplethFc(),
+                fetchAmenityPoints(),
+              ]);
+              renderChoroplethMap(container, fc, "value", {
+                label: prettyKey(indicatorKey),
+                tilesUrl: mapTilesUrl || undefined,
+                points,
+              });
+            } else if (overlay?.source === "amenities") {
+              // 2) amenity points only.
+              if (amenityKeys.length === 0) {
                 showBlockError(host, "Amenity overlay missing indicator_keys.");
                 container.remove();
                 return;
@@ -543,43 +582,14 @@
                   `/v1/place/${encodeURIComponent(mapPlaceId)}/geometry`,
                   apiBase,
                 ),
-                getJSON<GeoJSON.FeatureCollection>(
-                  `/v1/place/${encodeURIComponent(mapPlaceId)}/amenities/geometry` +
-                    `?indicators=${encodeURIComponent(keys.join(","))}`,
-                  apiBase,
-                ),
+                fetchAmenityPoints(),
               ]);
               renderAmenityMap(container, boundary, points, {
                 tilesUrl: mapTilesUrl || undefined,
               });
-            } else if (indicatorKey && granularity === "sub_areas") {
-              // 2) sub-area choropleth, falling back to peers if empty.
-              let fc = await getJSON<GeoJSON.FeatureCollection>(
-                `/v1/place/${encodeURIComponent(mapPlaceId)}/children/geometry` +
-                  `?indicator=${encodeURIComponent(indicatorKey)}` +
-                  (period ? `&period=${encodeURIComponent(period)}` : ""),
-                apiBase,
-              );
-              if (!fc.features || fc.features.length === 0) {
-                fc = await getJSON<GeoJSON.FeatureCollection>(
-                  `/v1/place/${encodeURIComponent(mapPlaceId)}/peers/geometry` +
-                    `?indicator=${encodeURIComponent(indicatorKey)}` +
-                    (period ? `&period=${encodeURIComponent(period)}` : ""),
-                  apiBase,
-                );
-              }
-              renderChoroplethMap(container, fc, "value", {
-                label: prettyKey(indicatorKey),
-                tilesUrl: mapTilesUrl || undefined,
-              });
             } else if (indicatorKey) {
-              // 3) peer choropleth.
-              const fc = await getJSON<GeoJSON.FeatureCollection>(
-                `/v1/place/${encodeURIComponent(mapPlaceId)}/peers/geometry` +
-                  `?indicator=${encodeURIComponent(indicatorKey)}` +
-                  (period ? `&period=${encodeURIComponent(period)}` : ""),
-                apiBase,
-              );
+              // 3) choropleth (sub-area with peers fallback, or peers).
+              const fc = await fetchChoroplethFc();
               renderChoroplethMap(container, fc, "value", {
                 label: prettyKey(indicatorKey),
                 tilesUrl: mapTilesUrl || undefined,
