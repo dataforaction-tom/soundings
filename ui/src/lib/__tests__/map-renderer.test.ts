@@ -5,7 +5,35 @@ import {
   amenityLegendItems,
   hasFiniteValues,
   rankFractions,
+  placePopupHtml,
 } from "../map-renderer";
+
+describe("placePopupHtml", () => {
+  it("includes name, label:value and a View place link with an encoded href", () => {
+    const html = placePopupHtml({
+      name: "County Durham",
+      label: "Green space per person",
+      value: "1,216",
+      placeId: "ltla24:E06000047",
+    });
+    expect(html).toContain("<strong>County Durham</strong>");
+    expect(html).toContain("Green space per person: 1,216");
+    expect(html).toContain('href="/place/ltla24%3AE06000047"');
+    expect(html).toContain("View place →");
+  });
+
+  it("omits the link when no placeId is given", () => {
+    const html = placePopupHtml({ name: "X", label: "Y", value: "1" });
+    expect(html).not.toContain("View place");
+    expect(html).not.toContain("<a ");
+  });
+
+  it("escapes HTML in the place name", () => {
+    const html = placePopupHtml({ name: "<script>", label: "L", value: "1" });
+    expect(html).not.toContain("<script>");
+    expect(html).toContain("&lt;script&gt;");
+  });
+});
 import { PALETTE } from "../chart";
 
 describe("colourDomain", () => {

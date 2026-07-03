@@ -235,6 +235,26 @@ export interface RenderChoroplethMapOptions {
   tilesUrl?: string;
 }
 
+/** HTML for a click pop-up on a choropleth area: place name, the indicator
+ *  value, and a "View place →" link to its profile page. The link is omitted
+ *  when no place id is available. */
+export function placePopupHtml(opts: {
+  name: string;
+  label: string;
+  value: string;
+  placeId?: string;
+}): string {
+  const link = opts.placeId
+    ? `<br/><a href="/place/${encodeURIComponent(opts.placeId)}" ` +
+      `style="color:#4a7c59;font-weight:600;text-decoration:none">View place →</a>`
+    : "";
+  return (
+    `<div style="font-family:system-ui,sans-serif;font-size:13px;line-height:1.5">` +
+    `<strong>${escapeHtml(opts.name)}</strong><br/>` +
+    `${escapeHtml(opts.label)}: ${escapeHtml(opts.value)}${link}</div>`
+  );
+}
+
 /**
  * Render a FeatureCollection as a choropleth, interpolating fill colour from
  * the `valueKey` property on each feature. Hover shows place name + value.
@@ -366,6 +386,39 @@ export function renderChoroplethMap(
     map.getCanvas().style.cursor = "";
   });
 
+  // Click pop-up: persists, with a "View place →" link to the area's profile.
+  const clickPopup = new maplibregl.Popup({
+    closeButton: true,
+    closeOnClick: false,
+    maxWidth: "260px",
+  });
+  map.on("click", fillId, (e) => {
+    const features = map.queryRenderedFeatures(e.point, { layers: [fillId] });
+    if (features.length === 0) return;
+    const props = (features[0].properties ?? {}) as Record<string, unknown>;
+    const placeName =
+      (props.name as string | undefined) ??
+      (props.place_name as string | undefined) ??
+      (props.place_id as string | undefined) ??
+      "—";
+    const rawValue = props[valueKey];
+    const displayValue =
+      typeof rawValue === "number" ? rawValue.toLocaleString("en-GB") : String(rawValue ?? "—");
+    const placeId =
+      (props.id as string | undefined) ?? (props.place_id as string | undefined);
+    clickPopup
+      .setLngLat(e.lngLat)
+      .setHTML(
+        placePopupHtml({
+          name: placeName,
+          label: options.label ?? valueKey,
+          value: displayValue,
+          placeId,
+        }),
+      )
+      .addTo(map);
+  });
+
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
 
   // Add legend element — only when there's real data to scale (an empty/no-data
@@ -383,6 +436,7 @@ export function renderChoroplethMap(
 
   return () => {
     popup.remove();
+    clickPopup.remove();
     legend.remove();
     map.remove();
   };
