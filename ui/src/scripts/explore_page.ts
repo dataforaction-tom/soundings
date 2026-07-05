@@ -30,10 +30,9 @@ function ensureMaplibreCss(): void {
 function init(): void {
   const surface = document.getElementById("explore-map");
   const indicatorSel = document.getElementById("explore-indicator") as HTMLSelectElement | null;
-  const levelSel = document.getElementById("explore-level") as HTMLSelectElement | null;
   const status = document.getElementById("explore-status");
   const dataEl = document.getElementById("explore-indicators-data");
-  if (!surface || !indicatorSel || !levelSel || !dataEl) return;
+  if (!surface || !indicatorSel || !dataEl) return;
 
   const apiBase = surface.dataset.apiBase || "";
   const tilesUrl = surface.dataset.mapTiles || undefined;
@@ -132,16 +131,12 @@ function init(): void {
   let drillName: string | null = null;
   let cleanup: (() => void) | null = null;
 
-  function levelsFor(key: string): string[] {
+  // Each indicator shows at its default (coarsest available) level — a sensible
+  // national overview — with drill-down for neighbourhoods. No manual level
+  // picker (it confused more than it helped).
+  function defaultLevel(key: string): string {
     const avail = byKey.get(key)?.available_at ?? [];
-    return LEVEL_ORDER.filter((l) => avail.includes(l));
-  }
-
-  function refreshLevelOptions(): void {
-    const levels = levelsFor(indicatorSel!.value);
-    levelSel!.innerHTML = levels
-      .map((l) => `<option value="${l}">${LEVEL_LABELS[l] ?? l}</option>`)
-      .join("");
+    return LEVEL_ORDER.find((l) => avail.includes(l)) ?? avail[0] ?? "ltla24";
   }
 
   async function render(): Promise<void> {
@@ -163,8 +158,7 @@ function init(): void {
         `?indicator=${encodeURIComponent(key)}&child_type=lsoa21`;
       contextLabel = `neighbourhoods in ${drillName ?? "this area"}`;
     } else {
-      const level = levelSel!.value;
-      if (!level) return;
+      const level = defaultLevel(key);
       const large = level === "lsoa21" ? "&large=true" : "";
       url =
         `${apiBase}/v1/geographies/${encodeURIComponent(level)}/geometry` +
@@ -202,16 +196,7 @@ function init(): void {
   }
 
   indicatorSel.addEventListener("change", () => {
-    refreshLevelOptions();
-    // Leave drill mode if the new indicator has no neighbourhood-level data.
-    if (drillPlaceId && !byKey.get(indicatorSel!.value)?.available_at.includes("lsoa21")) {
-      drillPlaceId = null;
-      drillName = null;
-    }
-    void render();
-  });
-  levelSel.addEventListener("change", () => {
-    // The geography control is a national-view action; leave drill mode.
+    // New indicator → its default national view (out of any drill-down).
     drillPlaceId = null;
     drillName = null;
     void render();
@@ -222,7 +207,6 @@ function init(): void {
     void render();
   });
 
-  refreshLevelOptions();
   void render();
 }
 
