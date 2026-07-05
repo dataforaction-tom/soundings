@@ -15,14 +15,54 @@
         // (the first h1 on the page) instead of the question.
         const query = surface.dataset.query || "";
 
-        function setStatus(message: string) {
-          let el = surface.querySelector<HTMLElement>(".answer-status");
-          if (!el) {
-            el = document.createElement("p");
-            el.className = "answer-status";
-            surface.appendChild(el);
+        // --- Processing steps (animated) ------------------------------------
+        const STEP_LABELS: Record<string, string> = {
+          find_place: "Finding the place",
+          get_indicators: "Looking up indicators",
+          get_place_profile: "Building the place profile",
+          compare_places: "Comparing places",
+          get_trend: "Fetching trends over time",
+          detect_insights: "Detecting notable signals",
+          get_peer_distribution: "Comparing against peers",
+          get_sub_areas: "Loading neighbourhoods",
+          find_organisations_in_place: "Finding organisations",
+          get_civil_society_profile: "Profiling civil society",
+          compose_answer: "Composing the answer",
+        };
+
+        function friendlyStep(message: string): string {
+          const tool = message.match(/Calling (\w+)/)?.[1];
+          return (tool && STEP_LABELS[tool]) || message.replace(/…$/, "");
+        }
+
+        let stepsEl: HTMLOListElement | null = null;
+        function pushStep(label: string) {
+          if (!stepsEl) {
+            stepsEl = document.createElement("ol");
+            stepsEl.className = "answer-steps";
+            surface.prepend(stepsEl);
           }
-          el.textContent = message;
+          const active = stepsEl.querySelector<HTMLElement>(".step.is-active");
+          if (active) {
+            active.classList.remove("is-active");
+            active.classList.add("is-done");
+          }
+          const li = document.createElement("li");
+          li.className = "step is-active";
+          const icon = document.createElement("span");
+          icon.className = "step-icon";
+          const text = document.createElement("span");
+          text.className = "step-label";
+          text.textContent = label;
+          li.append(icon, text);
+          stepsEl.appendChild(li);
+        }
+        function finishSteps() {
+          const active = stepsEl?.querySelector<HTMLElement>(".step.is-active");
+          if (active) {
+            active.classList.remove("is-active");
+            active.classList.add("is-done");
+          }
         }
 
         function renderMarkdown(text: string): string {
@@ -1159,31 +1199,29 @@
         // Clear the "Thinking…" status placeholder once first event arrives.
         let firstEvent = true;
 
+        function clearThinking() {
+          if (!firstEvent) return;
+          const s = surface.querySelector(".answer-status");
+          if (s) s.remove();
+          firstEvent = false;
+        }
+
         streamAsk(apiBase + "/v1/ask", body, (event) => {
-          if (firstEvent && event.type !== "status") {
-            const s = surface.querySelector(".answer-status");
-            if (s) s.remove();
-            firstEvent = false;
-          }
           switch (event.type) {
             case "status":
-              setStatus(event.message);
+              clearThinking();
+              pushStep(friendlyStep(event.message));
               break;
             case "block":
-              if (firstEvent) {
-                const s = surface.querySelector(".answer-status");
-                if (s) s.remove();
-                firstEvent = false;
-              }
+              clearThinking();
               renderBlock(event.block);
               break;
             case "sources":
               renderSources(event.sources);
               break;
             case "done":
-              setStatus("");
-              const s = surface.querySelector(".answer-status");
-              if (s && s.textContent === "") s.remove();
+              clearThinking();
+              finishSteps();
               break;
             case "error":
               renderError(event.message);
