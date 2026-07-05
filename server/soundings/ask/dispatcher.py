@@ -97,7 +97,7 @@ TERMINAL_TOOL = "compose_answer"
 
 COMPOSE_ANSWER_DESCRIPTION = (
     "Compose the final answer to the user's question. Each block is rendered "
-    "client-side; the orchestrator validates caps (max 20 blocks, max 10 visual)."
+    "client-side; the orchestrator validates caps (max 30 blocks, max 16 visual)."
 )
 
 

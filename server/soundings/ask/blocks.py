@@ -12,8 +12,8 @@ from pydantic import BaseModel, Field, model_validator
 ComparisonBasis = Literal["percentile", "rank", "absolute", "rate"]
 Severity = Literal["notable", "extreme"]
 
-MAX_TOTAL_BLOCKS = 20
-MAX_VISUAL_BLOCKS = 10
+MAX_TOTAL_BLOCKS = 30
+MAX_VISUAL_BLOCKS = 16
 
 _VISUAL_TYPES = frozenset(
     {
