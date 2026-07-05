@@ -233,6 +233,9 @@ export interface RenderChoroplethMapOptions {
   colourScale?: [string, string];
   label?: string;
   tilesUrl?: string;
+  /** Optional amenity point layers to overlay on top of the choropleth
+   *  (e.g. food banks over a deprivation map). Toggleable via the legend. */
+  points?: GeoJSON.FeatureCollection;
 }
 
 /** HTML for a click pop-up on a choropleth area: place name, the indicator
@@ -318,6 +321,23 @@ export function renderChoroplethMap(
         ]
   ) as unknown as maplibregl.ExpressionSpecification;
 
+  // Legend built up front (referenced by the async load handler below). The
+  // choropleth gradient row is added only when there's data; amenity swatch
+  // rows are appended once the point layers load.
+  const legend = document.createElement("div");
+  legend.className = "map-legend choropleth-legend";
+  if (hasData) {
+    legend.innerHTML =
+      `<span class="legend-label">${escapeHtml(options.label ?? valueKey)}</span>` +
+      `<span class="legend-gradient"></span>` +
+      `<span class="legend-min">${domMin.toLocaleString("en-GB")}</span>` +
+      `<span class="legend-max">${domMax.toLocaleString("en-GB")}</span>`;
+  }
+
+  const amenityPopup = options.points
+    ? new maplibregl.Popup({ closeButton: false, closeOnClick: false })
+    : null;
+
   map.on("load", () => {
     map.addSource(sourceId, { type: "geojson", data: featureCollection });
 
@@ -340,6 +360,20 @@ export function renderChoroplethMap(
         "line-width": 0.5,
       },
     });
+
+    // Overlay amenity point layers on top of the choropleth (increment 4).
+    if (options.points && amenityPopup) {
+      const { legendItems, layerIds } = addAmenityPointLayers(map, options.points, amenityPopup);
+      const amenityRows = buildAmenityLegend(legendItems, layerIds);
+      while (amenityRows.firstChild) legend.appendChild(amenityRows.firstChild);
+      wireLegendToggles(map, legend);
+    }
+
+    // Append the legend once its content is settled (gradient and/or amenity
+    // rows). Skip only when there's nothing to show.
+    if (legend.childNodes.length > 0 && !legend.parentElement) {
+      container.appendChild(legend);
+    }
 
     map.fitBounds(featureBounds(featureCollection), { padding: 20 });
   });
@@ -421,22 +455,10 @@ export function renderChoroplethMap(
 
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
 
-  // Add legend element — only when there's real data to scale (an empty/no-data
-  // choropleth shouldn't show a misleading gradient).
-  const legend = document.createElement("div");
-  if (hasData) {
-    legend.className = "map-legend choropleth-legend";
-    legend.innerHTML =
-      `<span class="legend-label">${escapeHtml(options.label ?? valueKey)}</span>` +
-      `<span class="legend-gradient"></span>` +
-      `<span class="legend-min">${domMin.toLocaleString("en-GB")}</span>` +
-      `<span class="legend-max">${domMax.toLocaleString("en-GB")}</span>`;
-    container.appendChild(legend);
-  }
-
   return () => {
     popup.remove();
     clickPopup.remove();
+    amenityPopup?.remove();
     legend.remove();
     map.remove();
   };
@@ -459,6 +481,91 @@ export function amenityLegendItems(
 }
 
 /**
+ * Add one colour-coded circle layer per distinct amenity `layer` property in
+ * `points`, with hover name popups. Assumes the map's style is loaded (call
+ * inside a `load` handler). Returns the legend items so the caller can render
+ * a combined legend. Shared by the points-only and choropleth+points maps.
+ */
+function addAmenityPointLayers(
+  map: maplibregl.Map,
+  points: GeoJSON.FeatureCollection,
+  popup: Popup,
+): { legendItems: Array<{ label: string; colour: string }>; layerIds: string[] } {
+  const layers = Array.from(
+    new Set(points.features.map((f) => String((f.properties ?? {}).layer ?? ""))),
+  ).filter(Boolean);
+  const legendItems = amenityLegendItems(layers);
+  const colourByLayer = new Map(legendItems.map((it, i) => [layers[i], it.colour]));
+
+  map.addSource("amenities", { type: "geojson", data: points });
+  const layerIds: string[] = [];
+  for (const layer of layers) {
+    const id = `amenity-${layer}`;
+    layerIds.push(id);
+    map.addLayer({
+      id,
+      type: "circle",
+      source: "amenities",
+      filter: ["==", ["get", "layer"], layer],
+      paint: {
+        "circle-radius": 5,
+        "circle-color": colourByLayer.get(layer) ?? NAVY,
+        "circle-stroke-color": CREAM,
+        "circle-stroke-width": 1,
+      },
+    });
+    map.on("mouseenter", id, (e) => {
+      const f = e.features?.[0];
+      const props = (f?.properties ?? {}) as Record<string, unknown>;
+      const name = (props.name as string | undefined) ?? amenityLayerLabel(layer);
+      const coords = (f?.geometry as GeoJSON.Point | undefined)?.coordinates;
+      popup.setHTML(
+        `<div style="font-family:system-ui,sans-serif"><strong>${escapeHtml(name)}</strong><br/>${escapeHtml(amenityLayerLabel(layer))}</div>`,
+      );
+      if (coords) popup.setLngLat(coords as [number, number]).addTo(map);
+      map.getCanvas().style.cursor = "pointer";
+    });
+    map.on("mouseleave", id, () => {
+      popup.remove();
+      map.getCanvas().style.cursor = "";
+    });
+  }
+  return { legendItems, layerIds };
+}
+
+/** Build a legend element: one clickable swatch row per amenity layer (click
+ *  toggles that layer). Returns the element; wiring the toggles is the caller's
+ *  job via `layerIds`. */
+export function buildAmenityLegend(
+  legendItems: Array<{ label: string; colour: string }>,
+  layerIds: string[],
+): HTMLElement {
+  const legend = document.createElement("div");
+  legend.className = "map-legend amenity-legend";
+  legend.innerHTML = legendItems
+    .map(
+      (it, i) =>
+        `<button type="button" class="legend-item legend-toggle" data-layer-id="${escapeHtml(layerIds[i] ?? "")}">` +
+        `<span class="legend-swatch" style="background:${it.colour}"></span>${escapeHtml(it.label)}</button>`,
+    )
+    .join("");
+  return legend;
+}
+
+/** Wire click-to-toggle visibility on each amenity legend button. */
+function wireLegendToggles(map: maplibregl.Map, legend: HTMLElement): void {
+  for (const btn of Array.from(legend.querySelectorAll<HTMLButtonElement>(".legend-toggle"))) {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.layerId;
+      if (!id) return;
+      const visible = map.getLayoutProperty(id, "visibility") !== "none";
+      map.setLayoutProperty(id, "visibility", visible ? "none" : "visible");
+      btn.classList.toggle("is-off", visible);
+    });
+  }
+}
+
+/**
  * Render a place boundary plus one colour-coded circle layer per amenity
  * `layer` property in `points`, with a legend and name popups. Returns a
  * cleanup function.
@@ -470,16 +577,8 @@ export function renderAmenityMap(
   options: { tilesUrl?: string } = {},
 ): () => void {
   const map = new maplibregl.Map(baseMapOptions(container, options.tilesUrl));
-
-  const layers = Array.from(
-    new Set(points.features.map((f) => String((f.properties ?? {}).layer ?? ""))),
-  ).filter(Boolean);
-  const legendItems = amenityLegendItems(layers);
-  const colourByLayer = new Map(
-    legendItems.map((it, i) => [layers[i], it.colour]),
-  );
-
   const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false });
+  let legend: HTMLElement | null = null;
 
   map.on("load", () => {
     map.addSource("boundary", { type: "geojson", data: boundary });
@@ -496,55 +595,19 @@ export function renderAmenityMap(
       paint: { "line-color": ACCENT_GREEN, "line-width": 1 },
     });
 
-    map.addSource("amenities", { type: "geojson", data: points });
-    for (const layer of layers) {
-      map.addLayer({
-        id: `amenity-${layer}`,
-        type: "circle",
-        source: "amenities",
-        filter: ["==", ["get", "layer"], layer],
-        paint: {
-          "circle-radius": 5,
-          "circle-color": colourByLayer.get(layer) ?? NAVY,
-          "circle-stroke-color": CREAM,
-          "circle-stroke-width": 1,
-        },
-      });
-      map.on("mouseenter", `amenity-${layer}`, (e) => {
-        const f = e.features?.[0];
-        const props = (f?.properties ?? {}) as Record<string, unknown>;
-        const name = (props.name as string | undefined) ?? amenityLayerLabel(layer);
-        const coords = (f?.geometry as GeoJSON.Point | undefined)?.coordinates;
-        popup.setHTML(
-          `<div style="font-family:system-ui,sans-serif"><strong>${escapeHtml(name)}</strong><br/>${escapeHtml(amenityLayerLabel(layer))}</div>`,
-        );
-        if (coords) popup.setLngLat(coords as [number, number]).addTo(map);
-        map.getCanvas().style.cursor = "pointer";
-      });
-      map.on("mouseleave", `amenity-${layer}`, () => {
-        popup.remove();
-        map.getCanvas().style.cursor = "";
-      });
-    }
+    const { legendItems, layerIds } = addAmenityPointLayers(map, points, popup);
+    legend = buildAmenityLegend(legendItems, layerIds);
+    container.appendChild(legend);
+    wireLegendToggles(map, legend);
 
     map.fitBounds(featureBounds(boundary), { padding: 20 });
   });
 
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
 
-  const legend = document.createElement("div");
-  legend.className = "map-legend amenity-legend";
-  legend.innerHTML = legendItems
-    .map(
-      (it) =>
-        `<span class="legend-item"><span class="legend-swatch" style="background:${it.colour}"></span>${escapeHtml(it.label)}</span>`,
-    )
-    .join("");
-  container.appendChild(legend);
-
   return () => {
     popup.remove();
-    legend.remove();
+    legend?.remove();
     map.remove();
   };
 }

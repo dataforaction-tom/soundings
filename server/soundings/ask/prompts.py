@@ -138,6 +138,13 @@ Block types for compose_answer:
     parks" questions, e.g. indicator_keys:
     ["infrastructure.food_banks_count","infrastructure.schools_count"]. Pair with
     the matching infrastructure.*_count indicators when the user also wants counts.
+  * combined — set BOTH a per-area indicator_key (with granularity) AND an
+    amenities overlay on one map to draw a choropleth with facility points on
+    top. Powerful for "is provision worst where need is highest?" questions,
+    e.g. a deprivation.* sub_areas choropleth with food-bank points:
+    indicator_key="deprivation.imd.score", granularity="sub_areas",
+    overlay={source:"amenities", indicator_keys:["infrastructure.food_banks_count"]}.
+    The point layers are toggleable in the legend.
 - sub-area-table: a table of sub-area (neighbourhood) values within a parent
   place. Use after calling get_sub_areas — the block carries the sub_areas
   data inline. Pair with a sub_areas choropleth map for the geographic view.
