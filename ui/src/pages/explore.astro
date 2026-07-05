@@ -1,0 +1,129 @@
+---
+// Interactive map explorer — pick an indicator + geography level and see a
+// national choropleth. Increment 3 of the interactive-map epic.
+import Base from "../layouts/Base.astro";
+import { apiBase as ssrApiBase } from "../lib/api";
+
+// Public base for browser fetches (relative, proxied by Caddy).
+const publicApiBase =
+  (typeof process !== "undefined" && process.env.SOUNDINGS_PUBLIC_API_BASE) || "";
+const mapTilesUrl =
+  typeof process !== "undefined" && process.env.SOUNDINGS_MAP_TILES_URL !== undefined
+    ? process.env.SOUNDINGS_MAP_TILES_URL
+    : "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+
+// Indicators that are stored per-area and so render as a choropleth. (Passthrough
+// indicators — OSM counts, air quality — have no per-area data to colour.)
+const CHOROPLETH_PREFIXES = [
+  "deprivation.",
+  "environment.greenspace.",
+  "population.",
+  "economy.active_companies_",
+  "economy.new_incorporations_12m",
+];
+// Levels we hold boundary geometry for (ward/constituency/country excluded).
+const GEOMETRY_LEVELS = ["lsoa21", "ltla24", "utla24", "region"];
+
+interface CatalogueIndicator {
+  key: string;
+  label: string;
+  available_at: string[];
+}
+
+let indicators: Array<{ key: string; label: string; available_at: string[] }> = [];
+let loadError: string | null = null;
+try {
+  const res = await fetch(`${ssrApiBase()}/v1/catalogue/indicators`);
+  if (!res.ok) throw new Error(`catalogue ${res.status}`);
+  const body = (await res.json()) as { indicators: CatalogueIndicator[] };
+  indicators = body.indicators
+    .filter((i) => CHOROPLETH_PREFIXES.some((p) => i.key.startsWith(p)))
+    .map((i) => ({
+      key: i.key,
+      label: i.label,
+      available_at: (i.available_at || []).filter((l) => GEOMETRY_LEVELS.includes(l)),
+    }))
+    .filter((i) => i.available_at.length > 0)
+    .sort((a, b) => a.key.localeCompare(b.key));
+} catch (err) {
+  loadError = err instanceof Error ? err.message : String(err);
+}
+---
+
+<Base title="Explore map">
+  <header class="explore-header">
+    <h1>Explore the map</h1>
+    <p class="text-muted">
+      Pick an indicator and a geography level to see how it varies across England.
+    </p>
+  </header>
+
+  {loadError ? (
+    <p class="error">Couldn't load the indicator catalogue: {loadError}</p>
+  ) : indicators.length === 0 ? (
+    <p class="no-match">No mappable indicators are available yet.</p>
+  ) : (
+    <div class="explore">
+      <div class="explore-controls">
+        <label>
+          <span>Indicator</span>
+          <select id="explore-indicator">
+            {indicators.map((i) => (
+              <option value={i.key} selected={i.key === "deprivation.imd.score"}>
+                {i.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Geography</span>
+          <select id="explore-level"></select>
+        </label>
+      </div>
+
+      <div
+        id="explore-map"
+        class="explore-map map-container"
+        data-api-base={publicApiBase}
+        data-map-tiles={mapTilesUrl}
+      ></div>
+
+      <p id="explore-status" class="text-muted text-small"></p>
+
+      <script
+        type="application/json"
+        id="explore-indicators-data"
+        set:html={JSON.stringify(indicators)}
+      ></script>
+      <script>
+        import "../scripts/explore_page";
+      </script>
+    </div>
+  )}
+</Base>
+
+<style>
+  .explore-header {
+    margin-bottom: var(--space-lg);
+  }
+  .explore-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-lg);
+    margin-bottom: var(--space-md);
+  }
+  .explore-controls label {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    font-weight: var(--font-weight-medium);
+  }
+  .explore-controls select {
+    padding: var(--space-sm) var(--space-md);
+    min-width: 16rem;
+  }
+  .explore-map {
+    height: 70vh;
+    min-height: 420px;
+  }
+</style>
