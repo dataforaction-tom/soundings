@@ -30,10 +30,9 @@ function ensureMaplibreCss(): void {
 function init(): void {
   const surface = document.getElementById("explore-map");
   const indicatorSel = document.getElementById("explore-indicator") as HTMLSelectElement | null;
-  const levelSel = document.getElementById("explore-level") as HTMLSelectElement | null;
   const status = document.getElementById("explore-status");
   const dataEl = document.getElementById("explore-indicators-data");
-  if (!surface || !indicatorSel || !levelSel || !dataEl) return;
+  if (!surface || !indicatorSel || !dataEl) return;
 
   const apiBase = surface.dataset.apiBase || "";
   const tilesUrl = surface.dataset.mapTiles || undefined;
@@ -103,38 +102,73 @@ function init(): void {
       `<h2>${esc(sel.name)}</h2>` +
       (rows || `<p class="text-muted text-small">No indicator data for this area.</p>`) +
       link;
+
+    // Offer a drill-down into this area's neighbourhoods when it's an authority
+    // and the active indicator has LSOA-level data.
+    const activeKey = indicatorSel!.value;
+    const canDrill =
+      !drillPlaceId &&
+      !!sel.placeId &&
+      (sel.placeId.startsWith("ltla24:") || sel.placeId.startsWith("utla24:")) &&
+      (byKey.get(activeKey)?.available_at.includes("lsoa21") ?? false);
+    if (canDrill && sel.placeId) {
+      const placeId = sel.placeId;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "panel-drill";
+      btn.textContent = "Explore its neighbourhoods →";
+      btn.addEventListener("click", () => {
+        drillPlaceId = placeId;
+        drillName = sel.name;
+        void render();
+      });
+      panel.appendChild(btn);
+    }
   }
 
+  const backBtn = document.getElementById("explore-back") as HTMLButtonElement | null;
+  let drillPlaceId: string | null = null;
+  let drillName: string | null = null;
   let cleanup: (() => void) | null = null;
 
-  function levelsFor(key: string): string[] {
+  // Each indicator shows at its default (coarsest available) level — a sensible
+  // national overview — with drill-down for neighbourhoods. No manual level
+  // picker (it confused more than it helped).
+  function defaultLevel(key: string): string {
     const avail = byKey.get(key)?.available_at ?? [];
-    return LEVEL_ORDER.filter((l) => avail.includes(l));
-  }
-
-  function refreshLevelOptions(): void {
-    const levels = levelsFor(indicatorSel!.value);
-    levelSel!.innerHTML = levels
-      .map((l) => `<option value="${l}">${LEVEL_LABELS[l] ?? l}</option>`)
-      .join("");
+    return LEVEL_ORDER.find((l) => avail.includes(l)) ?? avail[0] ?? "ltla24";
   }
 
   async function render(): Promise<void> {
     const key = indicatorSel!.value;
-    const level = levelSel!.value;
-    if (!key || !level) return;
+    if (!key) return;
 
     cleanup?.();
     cleanup = null;
+    if (backBtn) backBtn.hidden = !drillPlaceId;
     if (status) status.textContent = "Loading…";
 
-    const large = level === "lsoa21" ? "&large=true" : "";
+    // Drill mode: the selected area's LSOAs. National mode: all areas of the
+    // chosen level.
+    let url: string;
+    let contextLabel: string;
+    if (drillPlaceId) {
+      url =
+        `${apiBase}/v1/place/${encodeURIComponent(drillPlaceId)}/children/geometry` +
+        `?indicator=${encodeURIComponent(key)}&child_type=lsoa21`;
+      contextLabel = `neighbourhoods in ${drillName ?? "this area"}`;
+    } else {
+      const level = defaultLevel(key);
+      const large = level === "lsoa21" ? "&large=true" : "";
+      url =
+        `${apiBase}/v1/geographies/${encodeURIComponent(level)}/geometry` +
+        `?indicator=${encodeURIComponent(key)}${large}`;
+      contextLabel = `${LEVEL_LABELS[level] ?? level} areas`;
+    }
+
     let fc: GeoJSON.FeatureCollection;
     try {
-      const res = await fetch(
-        `${apiBase}/v1/geographies/${encodeURIComponent(level)}/geometry` +
-          `?indicator=${encodeURIComponent(key)}${large}`,
-      );
+      const res = await fetch(url);
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
       fc = (await res.json()) as GeoJSON.FeatureCollection;
     } catch (err) {
@@ -157,17 +191,22 @@ function init(): void {
       (f) => typeof f.properties?.value === "number",
     ).length;
     if (status) {
-      status.textContent = `${n} ${LEVEL_LABELS[level] ?? level} areas with data · click an area for details`;
+      status.textContent = `${n} ${contextLabel} with data · click an area for details`;
     }
   }
 
   indicatorSel.addEventListener("change", () => {
-    refreshLevelOptions();
+    // New indicator → its default national view (out of any drill-down).
+    drillPlaceId = null;
+    drillName = null;
     void render();
   });
-  levelSel.addEventListener("change", () => void render());
+  backBtn?.addEventListener("click", () => {
+    drillPlaceId = null;
+    drillName = null;
+    void render();
+  });
 
-  refreshLevelOptions();
   void render();
 }
 
