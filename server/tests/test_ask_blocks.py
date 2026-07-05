@@ -4,6 +4,8 @@ import pytest
 from pydantic import TypeAdapter, ValidationError
 
 from soundings.ask.blocks import (
+    MAX_TOTAL_BLOCKS,
+    MAX_VISUAL_BLOCKS,
     AnswerBlock,
     CompareChartBlock,
     ComposeAnswerArgs,
@@ -89,10 +91,10 @@ def test_compose_answer_rejects_unknown_block_type():
 
 
 def test_compose_answer_trims_to_max_total_blocks():
-    blocks = [TextBlock(type="text", markdown=f"Block {i}") for i in range(21)]
+    blocks = [TextBlock(type="text", markdown=f"Block {i}") for i in range(MAX_TOTAL_BLOCKS + 1)]
     args = ComposeAnswerArgs(blocks=blocks)
     # Over-length answers are trimmed to the cap rather than rejected.
-    assert len(args.blocks) == 20
+    assert len(args.blocks) == MAX_TOTAL_BLOCKS
 
 
 def test_compose_answer_trims_excess_visual_blocks():
@@ -100,13 +102,13 @@ def test_compose_answer_trims_excess_visual_blocks():
         IndicatorCardBlock(
             type="indicator-card", indicator_key=f"k{i}", place_id="ltla24:E06000047"
         )
-        for i in range(12)
+        for i in range(MAX_VISUAL_BLOCKS + 2)
     ]
     text = [TextBlock(type="text", markdown="intro")]
     args = ComposeAnswerArgs(blocks=text + visual)
     # Excess visual blocks are dropped; text blocks are always kept.
     visual_kept = sum(1 for b in args.blocks if b.type == "indicator-card")
-    assert visual_kept == 10
+    assert visual_kept == MAX_VISUAL_BLOCKS
     assert any(b.type == "text" for b in args.blocks)
 
 
@@ -166,10 +168,13 @@ def test_map_block_in_compose_answer():
 
 def test_map_block_counts_as_visual():
     """MapBlock should count toward the visual block cap (and be trimmed)."""
-    visual = [MapBlock(type="map", place_id=f"ltla24:E060000{i:02d}") for i in range(12)]
+    visual = [
+        MapBlock(type="map", place_id=f"ltla24:E060000{i:02d}")
+        for i in range(MAX_VISUAL_BLOCKS + 2)
+    ]
     text = [TextBlock(type="text", markdown="intro")]
     args = ComposeAnswerArgs(blocks=text + visual)
-    assert sum(1 for b in args.blocks if b.type == "map") == 10
+    assert sum(1 for b in args.blocks if b.type == "map") == MAX_VISUAL_BLOCKS
 
 
 def test_map_block_discriminator():
@@ -294,11 +299,11 @@ def test_distribution_chart_block_counts_as_visual():
             indicator_key=f"k{i}",
             place_id="ltla24:E06000047",
         )
-        for i in range(12)
+        for i in range(MAX_VISUAL_BLOCKS + 2)
     ]
     text = [TextBlock(type="text", markdown="intro")]
     args = ComposeAnswerArgs(blocks=text + visual)
-    assert sum(1 for b in args.blocks if b.type == "distribution-chart") == 10
+    assert sum(1 for b in args.blocks if b.type == "distribution-chart") == MAX_VISUAL_BLOCKS
     assert any(b.type == "text" for b in args.blocks)
 
 
@@ -355,11 +360,11 @@ def test_composition_chart_block_counts_as_visual():
             title=f"Chart {i}",
             segments=[CompositionSegment(label="A", value=1.0)],
         )
-        for i in range(12)
+        for i in range(MAX_VISUAL_BLOCKS + 2)
     ]
     text = [TextBlock(type="text", markdown="intro")]
     args = ComposeAnswerArgs(blocks=text + visual)
-    assert sum(1 for b in args.blocks if b.type == "composition-chart") == 10
+    assert sum(1 for b in args.blocks if b.type == "composition-chart") == MAX_VISUAL_BLOCKS
     assert any(b.type == "text" for b in args.blocks)
 
 
@@ -413,11 +418,11 @@ def test_scatter_plot_block_counts_as_visual():
             y_indicator_key="health.expectancy",
             place_id="ltla24:E06000047",
         )
-        for i in range(12)
+        for i in range(MAX_VISUAL_BLOCKS + 2)
     ]
     text = [TextBlock(type="text", markdown="intro")]
     args = ComposeAnswerArgs(blocks=text + visual)
-    assert sum(1 for b in args.blocks if b.type == "scatter-plot") == 10
+    assert sum(1 for b in args.blocks if b.type == "scatter-plot") == MAX_VISUAL_BLOCKS
     assert any(b.type == "text" for b in args.blocks)
 
 
