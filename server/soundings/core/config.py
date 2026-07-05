@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     env: str = "dev"
     ui_origin: str = "http://localhost:8088"
     anthropic_api_key: str = ""
-    ask_model: str = "claude-sonnet-4-6"
+    ask_model: str = "claude-sonnet-5"
 
 
 @lru_cache(maxsize=1)

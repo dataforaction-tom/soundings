@@ -21,6 +21,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from anthropic import Anthropic
+from anthropic.types import ThinkingConfigAdaptiveParam
 
 from soundings.ask.dispatcher import ToolDispatcher
 from soundings.ask.prompts import SystemPromptBuilder
@@ -28,12 +29,21 @@ from soundings.ask.prompts import SystemPromptBuilder
 logger = logging.getLogger(__name__)
 
 MAX_ITERATIONS = 12
-MAX_TOKENS_OUTPUT = 8192
+# Sonnet 5 runs adaptive thinking by default, and its new tokenizer emits ~30%
+# more tokens than 4.6 — thinking now shares this budget with the response, so a
+# cap tuned for 4.6 (8192) truncates a rich compose_answer mid-JSON. 16k leaves
+# headroom for thinking plus a full multi-block answer.
+MAX_TOKENS_OUTPUT = 16000
+# Adaptive thinking is the default on Sonnet 5; we send it explicitly so the
+# config is legible and survives a model swap. Thinking blocks it returns MUST
+# be echoed back in the assistant turn (see _loop) or the next call is rejected.
+THINKING_CONFIG: ThinkingConfigAdaptiveParam = {"type": "adaptive"}
 # Whole-request budget. Multi-tool answers (a place overview can touch the
 # profile, civil-society, several indicators and a comparison) legitimately
-# take over a minute when upstreams are cold, so allow generous headroom.
-# Effective only because the blocking LLM calls run via asyncio.to_thread.
-REQUEST_TIMEOUT_SECONDS = 120
+# take over a minute when upstreams are cold, and adaptive thinking adds to
+# per-turn latency, so allow generous headroom. Effective only because the
+# blocking LLM calls run via asyncio.to_thread.
+REQUEST_TIMEOUT_SECONDS = 180
 
 SSECallback = Callable[[dict[str, Any]], Awaitable[None] | None]
 
@@ -90,6 +100,17 @@ class AskOrchestrator:
         messages: list[dict[str, Any]],
         callback: SSECallback,
     ) -> None:
+        # The system prompt + tool list are a large, static prefix re-sent on
+        # every one of up to MAX_ITERATIONS turns. A cache breakpoint on the
+        # system block caches the whole tools+system prefix (render order is
+        # tools -> system -> messages), so iterations 2..N read it at ~0.1x.
+        system_blocks = [
+            {
+                "type": "text",
+                "text": system_prompt,
+                "cache_control": {"type": "ephemeral"},
+            }
+        ]
         for _iteration in range(self._max_iterations):
             # The Anthropic client is synchronous; calling it directly would
             # block the event loop for the whole request, stalling the SSE
@@ -99,18 +120,58 @@ class AskOrchestrator:
                 lambda: client.messages.create(
                     model=self._model,
                     max_tokens=MAX_TOKENS_OUTPUT,
-                    system=system_prompt,
+                    thinking=THINKING_CONFIG,
+                    system=system_blocks,  # type: ignore[arg-type]
                     tools=tool_specs,  # type: ignore[arg-type]
                     messages=messages,  # type: ignore[arg-type]
                 )
             )
+
+            # A cybersecurity/safety classifier can decline a request: HTTP 200
+            # with stop_reason "refusal" and (usually) empty content. Vanishingly
+            # rare for UK place statistics, but handle it rather than emit silence.
+            if getattr(response, "stop_reason", None) == "refusal":
+                await _emit(
+                    callback,
+                    {
+                        "type": "block",
+                        "block": {
+                            "type": "text",
+                            "markdown": (
+                                "Sorry — I can't answer that question. Try summarising a"
+                                " place or comparing two."
+                            ),
+                        },
+                    },
+                )
+                await _emit(callback, {"type": "done"})
+                return
 
             # Collect content blocks from the response
             assistant_content: list[dict[str, Any]] = []
             tool_use_blocks: list[dict[str, Any]] = []
 
             for content_block in response.content:
-                if content_block.type == "text":
+                # Thinking blocks must be echoed back verbatim (with signature,
+                # in their original position ahead of the tool_use they produced)
+                # or the next call is rejected. We preserve them but don't emit
+                # them to the UI — the status steps carry progress instead.
+                if content_block.type == "thinking":
+                    assistant_content.append(
+                        {
+                            "type": "thinking",
+                            "thinking": content_block.thinking,
+                            "signature": content_block.signature,
+                        }
+                    )
+                elif content_block.type == "redacted_thinking":
+                    assistant_content.append(
+                        {
+                            "type": "redacted_thinking",
+                            "data": content_block.data,
+                        }
+                    )
+                elif content_block.type == "text":
                     assistant_content.append(
                         {
                             "type": "text",
