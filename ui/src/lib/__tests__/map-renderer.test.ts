@@ -7,7 +7,26 @@ import {
   rankFractions,
   placePopupHtml,
   buildAmenityLegend,
+  amenityPopupHtml,
 } from "../map-renderer";
+
+describe("amenityPopupHtml", () => {
+  it("shows name, type, and address when present; escapes HTML", () => {
+    const html = amenityPopupHtml({
+      name: "Trussell <Trust> Food Bank",
+      type: "Food banks",
+      address: "TS18 1AB",
+    });
+    expect(html).toContain("Trussell &lt;Trust&gt; Food Bank");
+    expect(html).toContain("Food banks");
+    expect(html).toContain("TS18 1AB");
+  });
+  it("omits the address line when not given", () => {
+    const html = amenityPopupHtml({ name: "X", type: "Schools" });
+    expect(html).toContain("Schools");
+    expect(html.match(/<br\/>/g)?.length).toBe(1);
+  });
+});
 
 describe("buildAmenityLegend", () => {
   it("renders one toggle button per layer with its layer id and swatch", () => {

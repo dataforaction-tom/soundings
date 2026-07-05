@@ -474,6 +474,20 @@ export function renderChoroplethMap(
   };
 }
 
+/** HTML for a click pop-up on an amenity point: its name, type, and address
+ *  (when the feature carries one). */
+export function amenityPopupHtml(opts: {
+  name: string;
+  type: string;
+  address?: string;
+}): string {
+  return (
+    `<div style="font-family:system-ui,sans-serif;font-size:13px;line-height:1.5">` +
+    `<strong>${escapeHtml(opts.name)}</strong><br/>${escapeHtml(opts.type)}` +
+    `${opts.address ? `<br/>${escapeHtml(opts.address)}` : ""}</div>`
+  );
+}
+
 /** "infrastructure.food_banks_count" → "Food banks". */
 export function amenityLayerLabel(indicatorKey: string): string {
   const base = indicatorKey.replace(/^infrastructure\./, "").replace(/_count$/, "");
@@ -507,6 +521,14 @@ function addAmenityPointLayers(
   const legendItems = amenityLegendItems(layers);
   const colourByLayer = new Map(legendItems.map((it, i) => [layers[i], it.colour]));
 
+  // Persistent pop-up on click (hover gives the quick peek). Cleaned up with
+  // the map on teardown.
+  const clickPopup = new maplibregl.Popup({
+    closeButton: true,
+    closeOnClick: false,
+    maxWidth: "240px",
+  });
+
   map.addSource("amenities", { type: "geojson", data: points });
   const layerIds: string[] = [];
   for (const layer of layers) {
@@ -523,6 +545,20 @@ function addAmenityPointLayers(
         "circle-stroke-color": CREAM,
         "circle-stroke-width": 1,
       },
+    });
+    map.on("click", id, (e) => {
+      const f = e.features?.[0];
+      const props = (f?.properties ?? {}) as Record<string, unknown>;
+      const name = (props.name as string | undefined) ?? amenityLayerLabel(layer);
+      const address =
+        (props.address as string | undefined) ?? (props.postcode as string | undefined);
+      const coords = (f?.geometry as GeoJSON.Point | undefined)?.coordinates;
+      if (coords) {
+        clickPopup
+          .setLngLat(coords as [number, number])
+          .setHTML(amenityPopupHtml({ name, type: amenityLayerLabel(layer), address }))
+          .addTo(map);
+      }
     });
     map.on("mouseenter", id, (e) => {
       const f = e.features?.[0];
