@@ -236,6 +236,9 @@ export interface RenderChoroplethMapOptions {
   /** Optional amenity point layers to overlay on top of the choropleth
    *  (e.g. food banks over a deprivation map). Toggleable via the legend. */
   points?: GeoJSON.FeatureCollection;
+  /** When set, an area click calls this (for a side panel) instead of showing
+   *  the built-in "View place" pop-up. Used by the explorer. */
+  onSelectArea?: (sel: { placeId?: string; name: string; value: unknown }) => void;
 }
 
 /** HTML for a click pop-up on a choropleth area: place name, the indicator
@@ -440,6 +443,13 @@ export function renderChoroplethMap(
       typeof rawValue === "number" ? rawValue.toLocaleString("en-GB") : String(rawValue ?? "—");
     const placeId =
       (props.id as string | undefined) ?? (props.place_id as string | undefined);
+
+    // Explorer mode: notify a side panel instead of covering the map with a
+    // pop-up. Otherwise show the built-in "View place" pop-up.
+    if (options.onSelectArea) {
+      options.onSelectArea({ placeId, name: placeName, value: rawValue });
+      return;
+    }
     clickPopup
       .setLngLat(e.lngLat)
       .setHTML(

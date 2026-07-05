@@ -81,12 +81,19 @@ try {
         </label>
       </div>
 
-      <div
-        id="explore-map"
-        class="explore-map map-container"
-        data-api-base={publicApiBase}
-        data-map-tiles={mapTilesUrl}
-      ></div>
+      <div class="explore-body">
+        <div
+          id="explore-map"
+          class="explore-map map-container"
+          data-api-base={publicApiBase}
+          data-map-tiles={mapTilesUrl}
+        ></div>
+        <aside id="explore-panel" class="explore-panel">
+          <p class="explore-panel-empty text-muted text-small">
+            Click an area on the map to see its details.
+          </p>
+        </aside>
+      </div>
 
       <p id="explore-status" class="text-muted text-small"></p>
 
@@ -122,8 +129,44 @@ try {
     padding: var(--space-sm) var(--space-md);
     min-width: 16rem;
   }
+  .explore-body {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-md);
+    align-items: stretch;
+  }
   .explore-map {
+    flex: 1 1 20rem;
     height: 70vh;
     min-height: 420px;
+  }
+  .explore-panel {
+    flex: 0 0 20rem;
+    max-width: 100%;
+    padding: var(--space-md);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    overflow-y: auto;
+  }
+  .explore-panel h2 {
+    margin: 0 0 var(--space-sm);
+    font-size: var(--font-size-lg);
+  }
+  .explore-panel .panel-row {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-sm);
+    padding: var(--space-xs) 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .explore-panel .panel-row .panel-label {
+    color: var(--color-text-muted);
+  }
+  .explore-panel .panel-link {
+    display: inline-block;
+    margin-top: var(--space-md);
+    color: var(--color-accent);
+    font-weight: var(--font-weight-medium);
   }
 </style>

@@ -37,8 +37,73 @@ function init(): void {
 
   const apiBase = surface.dataset.apiBase || "";
   const tilesUrl = surface.dataset.mapTiles || undefined;
+  const panel = document.getElementById("explore-panel");
   const indicators = JSON.parse(dataEl.textContent || "[]") as ExploreIndicator[];
   const byKey = new Map(indicators.map((i) => [i.key, i]));
+
+  // Contextual indicators shown in the side panel alongside the active one.
+  const HEADLINE = [
+    "population.total",
+    "deprivation.imd.score",
+    "economy.active_companies_count",
+    "environment.greenspace.area_per_capita",
+  ];
+
+  function esc(s: string): string {
+    return s
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+  function labelFor(key: string): string {
+    const known = byKey.get(key)?.label;
+    if (known) return known;
+    const [head, ...rest] = key.split(".");
+    const h = head ? head[0]!.toUpperCase() + head.slice(1) : key;
+    const tail = rest.join(" · ").replaceAll("_", " ");
+    return tail ? `${h}: ${tail}` : h;
+  }
+
+  interface IndicatorResult {
+    indicator: string;
+    value: number | null;
+    unit?: string | null;
+  }
+
+  async function showPanel(sel: { placeId?: string; name: string }): Promise<void> {
+    if (!panel) return;
+    panel.innerHTML = `<h2>${esc(sel.name)}</h2><p class="text-muted text-small">Loading…</p>`;
+    const keys = Array.from(new Set([indicatorSel!.value, ...HEADLINE]));
+    let results: IndicatorResult[] = [];
+    if (sel.placeId) {
+      try {
+        const res = await fetch(`${apiBase}/v1/tools/get_indicators`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ place_id: sel.placeId, indicators: keys }),
+        });
+        if (res.ok) results = ((await res.json()).results ?? []) as IndicatorResult[];
+      } catch {
+        /* leave results empty; panel shows the no-data note */
+      }
+    }
+    const rows = results
+      .filter((r) => typeof r.value === "number")
+      .map(
+        (r) =>
+          `<div class="panel-row"><span class="panel-label">${esc(labelFor(r.indicator))}</span>` +
+          `<span>${(r.value as number).toLocaleString("en-GB")}${r.unit ? " " + esc(r.unit) : ""}</span></div>`,
+      )
+      .join("");
+    const link = sel.placeId
+      ? `<a class="panel-link" href="/place/${encodeURIComponent(sel.placeId)}">View full profile →</a>`
+      : "";
+    panel.innerHTML =
+      `<h2>${esc(sel.name)}</h2>` +
+      (rows || `<p class="text-muted text-small">No indicator data for this area.</p>`) +
+      link;
+  }
 
   let cleanup: (() => void) | null = null;
 
@@ -86,6 +151,7 @@ function init(): void {
     cleanup = renderChoroplethMap(surface!, fc, "value", {
       label: byKey.get(key)?.label ?? key,
       tilesUrl,
+      onSelectArea: (sel) => void showPanel(sel),
     });
     const n = (fc.features ?? []).filter(
       (f) => typeof f.properties?.value === "number",
