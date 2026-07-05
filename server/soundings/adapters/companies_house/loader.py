@@ -50,7 +50,10 @@ class CompaniesHouseLoader(LoaderAdapter):
     ) -> None:
         super().__init__(engine)
         self._as_of = as_of
-        self._bulk_client = bulk_client or CompaniesHouseBulkClient(as_of=as_of)
+        # The default bulk client is built lazily in load(), once as_of is
+        # resolved — building it here with the (possibly None) __init__ as_of
+        # left the daemon path unable to resolve download URLs.
+        self._bulk_client = bulk_client
         self._postcodes_io = postcodes_io or PostcodesIoAdapter(
             engine, ttl=timedelta(hours=POSTCODES_IO_TTL_HOURS)
         )
@@ -58,11 +61,10 @@ class CompaniesHouseLoader(LoaderAdapter):
     async def load(self, run_id: str | None = None) -> LoaderResult:
         retrieved_at = datetime.now(tz=UTC)
         as_of = self._as_of or retrieved_at.date()
+        client = self._bulk_client or CompaniesHouseBulkClient(as_of=as_of)
 
         # Pass 1: stream + accumulate per normalised postcode (bounded memory).
-        postcode_aggs = await self._accumulate(
-            self._bulk_client.iter_active_companies(), as_of=as_of
-        )
+        postcode_aggs = await self._accumulate(client.iter_active_companies(), as_of=as_of)
 
         # Pass 2: resolve the distinct postcode set to LTLAs (cache-first).
         resolved = await resolve_postcodes_to_ltlas(self._postcodes_io, list(postcode_aggs.keys()))

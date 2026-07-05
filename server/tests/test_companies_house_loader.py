@@ -9,6 +9,7 @@ marked `integration`).
 from collections.abc import AsyncIterator
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 from sqlalchemy import text
@@ -83,6 +84,39 @@ def test_rollup_to_ltla_aggregates_and_drops_unresolved() -> None:
     assert set(out) == {"ltla24:E06000047"}
     assert out["ltla24:E06000047"].count == 5
     assert out["ltla24:E06000047"].incorporations_12m == 3
+
+
+# --- default-client wiring (the daemon path) ------------------------------
+
+
+async def test_load_hands_a_resolved_as_of_to_the_default_bulk_client(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression: the loader daemon constructs ``CompaniesHouseLoader(engine)``
+    with no injected client and no as_of. ``load()`` must resolve an as_of and
+    build the bulk client with it, or ``_resolve_urls`` raises 'needs urls or
+    as_of' (the real daemon failure). An empty company stream keeps this a
+    pure unit — the resolver and UPSERT both short-circuit on no data."""
+    built_with: dict[str, Any] = {}
+
+    class _SpyClient:
+        def __init__(self, *, as_of: date | None = None, **_: Any) -> None:
+            built_with["as_of"] = as_of
+
+        async def iter_active_companies(self) -> AsyncIterator[dict[str, Any]]:
+            return
+            yield  # pragma: no cover - makes this an async generator
+
+    monkeypatch.setattr(
+        "soundings.adapters.companies_house.loader.CompaniesHouseBulkClient",
+        _SpyClient,
+    )
+
+    loader = CompaniesHouseLoader(engine=MagicMock())  # no client, no as_of
+    result = await loader.load()
+
+    assert built_with.get("as_of") is not None, "default client must receive a resolved as_of"
+    assert result.rows_written == 0
 
 
 # --- integration: end-to-end indicator UPSERT -----------------------------
