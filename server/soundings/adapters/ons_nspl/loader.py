@@ -25,15 +25,17 @@ SOURCE_ID = "ons.nspl"
 BATCH_SIZE = 10_000
 
 # NSPL column -> (our geography.postcode column, place-id type prefix).
-# utla24 is derived post-load (NSPL has no UTLA field), so it is not here.
+# Column names are the actual NSPL May 2026 headers (cd-suffixed and
+# vintage-stamped). Postcode comes from `pcds`. utla24 is derived post-load
+# (NSPL has no UTLA field), so it is not here.
 _COLUMN_MAP: list[tuple[str, str, str]] = [
-    ("lsoa21", "lsoa21", "lsoa21"),
-    ("msoa21", "msoa21", "msoa21"),
-    ("laua", "ltla24", "ltla24"),
-    ("ward", "ward24", "ward24"),
-    ("pcon", "westminster_constituency_24", "westminster_constituency_24"),
-    ("rgn", "region", "region"),
-    ("ctry", "country", "country"),
+    ("lsoa21cd", "lsoa21", "lsoa21"),
+    ("msoa21cd", "msoa21", "msoa21"),
+    ("lad25cd", "ltla24", "ltla24"),
+    ("wd25cd", "ward24", "ward24"),
+    ("pcon24cd", "westminster_constituency_24", "westminster_constituency_24"),
+    ("rgn25cd", "region", "region"),
+    ("ctry25cd", "country", "country"),
 ]
 
 _UPSERT_SQL = text(
