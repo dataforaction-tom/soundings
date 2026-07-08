@@ -28,5 +28,13 @@ class OrganisationRef(BaseModel):
     registered_address_place_id: str | None = None
     operates_in_place_ids: list[str] = Field(default_factory=list)
     recent_grants: list[GrantRef] = Field(default_factory=list)
+    latest_income: float | None = Field(
+        default=None,
+        description="Latest reported annual income in GBP, if available.",
+    )
+    register_url: str | None = Field(
+        default=None,
+        description="Direct link to the regulator's public register page, if constructible.",
+    )
     source: SourceRef
     methodology_note: str | None = None

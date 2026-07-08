@@ -155,6 +155,8 @@ export interface OrganisationRef {
   registered_address_place_id: string | null;
   operates_in_place_ids: string[];
   recent_grants: GrantRef[];
+  latest_income: number | null;
+  register_url: string | null;
   source: SourceRef;
   methodology_note: string | null;
 }
@@ -182,6 +184,12 @@ export interface RegistrationCohort {
   net: number;
 }
 
+export interface FunderSummary {
+  name: string;
+  grant_count: number;
+  total_gbp: number;
+}
+
 export interface CivilSocietyProfile {
   place_id: string;
   total_organisations: number;
@@ -190,6 +198,7 @@ export interface CivilSocietyProfile {
   mean_income: number | null;
   income_buckets: IncomeBucket[];
   registration_cohort: RegistrationCohort[];
+  top_funders: FunderSummary[];
   sources: SourceRef[];
   caveats: string[];
   partial: boolean;

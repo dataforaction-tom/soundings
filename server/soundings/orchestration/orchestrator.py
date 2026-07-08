@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from soundings.contracts.civil_society import (
     CivilSocietyProfile,
+    FunderSummary,
     IncomeBucket,
     RegistrationCohort,
 )
@@ -722,7 +723,10 @@ class IndicatorOrchestrator:
     async def _find_via_cc_loader(
         self, place_id: str, activity_filter: list[str] | None, limit: int
     ) -> FindOrganisationsResult:
-        """SELECT from data.organisation for England/Wales."""
+        """SELECT from data.organisation for England/Wales.
+
+        Sorted by latest_income DESC so the largest charities appear first.
+        """
         from datetime import UTC as TZ_UTC
 
         from soundings.contracts.source_ref import SourceRef
@@ -736,7 +740,8 @@ class IndicatorOrchestrator:
                 text(
                     """
                     SELECT o.id, o.name, o.classification,
-                           o.registered_address_place_id, o.source_id, o.retrieved_at
+                           o.registered_address_place_id, o.source_id, o.retrieved_at,
+                           (o.raw->>'latest_income')::numeric AS latest_income
                     FROM data.organisation o
                     LEFT JOIN data.organisation_operates_in oi
                         ON oi.organisation_id = o.id
@@ -744,6 +749,7 @@ class IndicatorOrchestrator:
                         OR oi.place_id = :pid)
                     """  # noqa: S608
                     f"{kw_sql}"
+                    " ORDER BY latest_income DESC NULLS LAST"
                     " LIMIT :limit"
                 ),
                 {"pid": place_id, "limit": limit, **kw_params},
@@ -756,6 +762,16 @@ class IndicatorOrchestrator:
         for row in rows:
             source_id = row.source_id or "charity_commission"
             source_ids.add(source_id)
+            # Construct a Charity Commission register deep-link from the
+            # registration number (the part after the colon in the id).
+            register_url: str | None = None
+            if row.id.startswith("charity_commission:"):
+                reg_no = row.id.split(":", 1)[1]
+                register_url = (
+                    "https://register-of-charities.charitycommission.gov.uk/"
+                    f"charity-search-/charity-details/{reg_no}"
+                )
+            income = float(row.latest_income) if row.latest_income is not None else None
             orgs.append(
                 OrganisationRef(
                     id=row.id,
@@ -764,6 +780,8 @@ class IndicatorOrchestrator:
                     registered_address_place_id=row.registered_address_place_id,
                     operates_in_place_ids=[],
                     recent_grants=[],
+                    latest_income=income,
+                    register_url=register_url,
                     source=SourceRef(
                         source_id=source_id,
                         source_label=source_id,
@@ -1030,6 +1048,47 @@ class IndicatorOrchestrator:
             caveats.append(
                 f"{missing} of {total} charities have no income on the latest CC return."
             )
+
+        # Top funders: aggregate 360G grants by funder name for this place.
+        # Best-effort with a 5s timeout — 360G fan-out can take 30s+ on a cold
+        # cache, and funder data is supplementary, not worth blocking the
+        # profile on.
+        top_funders: list[FunderSummary] = []
+        try:
+            tsg_adapter = self._registry.adapter_for_source("threesixtygiving")
+            grants = await asyncio.wait_for(
+                tsg_adapter._fetch_grants_for_place(place_id),
+                timeout=5.0,
+            )
+            funder_totals: dict[str, dict[str, float | int]] = {}
+            for g in grants:
+                funder = g.get("funder") or "Unknown"
+                if not funder:
+                    funder = "Unknown"
+                entry = funder_totals.setdefault(funder, {"total": 0.0, "count": 0})
+                entry["total"] += g.get("amount", 0.0)
+                entry["count"] += 1
+            top_funders = sorted(
+                (
+                    FunderSummary(
+                        name=name,
+                        grant_count=int(data["count"]),
+                        total_gbp=float(data["total"]),
+                    )
+                    for name, data in funder_totals.items()
+                ),
+                key=lambda f: f.total_gbp,
+                reverse=True,
+            )[:10]
+            if top_funders:
+                caveats.append(
+                    "Funder data from 360Giving covers the last 12 months only and"
+                    " is limited to grants received by charities registered in this"
+                    " place (England/Wales)."
+                )
+        except Exception:  # noqa: S110 — best-effort, funder data is supplementary
+            pass
+
         source = SourceRef(
             source_id="charity_commission",
             source_label="Charity Commission for England and Wales",
@@ -1038,6 +1097,20 @@ class IndicatorOrchestrator:
             retrieved_at=retrieved,
             cache_status="cached",
         )
+        sources_list = [source]
+        if top_funders:
+            from soundings.contracts.source_ref import SourceRef as TsgSourceRef
+
+            sources_list.append(
+                TsgSourceRef(
+                    source_id="threesixtygiving",
+                    source_label="360Giving",
+                    publisher="360Giving",
+                    licence="CC-BY-4.0",
+                    retrieved_at=retrieved,
+                    cache_status="cached",
+                )
+            )
         return CivilSocietyProfile(
             place_id=place_id,
             total_organisations=total,
@@ -1046,8 +1119,9 @@ class IndicatorOrchestrator:
             mean_income=mean_income,
             income_buckets=income_buckets,
             registration_cohort=cohort,
+            top_funders=top_funders,
             filter_keywords=normalised_keywords,
-            sources=[source],
+            sources=sources_list,
             caveats=caveats,
             partial=False,
         )

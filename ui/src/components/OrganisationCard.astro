@@ -31,9 +31,27 @@ const topGrants = organisation.recent_grants.slice(0, 3);
 
 <article class="organisation-card">
   <header>
-    <h4>{organisation.name}</h4>
+    <h4>
+      {organisation.register_url ? (
+        <a href={organisation.register_url} target="_blank" rel="noopener noreferrer">
+          {organisation.name}
+        </a>
+      ) : (
+        organisation.name
+      )}
+    </h4>
     <span class="source-label">{organisation.source.source_label}</span>
   </header>
+
+  {organisation.latest_income !== null && organisation.latest_income !== undefined && (
+    <p class="income">
+      {new Intl.NumberFormat("en-GB", {
+        style: "currency",
+        currency: "GBP",
+        maximumFractionDigits: 0,
+      }).format(organisation.latest_income)}/yr
+    </p>
+  )}
 
   {organisation.classification.length > 0 && (
     <div class="classifications">
@@ -86,6 +104,20 @@ const topGrants = organisation.recent_grants.slice(0, 3);
   .source-label {
     font-size: var(--font-size-xs);
     color: var(--color-muted);
+  }
+  .income {
+    margin: var(--space-xs) 0 0;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+  }
+  .organisation-card h4 a {
+    color: var(--color-primary);
+    text-decoration: none;
+  }
+  .organisation-card h4 a:hover {
+    text-decoration: underline;
   }
   .classifications {
     display: flex;

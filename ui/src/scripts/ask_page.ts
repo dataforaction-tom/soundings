@@ -452,6 +452,8 @@
               date: string;
               purpose: string | null;
             }[];
+            latest_income: number | null;
+            register_url: string | null;
           }[];
         }
 
@@ -497,8 +499,27 @@
             const card = document.createElement("article");
             card.className = "card org-card";
             const h4 = document.createElement("h4");
-            h4.textContent = org.name;
+            if (org.register_url) {
+              const link = document.createElement("a");
+              link.href = org.register_url;
+              link.target = "_blank";
+              link.rel = "noopener noreferrer";
+              link.textContent = org.name;
+              h4.appendChild(link);
+            } else {
+              h4.textContent = org.name;
+            }
             card.appendChild(h4);
+            if (org.latest_income !== null && org.latest_income !== undefined) {
+              const incomeP = document.createElement("p");
+              incomeP.className = "org-income";
+              incomeP.textContent = org.latest_income.toLocaleString("en-GB", {
+                style: "currency",
+                currency: "GBP",
+                maximumFractionDigits: 0,
+              }) + "/yr";
+              card.appendChild(incomeP);
+            }
             if (org.classification.length > 0) {
               const cls = document.createElement("p");
               cls.className = "text-muted text-small";
