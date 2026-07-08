@@ -944,6 +944,22 @@ class IndicatorOrchestrator:
             total = int(totals_row.total) if totals_row else 0
             with_income = int(totals_row.with_income) if totals_row else 0
 
+            # Count charities with registered address in this place
+            # (as opposed to those that merely operate here).
+            reg_row = (
+                await conn.execute(
+                    text(
+                        "SELECT COUNT(*) AS cnt "  # noqa: S608
+                        "FROM data.organisation o "
+                        "WHERE o.registered_address_place_id = :pid"
+                        f"  AND o.source_id = 'charity_commission'"
+                        f"{kw_sql.replace('o.', 'o.')}"
+                    ),
+                    {"pid": place_id, **kw_params},
+                )
+            ).first()
+            registered_address_count = int(reg_row.cnt) if reg_row else 0
+
             stats_row = (
                 await conn.execute(
                     text(
@@ -1060,6 +1076,15 @@ class IndicatorOrchestrator:
             caveats.append(
                 f"{missing} of {total} charities have no income on the latest CC return."
             )
+        # Explain the two counts when they differ
+        if total != registered_address_count:
+            caveats.append(
+                f"{total} charities operate in this place (self-declared area of"
+                f" operation), of which {registered_address_count} have their"
+                " registered address here. The difference reflects charities"
+                " registered elsewhere but operating in this area — this matches"
+                " how the Charity Commission website reports charity counts."
+            )
 
         # Top funders + grants by year: aggregate 360G grants for this place.
         # Best-effort with a 5s timeout — 360G fan-out can take 30s+ on a cold
@@ -1158,6 +1183,7 @@ class IndicatorOrchestrator:
         return CivilSocietyProfile(
             place_id=place_id,
             total_organisations=total,
+            registered_address_count=registered_address_count,
             with_reported_income=with_income,
             median_income=median_income,
             mean_income=mean_income,

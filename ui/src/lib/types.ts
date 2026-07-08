@@ -199,6 +199,7 @@ export interface GrantYearSummary {
 export interface CivilSocietyProfile {
   place_id: string;
   total_organisations: number;
+  registered_address_count: number;
   with_reported_income: number;
   median_income: number | null;
   mean_income: number | null;

@@ -50,6 +50,16 @@ CC_CHARITY_BULK_URL = (
 )
 CHARITY_TXT = "publicextract.charity.txt"
 
+# Area-of-operation bulk extract — maps each charity to the geographic
+# areas it operates in (Local Authority, Region, Country).  We use the
+# "Local Authority" rows to populate data.organisation_operates_in with
+# a richer mapping than registered-address-only.
+CC_AREA_OF_OPERATION_URL = (
+    "https://ccewuksprdoneregsadata1.blob.core.windows.net/data/txt"
+    "/publicextract.charity_area_of_operation.zip"
+)
+AREA_OF_OPERATION_TXT = "publicextract.charity_area_of_operation.txt"
+
 
 class CharityCommissionBulkClient:
     def __init__(
@@ -95,6 +105,39 @@ class CharityCommissionBulkClient:
                         "latest_income": _coerce_float(row.get("latest_income")),
                         "date_of_registration": _blank_to_none(row.get("date_of_registration")),
                         "date_of_removal": _blank_to_none(row.get("date_of_removal")),
+                    }
+        finally:
+            if self._owns_client:
+                await client.aclose()
+
+    async def iter_area_of_operation(self) -> AsyncIterator[dict[str, Any]]:
+        """Yield one dict per Local-Authority area-of-operation row.
+
+        Each yielded dict has: ``registration_number`` (str), ``area_description``
+        (str — the CC LA name, e.g. ``"Durham"``, ``"Birmingham City"``).
+
+        Only ``geographic_area_type == "Local Authority"`` rows are yielded.
+        Region-level rows (``"Throughout England And Wales"`` etc.) and
+        international Country rows are skipped — they don't map to a single
+        LTLA.
+        """
+        client = self._client or httpx.AsyncClient(timeout=120.0)
+        try:
+            response = await client.get(CC_AREA_OF_OPERATION_URL, follow_redirects=True)
+            response.raise_for_status()
+            archive = zipfile.ZipFile(io.BytesIO(response.content))
+            with archive.open(AREA_OF_OPERATION_TXT) as fh:
+                text = io.TextIOWrapper(fh, encoding="utf-8", newline="")
+                reader = csv.DictReader(text, delimiter="\t")
+                for row in reader:
+                    if row.get("geographic_area_type", "").strip() != "Local Authority":
+                        continue
+                    reg = row.get("registered_charity_number", "").strip()
+                    if not reg:
+                        continue
+                    yield {
+                        "registration_number": reg,
+                        "area_description": row.get("geographic_area_description", "").strip(),
                     }
         finally:
             if self._owns_client:

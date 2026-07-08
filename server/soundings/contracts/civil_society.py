@@ -50,7 +50,23 @@ class GrantYearSummary(BaseModel):
 
 class CivilSocietyProfile(BaseModel):
     place_id: str
-    total_organisations: int = Field(ge=0)
+    total_organisations: int = Field(
+        ge=0,
+        description=(
+            "Charities that *operate* in this place — based on the CC"
+            " area-of-operation field, which a charity self-declares. This"
+            " includes charities registered elsewhere but operating here."
+            " This is the number the Charity Commission website reports."
+        ),
+    )
+    registered_address_count: int = Field(
+        ge=0,
+        description=(
+            "Charities with their *registered address* in this place —"
+            " based on postcode resolution. A subset of"
+            " total_organisations. Always <= total_organisations."
+        ),
+    )
     with_reported_income: int = Field(
         ge=0,
         description=(

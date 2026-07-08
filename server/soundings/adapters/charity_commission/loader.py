@@ -21,6 +21,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from soundings.adapters.base import LoaderAdapter, LoaderResult
+from soundings.adapters.charity_commission.area_mapping import build_area_name_to_place_id_map
 from soundings.adapters.charity_commission.client import CharityCommissionBulkClient
 from soundings.adapters.charity_commission.mapping import resolve_postcodes_to_ltlas
 from soundings.adapters.postcodes_io.adapter import PostcodesIoAdapter
@@ -64,10 +65,27 @@ class CharityCommissionLoader(LoaderAdapter):
         # Pass 3: materialise + chunked upsert.
         retrieved_at = datetime.now(tz=UTC)
         org_rows = self._build_org_rows(rows, resolved, retrieved_at)
-        operates_in_rows = self._build_operates_in_rows(org_rows)
 
         await self._upsert_organisations(org_rows)
-        await self._upsert_operates_in(operates_in_rows)
+
+        # Pass 4: build operates_in from area-of-operation data.
+        # The CC publishes a separate bulk file mapping each charity to
+        # the local authorities it operates in.  This is richer than
+        # registered-address-only: a charity registered in London but
+        # operating in Durham counts toward Durham.
+        operates_in_rows = await self._build_operates_in_from_area_of_operation(
+            retrieved_at,
+        )
+
+        # Also add registered-address rows for charities NOT covered by
+        # area-of-operation data (some charities have no area_of_operation
+        # entry — they should still be mapped via their registered address).
+        area_org_ids = {r["organisation_id"] for r in operates_in_rows}
+        for row in self._build_operates_in_rows(org_rows):
+            if row["organisation_id"] not in area_org_ids:
+                operates_in_rows.append(row)
+
+        await self._replace_operates_in(operates_in_rows, retrieved_at)
 
         # Phase 4 Task 7: end-of-load aggregates into data.indicator_value.
         # Period = YYYY-MM (CC publishes monthly); UPSERT so re-runs in the
@@ -237,6 +255,87 @@ class CharityCommissionLoader(LoaderAdapter):
             if row["registered_address_place_id"] is not None
         ]
 
+    async def _build_operates_in_from_area_of_operation(
+        self,
+        retrieved_at: datetime,
+    ) -> list[dict[str, str]]:
+        """Download the CC area-of-operation bulk file and map each
+        charity → LTLA place_id.
+
+        Returns a list of ``{organisation_id, place_id}`` dicts.  Charities
+        whose area descriptions can't be mapped (historic county names like
+        ``"Devon"``, ``"Kent"`` — not single LTLAs) are skipped.  Those
+        charities will still appear via the registered-address fallback.
+
+        Only charities already in ``data.organisation`` (main entries with
+        ``linked_charity_number = 0``) are included — the area-of-operation
+        file also contains linked subsidiaries which we don't store.
+        """
+        area_name_to_place_id = await build_area_name_to_place_id_map(self._engine)
+        # Collect existing org IDs to filter out linked subsidiaries
+        # that appear in the area-of-operation file but aren't in our org table.
+        existing_org_ids: set[str] = set()
+        async with self._engine.connect() as conn:
+            result = await conn.execute(
+                text("SELECT id FROM data.organisation WHERE source_id = :sid"),
+                {"sid": SOURCE_ID},
+            )
+            for row in result.fetchall():
+                existing_org_ids.add(row.id)
+
+        rows: list[dict[str, str]] = []
+        async for entry in self._bulk_client.iter_area_of_operation():
+            place_id = area_name_to_place_id.get(entry["area_description"])
+            if not place_id:
+                continue
+            org_id = f"charity_commission:{entry['registration_number']}"
+            if org_id not in existing_org_ids:
+                continue
+            rows.append({"organisation_id": org_id, "place_id": place_id})
+        return rows
+
+    async def _replace_operates_in(
+        self,
+        operates_in_rows: list[dict[str, str]],
+        retrieved_at: datetime,
+    ) -> None:
+        """Delete all existing CC operates_in rows, then insert fresh ones.
+
+        Unlike the old ``_upsert_operates_in`` (which used ON CONFLICT DO
+        NOTHING and could accumulate stale rows across loads), this fully
+        replaces the mapping so charities that no longer operate in a place
+        are removed.
+        """
+        if not operates_in_rows:
+            # Still clear stale rows even if new set is empty.
+            async with self._engine.begin() as conn:
+                await conn.execute(
+                    text(
+                        "DELETE FROM data.organisation_operates_in oi "
+                        "USING data.organisation o "
+                        "WHERE oi.organisation_id = o.id "
+                        "  AND o.source_id = :sid"
+                    ),
+                    {"sid": SOURCE_ID},
+                )
+            return
+        async with self._engine.begin() as conn:
+            # Delete existing CC operates_in rows
+            await conn.execute(
+                text(
+                    "DELETE FROM data.organisation_operates_in oi "
+                    "USING data.organisation o "
+                    "WHERE oi.organisation_id = o.id "
+                    "  AND o.source_id = :sid"
+                ),
+                {"sid": SOURCE_ID},
+            )
+            # Insert fresh rows in chunks
+            for chunk in _chunked(operates_in_rows, ORG_INSERT_CHUNK):
+                stmt = insert(OrganisationOperatesIn).values(chunk)
+                stmt = stmt.on_conflict_do_nothing()
+                await conn.execute(stmt)
+
     async def _upsert_organisations(self, org_rows: list[dict[str, Any]]) -> None:
         if not org_rows:
             return
@@ -253,15 +352,6 @@ class CharityCommissionLoader(LoaderAdapter):
                         "raw": stmt.excluded.raw,
                     },
                 )
-                await conn.execute(stmt)
-
-    async def _upsert_operates_in(self, operates_in_rows: list[dict[str, str]]) -> None:
-        if not operates_in_rows:
-            return
-        async with self._engine.begin() as conn:
-            for chunk in _chunked(operates_in_rows, ORG_INSERT_CHUNK):
-                stmt = insert(OrganisationOperatesIn).values(chunk)
-                stmt = stmt.on_conflict_do_nothing()
                 await conn.execute(stmt)
 
 

@@ -55,7 +55,11 @@ function fmtInt(value: number): string {
     <div class="cs-headlines">
       <div class="cs-stat">
         <span class="stat-value">{fmtInt(profile.total_organisations)}</span>
-        <span class="stat-label">registered charities</span>
+        <span class="stat-label">charities operating here</span>
+      </div>
+      <div class="cs-stat">
+        <span class="stat-value">{fmtInt(profile.registered_address_count)}</span>
+        <span class="stat-label">registered in this place</span>
       </div>
       <div class="cs-stat">
         <span class="stat-value">{fmtGBP(profile.median_income)}</span>

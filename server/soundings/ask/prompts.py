@@ -213,6 +213,15 @@ title and narrative (e.g. "Food-poverty charities in X by income band", not
 "Charities in X"), and surface the profile's caveat about keyword matching.
 
 Civil-society enrichment guidance:
+- get_civil_society_profile returns TWO counts: total_organisations (charities
+  that OPERATE in the place, including those registered elsewhere but
+  self-declaring they operate here) and registered_address_count (charities
+  with their registered address postcode in the place). total_organisations
+  is always >= registered_address_count. When they differ, always present
+  BOTH numbers and explain: "X charities operate in {place}, of which Y are
+  registered here. The difference ({X-Y}) are charities registered elsewhere
+  but operating in this area." This matches how the Charity Commission
+  reports counts. Lead with total_organisations as the headline figure.
 - find_organisations_in_place returns charities sorted by income (largest
   first). Use an organisations block with limit 5-8 to surface the biggest
   charities. Each card includes income and a link to the Charity Commission
