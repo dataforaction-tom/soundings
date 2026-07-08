@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     ui_origin: str = "http://localhost:8088"
     anthropic_api_key: str = ""
     ask_model: str = "claude-sonnet-5"
+    # ONS NSPL bulk ZIP (stable ArcGIS item /data URL; redirects to a signed
+    # S3 link). Pinned to the current quarterly release — bump the item ID when
+    # ONS republishes. See docs/superpowers/specs/2026-07-07-nspl-loader-design.md.
+    nspl_url: str = (
+        "https://www.arcgis.com/sharing/rest/content/items/7668e0d35cab4f6db6f15f03be610fb0/data"
+    )
 
 
 @lru_cache(maxsize=1)

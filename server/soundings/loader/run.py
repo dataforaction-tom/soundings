@@ -33,6 +33,7 @@ from soundings.adapters.ons_geography.hierarchy_loader import (
 )
 from soundings.adapters.ons_geography.places_loader import OnsGeographyPlacesLoader
 from soundings.adapters.ons_mid_year_estimates.loader import OnsMidYearEstimatesLoader
+from soundings.adapters.ons_nspl.loader import NsplLoader
 from soundings.capture.retention import delete_old_raw_records
 from soundings.db.engine import get_engine
 
@@ -71,6 +72,9 @@ def build_source_registry(engine: AsyncEngine) -> dict[str, LoaderCallable]:
     async def _foe_green_space() -> None:
         await FoeGreenSpaceLoader(engine).load()
 
+    async def _nspl() -> None:
+        await NsplLoader(engine).load()
+
     return {
         "ons.geography": _geography,
         "ons.mid_year_estimates": _mye,
@@ -80,6 +84,7 @@ def build_source_registry(engine: AsyncEngine) -> dict[str, LoaderCallable]:
         "charity_commission": _charity_commission,
         "companies_house": _companies_house,
         "foe.green_space": _foe_green_space,
+        "ons.nspl": _nspl,
     }
 
 
