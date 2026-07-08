@@ -41,6 +41,7 @@ from soundings.adapters.ons_geography.hierarchy_loader import (
 )
 from soundings.adapters.ons_geography.places_loader import OnsGeographyPlacesLoader
 from soundings.adapters.ons_mid_year_estimates.loader import OnsMidYearEstimatesLoader
+from soundings.adapters.ons_nspl.loader import NsplLoader
 from soundings.db.engine import get_engine
 
 LIGHT_LAYERS = {"ltla24", "utla24", "region", "country", "westminster_constituency_24", "ward24"}
@@ -116,6 +117,14 @@ async def _seed(*, full: bool) -> None:
 
     chd = OnsGeographyCodeChangeLoader(engine)
     await _run_loader(engine, "ons.geography", "code_change", chd.load())
+
+    # NSPL populates geography.postcode (postcode -> statutory geographies) so
+    # postcode-based loaders resolve locally instead of via postcodes.io.
+    # Full-only: ~2.7M postcodes. Needs places + hierarchy loaded above (FK
+    # guard + utla24 derivation).
+    if full:
+        nspl = NsplLoader(engine)
+        await _run_loader(engine, "ons.nspl", "nspl", nspl.load())
 
     # Indicator data — Phase 1 sources. `--light` filters to the dev LTLA
     # so a fresh box doesn't burn through Nomis rate limits.

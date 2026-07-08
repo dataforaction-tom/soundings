@@ -186,6 +186,19 @@ sources:
     refresh_cadence: "0 6 12 1 *"
     rate_limit: { rps: 2 }
 
+  - id: ons.nspl
+    label: ONS National Statistics Postcode Lookup (NSPL)
+    publisher: Office for National Statistics
+    publisher_url: https://geoportal.statistics.gov.uk/
+    dataset_url: https://geoportal.statistics.gov.uk/datasets/7668e0d35cab4f6db6f15f03be610fb0
+    licence: OGL-UK-3.0
+    mode: loader
+    # NSPL is published quarterly (Feb/May/Aug/Nov). Refresh a few weeks after
+    # each release; also runnable on demand via the full seed or
+    # `--once ons.nspl`. Bump `nspl_url` in config when a new release lands.
+    refresh_cadence: "0 4 20 2,5,8,11 *"
+    rate_limit: { rps: 1 }
+
   - id: osm_overpass
     label: OpenStreetMap (Overpass API)
     publisher: OpenStreetMap contributors
