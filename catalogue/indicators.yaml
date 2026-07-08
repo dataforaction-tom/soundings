@@ -689,7 +689,7 @@ indicators:
     description: "Fine particulate matter (PM2.5) concentration, interpolated from nearby monitoring stations."
     unit: "µg/m³"
     higher_is: "worse"
-    source_id: "openaq"
+    source_id: "openweather"
     available_at: ["ltla24", "utla24"]
     refresh_cadence: "hourly"
     confidence: "modelled"
@@ -701,7 +701,7 @@ indicators:
     description: "Coarse particulate matter (PM10) concentration, interpolated from nearby monitoring stations."
     unit: "µg/m³"
     higher_is: "worse"
-    source_id: "openaq"
+    source_id: "openweather"
     available_at: ["ltla24", "utla24"]
     refresh_cadence: "hourly"
     confidence: "modelled"
@@ -713,7 +713,7 @@ indicators:
     description: "Nitrogen dioxide (NO₂) concentration, interpolated from nearby monitoring stations."
     unit: "µg/m³"
     higher_is: "worse"
-    source_id: "openaq"
+    source_id: "openweather"
     available_at: ["ltla24", "utla24"]
     refresh_cadence: "hourly"
     confidence: "modelled"
@@ -725,7 +725,7 @@ indicators:
     description: "Ozone (O₃) concentration, interpolated from nearby monitoring stations."
     unit: "µg/m³"
     higher_is: "worse"
-    source_id: "openaq"
+    source_id: "openweather"
     available_at: ["ltla24", "utla24"]
     refresh_cadence: "hourly"
     confidence: "modelled"
@@ -737,7 +737,7 @@ indicators:
     description: "Sulphur dioxide (SO₂) concentration, interpolated from nearby monitoring stations."
     unit: "µg/m³"
     higher_is: "worse"
-    source_id: "openaq"
+    source_id: "openweather"
     available_at: ["ltla24", "utla24"]
     refresh_cadence: "hourly"
     confidence: "modelled"
