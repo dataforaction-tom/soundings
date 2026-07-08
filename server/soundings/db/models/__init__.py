@@ -9,6 +9,7 @@ class Base(DeclarativeBase):
 metadata = Base.metadata
 
 from soundings.db.models import (  # noqa: E402, F401
+    answer_cache,
     cache,
     catalogue,
     corpus,

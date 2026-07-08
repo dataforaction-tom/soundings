@@ -25,6 +25,7 @@ from soundings.adapters.police_uk.adapter import PoliceUkAdapter
 from soundings.adapters.postcodes_io.adapter import PostcodesIoAdapter
 from soundings.adapters.threesixtygiving import ThreeSixtyGivingAdapter
 from soundings.alerts import send_alert
+from soundings.cache.answer_cache import AnswerCacheStore
 from soundings.capture.middleware import CaptureMiddleware
 from soundings.capture.rate_limit import FullConsentRateLimiter
 from soundings.capture.raw_writer import RawRecordWriter
@@ -39,6 +40,7 @@ from soundings.geography.service import GeographyService
 from soundings.http.ask import router as ask_router
 from soundings.http.capture import router as capture_router
 from soundings.http.catalogue import router as catalogue_router
+from soundings.http.corpus import router as corpus_router
 from soundings.http.errors import install_error_envelope
 from soundings.http.health import router as health_router
 from soundings.http.place_geometry import router as place_geometry_router
@@ -99,6 +101,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.orchestrator = IndicatorOrchestrator(engine, registry)
     app.state.geography_service = GeographyService(engine, postcodes_io)
     app.state.raw_writer = RawRecordWriter(engine)
+    app.state.answer_cache = AnswerCacheStore(engine)
     app.state.rate_limiter = FullConsentRateLimiter(
         engine,
         threshold=sanitisation_config.asker_purpose.rate_limit.full_consent_per_session_per_hour,
@@ -149,5 +152,6 @@ app.include_router(ask_router)
 app.include_router(sources_router)
 app.include_router(catalogue_router)
 app.include_router(capture_router)
+app.include_router(corpus_router)
 app.include_router(place_geometry_router)
 install_error_envelope(app)

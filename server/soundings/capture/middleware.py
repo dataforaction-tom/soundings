@@ -96,8 +96,20 @@ def _schedule_sanitiser(app_obj: Any, record_id: UUID) -> None:
     task.add_done_callback(background_tasks.discard)
 
 
-def _extract_capture_fields(response_payload: Any) -> dict[str, Any]:
-    """Best-effort pull of tool-response fields into the capture record."""
+def _extract_capture_fields(
+    response_payload: Any,
+    *,
+    is_sse: bool = False,
+    response_bytes: bytes = b"",
+) -> dict[str, Any]:
+    """Best-effort pull of tool-response fields into the capture record.
+
+    For SSE streams (/v1/ask), parse each ``data:`` frame as JSON and
+    merge indicators / sources / geography across all frames. The final
+    ``done`` or ``error`` event determines ``result_status``.
+    """
+    if is_sse:
+        return _extract_sse_capture_fields(response_bytes)
     if not isinstance(response_payload, dict):
         return {
             "indicators_returned": [],
@@ -132,6 +144,66 @@ def _extract_capture_fields(response_payload: Any) -> dict[str, Any]:
     err = response_payload.get("error")
     result_status = "error" if isinstance(err, dict) else "ok"
     error_class = err.get("code") if isinstance(err, dict) else None
+
+    return {
+        "indicators_returned": indicators,
+        "sources_used": list(dict.fromkeys(sources)),
+        "geography_referenced": geography,
+        "result_status": result_status,
+        "error_class": error_class,
+    }
+
+
+def _extract_sse_capture_fields(response_bytes: bytes) -> dict[str, Any]:
+    """Parse SSE stream bytes and extract capture fields.
+
+    Each frame is ``data: {json}\\n\\n``. We look for ``done`` / ``error``
+    events to determine status, and collect indicators / sources / geography
+    from ``block`` events that carry tool results.
+    """
+    text = response_bytes.decode("utf-8", errors="replace")
+    indicators: list[str] = []
+    sources: list[str] = []
+    geography: list[dict[str, str]] = []
+    result_status = "ok"
+    error_class: str | None = None
+
+    for line in text.split("\n"):
+        line = line.strip()
+        if not line.startswith("data:"):
+            continue
+        payload = line[5:].strip()
+        if not payload:
+            continue
+        try:
+            evt = json.loads(payload)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(evt, dict):
+            continue
+        evt_type = evt.get("type", "")
+        if evt_type == "error":
+            result_status = "error"
+            error_class = "ask_error"
+        elif evt_type == "done":
+            result_status = "ok"
+        elif evt_type == "sources":
+            for src in evt.get("sources", []) or []:
+                if isinstance(src, dict) and src.get("source_id"):
+                    sources.append(str(src["source_id"]))
+        elif evt_type == "block":
+            block = evt.get("block", {})
+            if isinstance(block, dict):
+                for row in block.get("results", []) or []:
+                    if isinstance(row, dict):
+                        if (key := row.get("indicator")) is not None:
+                            indicators.append(str(key))
+                        src = row.get("source")
+                        if isinstance(src, dict) and (sid := src.get("source_id")) is not None:
+                            sources.append(str(sid))
+                place = block.get("place")
+                if isinstance(place, dict) and place.get("id") and place.get("type"):
+                    geography.append({"id": str(place["id"]), "type": str(place["type"])})
 
     return {
         "indicators_returned": indicators,
@@ -191,8 +263,14 @@ class CaptureMiddleware:
         tool_inputs: dict[str, Any] = body_json if isinstance(body_json, dict) else {}
 
         nl_question: str | None = None
-        if effective_consent == "full" and isinstance(tool_inputs.get("nl_question"), str):
-            nl_question = tool_inputs["nl_question"]
+        if effective_consent == "full":
+            # /v1/ask sends the question as "query"; /v1/tools/* may carry
+            # it as "nl_question" (the find_place tool accepts it).
+            raw_q = tool_inputs.get("nl_question")
+            if isinstance(raw_q, str):
+                nl_question = raw_q
+            elif scope["path"] == ASK_PATH and isinstance(tool_inputs.get("query"), str):
+                nl_question = tool_inputs["query"]
         tool_inputs.pop("nl_question", None)
 
         replay_body = (
@@ -230,8 +308,13 @@ class CaptureMiddleware:
 
         response_bytes = b"".join(response_body_chunks)
 
+        is_sse = scope["path"] == ASK_PATH
         response_payload = _safe_json_loads(response_bytes)
-        extras = _extract_capture_fields(response_payload)
+        extras = _extract_capture_fields(
+            response_payload,
+            is_sse=is_sse,
+            response_bytes=response_bytes,
+        )
         ctx = CaptureContext(
             session_id=session.session_id,
             consent_level=effective_consent,

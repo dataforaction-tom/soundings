@@ -104,13 +104,19 @@ async def get_sub_areas(
         value_rows = (
             await conn.execute(
                 text(
+                    # CAST(:period AS text) rather than a bare `:period IS NULL`:
+                    # asyncpg can't infer the type of a NULL bind in `$n IS NULL`
+                    # and raised AmbiguousParameterError for the common no-period
+                    # case. When period is NULL the filter is a no-op and
+                    # DISTINCT ON ... ORDER BY period DESC returns the latest
+                    # value per place.
                     """
                     SELECT DISTINCT ON (iv.place_id)
                         iv.place_id, iv.value, iv.period
                     FROM data.indicator_value iv
                     WHERE iv.place_id = ANY(:child_ids)
                       AND iv.indicator_key = :indicator_key
-                      AND (:period IS NULL OR iv.period = :period)
+                      AND (CAST(:period AS text) IS NULL OR iv.period = :period)
                     ORDER BY iv.place_id, iv.period DESC
                     """
                 ),

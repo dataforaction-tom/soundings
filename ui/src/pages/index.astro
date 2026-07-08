@@ -28,60 +28,609 @@ if (query) {
     return Astro.redirect(`/place/${encodeURIComponent(matches[0]!.id)}`);
   }
 }
+
+const domains = [
+  { name: "Population", indicators: 7, desc: "Age structure, density, estimates" },
+  { name: "Deprivation", indicators: 9, desc: "IMD score, domains, rank" },
+  { name: "Health", indicators: 7, desc: "Life expectancy, long-term illness" },
+  { name: "Economy", indicators: 8, desc: "Active companies, incorporations" },
+  { name: "Environment", indicators: 9, desc: "Air quality, green space" },
+  { name: "Education", indicators: 4, desc: "Attainment, absence, NEET" },
+  { name: "Crime", indicators: 3, desc: "ASB, burglary, vehicle crime" },
+  { name: "Housing", indicators: 5, desc: "Tenure, overcrowding, EPC" },
+  { name: "Infrastructure", indicators: 9, desc: "Transport, broadband, road safety" },
+  { name: "Civil Society", indicators: 4, desc: "Charities, grants, food banks" },
+];
+
+// Pretend chart data — deterministic, illustrative only
+const deprivationBars = [42, 58, 35, 71, 49, 63, 38, 55, 44, 67];
+const barLabels = ["Hart", "Ribble", "Mendip", "Brent", "Selby", "Thanet", "Weald", "Lewes", "Eden", "Burnley"];
+const trendPoints = [0, 8, 5, 15, 12, 22, 18, 28, 25, 35, 32, 40];
+const maxBar = Math.max(...deprivationBars);
 ---
 
 <Base title="Soundings">
-  <p class="intro">Ask a question about a place — postcode, council, region.</p>
-  <form class="search-form" method="get" action="/">
-    <label>
-      <span>What do you want to know about a place?</span>
-      <input
-        type="text"
-        name="q"
-        value={query}
-        placeholder="Stockton-on-Tees, TS18 1AB, North Tyneside…"
-        autofocus
-        required
-      />
-    </label>
-    <button type="submit">Search</button>
-  </form>
+  {!query && (
+    <>
+      {/* ─── Hero ─── */}
+      <section class="hero">
+        <div class="hero-decoration" aria-hidden="true">
+          <svg viewBox="0 0 600 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+            {/* Bathymetric contour lines — the "soundings" metaphor */}
+            <path d="M0 180 Q150 140 300 160 T600 150" stroke="var(--color-accent)" stroke-width="1" opacity="0.3" />
+            <path d="M0 165 Q150 120 300 145 T600 130" stroke="var(--color-accent)" stroke-width="1" opacity="0.25" />
+            <path d="M0 150 Q150 100 300 130 T600 110" stroke="var(--color-accent)" stroke-width="1" opacity="0.2" />
+            <path d="M0 135 Q150 80 300 115 T600 90" stroke="var(--color-accent)" stroke-width="1" opacity="0.15" />
+            <path d="M0 120 Q150 60 300 100 T600 70" stroke="var(--color-accent)" stroke-width="1" opacity="0.1" />
+            {/* Depth markers */}
+            <circle cx="120" cy="155" r="2" fill="var(--color-primary)" opacity="0.4" />
+            <circle cx="280" cy="138" r="2" fill="var(--color-primary)" opacity="0.4" />
+            <circle cx="440" cy="125" r="2" fill="var(--color-primary)" opacity="0.4" />
+          </svg>
+        </div>
 
-  <AskBox />
+        <p class="hero-eyebrow">An open insight commons for UK places</p>
+        <h1 class="hero-title">Ask a question about<br/>any place in England</h1>
+        <p class="hero-subtitle">
+          Postcode, council, region — get coherent answers grounded in named
+          open data sources. 65 indicators across 10 domains, from deprivation
+          to air quality.
+        </p>
+      </section>
 
-  {error && (
-    <p class="error">
-      Sorry — couldn't reach the indicator service: {error}
-    </p>
+      <div class="hero-search">
+        <AskBox />
+      </div>
+
+      {error && (
+        <p class="error">
+          Sorry — couldn't reach the indicator service: {error}
+        </p>
+      )}
+
+      {/* ─── Preview: pretend charts ─── */}
+      <section class="preview">
+        <div class="preview-grid">
+          {/* Bar chart — deprivation comparison */}
+          <div class="preview-card">
+            <div class="preview-card-header">
+              <h3>Deprivation score</h3>
+              <span class="preview-card-tag">IMD 2025</span>
+            </div>
+            <svg class="preview-chart" viewBox="0 0 320 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+              {deprivationBars.map((val, i) => {
+                const x = 10 + i * 30;
+                const h = (val / maxBar) * 90;
+                const y = 110 - h;
+                return (
+                  <>
+                    <rect x={x} y={y} width="18" height={h} rx="2"
+                      fill={i === 3 ? "var(--color-accent)" : "var(--color-primary)"}
+                      opacity={i === 3 ? 1 : 0.15}
+                    />
+                    <text x={x + 9} y={128} text-anchor="middle"
+                      font-size="7" fill="var(--color-muted)" font-family="inherit">
+                      {barLabels[i]}
+                    </text>
+                  </>
+                );
+              })}
+              <line x1="5" y1="110" x2="315" y2="110" stroke="var(--color-border)" stroke-width="1" />
+            </svg>
+            <p class="preview-card-caption">Brent ranks highest among peers. Source: MHCLG IMD 2025.</p>
+          </div>
+
+          {/* Trend line — population change */}
+          <div class="preview-card">
+            <div class="preview-card-header">
+              <h3>Population trend</h3>
+              <span class="preview-card-tag">ONS APS</span>
+            </div>
+            <svg class="preview-chart" viewBox="0 0 320 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+              {/* gridlines */}
+              <line x1="5" y1="20" x2="315" y2="20" stroke="var(--color-border-light)" stroke-width="0.5" />
+              <line x1="5" y1="60" x2="315" y2="60" stroke="var(--color-border-light)" stroke-width="0.5" />
+              <line x1="5" y1="100" x2="315" y2="100" stroke="var(--color-border)" stroke-width="0.5" />
+              {/* area under curve */}
+              <path
+                d={`M5 100 ${trendPoints.map((p, i) => `L ${5 + i * 26} ${100 - p * 2}`).join(" ")} L 315 100 Z`}
+                fill="var(--color-accent)" opacity="0.1"
+              />
+              {/* line */}
+              <path
+                d={`M5 ${100 - trendPoints[0]! * 2} ${trendPoints.map((p, i) => `L ${5 + i * 26} ${100 - p * 2}`).join(" ")}`}
+                stroke="var(--color-accent)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"
+              />
+              {/* dots */}
+              {trendPoints.map((p, i) => (
+                <circle cx={5 + i * 26} cy={100 - p * 2} r="2.5"
+                  fill="var(--color-surface)" stroke="var(--color-accent)" stroke-width="1.5"
+                />
+              ))}
+              {/* x-axis labels */}
+              <text x="5" y="130" font-size="7" fill="var(--color-muted)">2013</text>
+              <text x="153" y="130" font-size="7" fill="var(--color-muted)">2018</text>
+              <text x="295" y="130" font-size="7" fill="var(--color-muted)">2024</text>
+            </svg>
+            <p class="preview-card-caption">Steady growth over the decade. Source: ONS APS.</p>
+          </div>
+
+          {/* Choropleth map — abstract */}
+          <div class="preview-card preview-card-wide">
+            <div class="preview-card-header">
+              <h3>Green space access</h3>
+              <span class="preview-card-tag">FoE Green Space</span>
+            </div>
+            <svg class="preview-chart preview-map" viewBox="0 0 420 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+              {/* Abstract region shapes with gradient fill */}
+              <path d="M20 30 L80 25 L110 40 L95 70 L60 75 L25 60 Z"
+                fill="var(--color-accent)" opacity="0.6" stroke="var(--color-surface)" stroke-width="0.5" />
+              <path d="M110 40 L170 30 L195 55 L180 80 L130 85 L95 70 Z"
+                fill="var(--color-accent)" opacity="0.3" stroke="var(--color-surface)" stroke-width="0.5" />
+              <path d="M170 30 L240 35 L250 65 L210 80 L180 80 L195 55 Z"
+                fill="var(--color-accent)" opacity="0.8" stroke="var(--color-surface)" stroke-width="0.5" />
+              <path d="M250 65 L310 50 L335 75 L300 95 L250 90 Z"
+                fill="var(--color-accent)" opacity="0.2" stroke="var(--color-surface)" stroke-width="0.5" />
+              <path d="M310 50 L380 40 L395 70 L360 90 L335 75 Z"
+                fill="var(--color-accent)" opacity="0.5" stroke="var(--color-surface)" stroke-width="0.5" />
+              <path d="M60 75 L95 70 L130 85 L120 115 L70 110 Z"
+                fill="var(--color-accent)" opacity="0.4" stroke="var(--color-surface)" stroke-width="0.5" />
+              <path d="M130 85 L180 80 L210 80 L200 110 L150 120 L120 115 Z"
+                fill="var(--color-accent)" opacity="0.7" stroke="var(--color-surface)" stroke-width="0.5" />
+              <path d="M210 80 L250 90 L300 95 L280 120 L230 125 L200 110 Z"
+                fill="var(--color-accent)" opacity="0.15" stroke="var(--color-surface)" stroke-width="0.5" />
+              <path d="M300 95 L335 75 L395 70 L390 100 L340 110 L280 120 Z"
+                fill="var(--color-accent)" opacity="0.5" stroke="var(--color-surface)" stroke-width="0.5" />
+              {/* Legend */}
+              <rect x="340" y="125" width="10" height="8" rx="1" fill="var(--color-accent)" opacity="0.8" />
+              <text x="354" y="132" font-size="7" fill="var(--color-muted)">High access</text>
+              <rect x="340" y="135" width="10" height="8" rx="1" fill="var(--color-accent)" opacity="0.2" />
+              <text x="354" y="142" font-size="7" fill="var(--color-muted)">Low access</text>
+            </svg>
+            <p class="preview-card-caption">Regional variation in green space provision. Source: Friends of the Earth.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── Domains ─── */}
+      <section class="domains">
+        <h2 class="section-title">What you can ask about</h2>
+        <div class="domain-grid">
+          {domains.map((d) => (
+            <div class="domain-card">
+              <div class="domain-icon" aria-hidden="true">
+                {d.name === "Population" && (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="9" cy="7" r="3" /><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" />
+                    <circle cx="17" cy="7" r="2.5" opacity="0.6" /><path d="M17 13a3 3 0 0 1 3 3v1" opacity="0.6" />
+                  </svg>
+                )}
+                {d.name === "Deprivation" && (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="14" width="4" height="7" rx="1" /><rect x="9" y="10" width="4" height="11" rx="1" opacity="0.7" />
+                    <rect x="15" y="5" width="4" height="16" rx="1" opacity="0.4" /><line x1="2" y1="21" x2="22" y2="21" />
+                  </svg>
+                )}
+                {d.name === "Health" && (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 12h3l2-5 4 10 2-5h7" />
+                  </svg>
+                )}
+                {d.name === "Economy" && (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M2 20 L8 12 L12 16 L16 8 L20 14 L22 10" />
+                    <path d="M16 8 L20 8 L20 12" />
+                  </svg>
+                )}
+                {d.name === "Environment" && (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22 C12 22 5 15 5 10 A7 7 0 0 1 12 3 A7 7 0 0 1 19 10 C19 15 12 22 12 22 Z" />
+                    <path d="M12 3 L12 22" opacity="0.4" /><path d="M12 10 L16 7" opacity="0.4" /><path d="M12 14 L8 11" opacity="0.4" />
+                  </svg>
+                )}
+                {d.name === "Education" && (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M2 9 L12 4 L22 9 L12 14 Z" /><path d="M6 11 L6 17 C6 17 8 19 12 19 C16 19 18 17 18 17 L18 11" />
+                    <path d="M22 9 L22 14" />
+                  </svg>
+                )}
+                {d.name === "Crime" && (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2 L22 5 V12 C22 17 18 21 12 22 C6 21 2 17 2 12 V5 Z" />
+                    <path d="M12 8 V13" /><circle cx="12" cy="16" r="0.8" fill="currentColor" />
+                  </svg>
+                )}
+                {d.name === "Housing" && (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 12 L12 3 L21 12" /><path d="M5 10 V20 H19 V10" /><rect x="10" y="14" width="4" height="6" />
+                  </svg>
+                )}
+                {d.name === "Infrastructure" && (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="5" y="3" width="14" height="14" rx="2" /><path d="M5 10 H19" /><circle cx="9" cy="14" r="1.5" /><circle cx="15" cy="6.5" r="1.5" />
+                    <path d="M9 17 V20 M15 17 V20" /><line x1="7" y1="20" x2="17" y2="20" />
+                  </svg>
+                )}
+                {d.name === "Civil Society" && (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="7" cy="8" r="3" /><circle cx="17" cy="8" r="3" /><circle cx="12" cy="16" r="3" />
+                    <path d="M9 10 L12 14" opacity="0.6" /><path d="M15 10 L12 14" opacity="0.6" />
+                  </svg>
+                )}
+              </div>
+              <span class="domain-name">{d.name}</span>
+              <span class="domain-count">{d.indicators} indicators</span>
+              <span class="domain-desc">{d.desc}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ─── How it works ─── */}
+      <section class="how-it-works">
+        <h2 class="section-title">How it works</h2>
+        <div class="steps">
+          <div class="step">
+            <div class="step-icon" aria-hidden="true">
+              <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 16 C4 10 9 5 16 5 C23 5 28 10 28 16 C28 22 23 27 16 27 C9 27 4 22 4 16 Z" />
+                <path d="M11 14 L14 11 L14 21" /><path d="M21 14 L18 17 L18 21" opacity="0.5" />
+              </svg>
+            </div>
+            <h3>Ask</h3>
+            <p>Type a question in plain English — no menus, no selectors. The model figures out what you're looking for.</p>
+          </div>
+          <div class="step">
+            <div class="step-icon" aria-hidden="true">
+              <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 24 L11 16 L15 20 L22 10 L28 18" />
+                <path d="M22 10 L28 10 L28 16" />
+                <circle cx="11" cy="16" r="1.5" fill="currentColor" /><circle cx="22" cy="10" r="1.5" fill="currentColor" />
+              </svg>
+            </div>
+            <h3>Answer</h3>
+            <p>Soundings calls the right tools, pulls the right indicators, and composes a grounded answer with every source cited.</p>
+          </div>
+          <div class="step">
+            <div class="step-icon" aria-hidden="true">
+              <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 22 L12 14 L16 18 L24 8" />
+                <path d="M24 8 L24 14 M24 8 L18 8" />
+                <line x1="4" y1="26" x2="28" y2="26" />
+              </svg>
+            </div>
+            <h3>Explore</h3>
+            <p>Compare places, see trends, drill into neighbourhoods. Every number links back to its origin dataset.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── Corpus ─── */}
+      <section class="corpus-info">
+        <div class="corpus-info-inner">
+          <div class="corpus-icon" aria-hidden="true">
+            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M8 38 Q16 28 24 32 T40 26" opacity="0.5" /><path d="M8 32 Q16 22 24 26 T40 20" opacity="0.4" />
+              <path d="M8 26 Q16 16 24 20 T40 14" opacity="0.3" /><circle cx="16" cy="30" r="2" fill="currentColor" opacity="0.6" />
+              <circle cx="28" cy="24" r="2" fill="currentColor" opacity="0.6" /><circle cx="36" cy="18" r="2" fill="currentColor" opacity="0.6" />
+              <line x1="8" y1="40" x2="40" y2="40" /><line x1="8" y1="8" x2="8" y2="40" />
+            </svg>
+          </div>
+          <h2 class="section-title">The public corpus</h2>
+          <p class="corpus-desc">
+            Soundings logs every question to a public, open corpus — a record
+            of what communities need to know. Questions are sanitised before
+            publication: postcodes truncated to sector, personal names redacted,
+            small charity names stripped. The corpus is published monthly under
+            CC BY 4.0 as gzipped CSV and JSON Lines.
+          </p>
+          <a href="/corpus" class="corpus-link">Browse the corpus →</a>
+        </div>
+      </section>
+    </>
   )}
 
-  {query && !error && matches.length === 0 && (
-    <p class="no-match">
-      No places matched <strong>{query}</strong>. Try a postcode, a full council
-      name, or a region.
-    </p>
-  )}
+  {query && (
+    <>
+      <p class="intro">Results for: <strong>{query}</strong></p>
+      <form class="search-form" method="get" action="/">
+        <label>
+          <span>What do you want to know about a place?</span>
+          <input
+            type="text"
+            name="q"
+            value={query}
+            placeholder="Stockton-on-Tees, TS18 1AB, North Tyneside…"
+            autofocus
+            required
+          />
+        </label>
+        <button type="submit">Search</button>
+      </form>
 
-  {matches.length > 1 && (
-    <section>
-      <h2>{matches.length} matches</h2>
-      <ul class="match-list">
-        {matches.map((m) => (
-          <li>
-            <a href={`/place/${encodeURIComponent(m.id)}`}>
-              <strong>{m.name}</strong>
-              <span class="match-type"> · {m.type}</span>
-            </a>
-            {m.parent_ids && m.parent_ids.length > 0 && (
-              <span class="parents"> in {m.parent_ids.join(" → ")}</span>
-            )}
-          </li>
-        ))}
-      </ul>
-    </section>
+      {error && (
+        <p class="error">
+          Sorry — couldn't reach the indicator service: {error}
+        </p>
+      )}
+
+      {query && !error && matches.length === 0 && (
+        <p class="no-match">
+          No places matched <strong>{query}</strong>. Try a postcode, a full
+          council name, or a region.
+        </p>
+      )}
+
+      {matches.length > 1 && (
+        <section>
+          <h2>{matches.length} matches</h2>
+          <ul class="match-list">
+            {matches.map((m) => (
+              <li>
+                <a href={`/place/${encodeURIComponent(m.id)}`}>
+                  <strong>{m.name}</strong>
+                  <span class="match-type"> · {m.type}</span>
+                </a>
+                {m.parent_ids && m.parent_ids.length > 0 && (
+                  <span class="parents"> in {m.parent_ids.join(" → ")}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </>
   )}
 
   <style>
+    .hero {
+      text-align: center;
+      padding: var(--space-3xl) 0 var(--space-xl);
+      position: relative;
+    }
+    .hero-decoration {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100%;
+      max-width: 600px;
+      opacity: 0.8;
+      pointer-events: none;
+    }
+    .hero-decoration svg {
+      width: 100%;
+      height: auto;
+    }
+    .hero-eyebrow {
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-size: var(--font-size-xs);
+      color: var(--color-accent);
+      font-weight: var(--font-weight-semibold);
+      margin-bottom: var(--space-md);
+      position: relative;
+    }
+    .hero-title {
+      font-size: clamp(1.75rem, 5vw, 2.75rem);
+      line-height: 1.15;
+      color: var(--color-primary);
+      margin-bottom: var(--space-lg);
+      position: relative;
+    }
+    .hero-subtitle {
+      font-size: var(--font-size-lg);
+      color: var(--color-text-light);
+      line-height: var(--line-height-relaxed);
+      max-width: 36rem;
+      margin: 0 auto;
+      position: relative;
+    }
+    .hero-search {
+      max-width: 42rem;
+      margin: 0 auto var(--space-3xl);
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ─── Preview charts ─── */
+    .preview {
+      margin-bottom: var(--space-3xl);
+    }
+    .preview-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-lg);
+    }
+    .preview-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      padding: var(--space-lg);
+      transition: box-shadow 0.2s ease;
+    }
+    .preview-card:hover {
+      box-shadow: var(--shadow);
+    }
+    .preview-card-wide {
+      grid-column: 1 / -1;
+    }
+    .preview-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-md);
+    }
+    .preview-card-header h3 {
+      margin: 0;
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-semibold);
+    }
+    .preview-card-tag {
+      font-size: var(--font-size-xs);
+      color: var(--color-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 0.15em 0.6em;
+      background: var(--color-bg);
+      border-radius: var(--radius-sm);
+    }
+    .preview-chart {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    .preview-map {
+      max-height: 160px;
+    }
+    .preview-card-caption {
+      margin: var(--space-sm) 0 0 0;
+      font-size: var(--font-size-xs);
+      color: var(--color-muted);
+    }
+    @media (max-width: 640px) {
+      .preview-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ─── Domains ─── */
+    .section-title {
+      font-size: var(--font-size-xl);
+      margin-bottom: var(--space-xl);
+      text-align: center;
+    }
+    .domains {
+      margin-bottom: var(--space-3xl);
+    }
+    .domain-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+      gap: var(--space-md);
+    }
+    .domain-card {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+      padding: var(--space-lg);
+      background: var(--color-surface);
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      transition: box-shadow 0.15s ease, border-color 0.15s ease;
+    }
+    .domain-card:hover {
+      box-shadow: var(--shadow);
+      border-color: var(--color-accent);
+    }
+    .domain-icon {
+      width: 28px;
+      height: 28px;
+      color: var(--color-primary);
+      margin-bottom: var(--space-xs);
+    }
+    .domain-icon svg {
+      width: 100%;
+      height: 100%;
+    }
+    .domain-name {
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-primary);
+      font-size: var(--font-size-base);
+    }
+    .domain-count {
+      font-size: var(--font-size-xs);
+      color: var(--color-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .domain-desc {
+      font-size: var(--font-size-sm);
+      color: var(--color-text-light);
+      line-height: var(--line-height-normal);
+    }
+
+    /* ─── How it works ─── */
+    .how-it-works {
+      margin-bottom: var(--space-3xl);
+    }
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+      gap: var(--space-lg);
+    }
+    .step {
+      text-align: center;
+      padding: var(--space-xl);
+    }
+    .step-icon {
+      width: 48px;
+      height: 48px;
+      margin: 0 auto var(--space-md);
+      color: var(--color-accent);
+    }
+    .step-icon svg {
+      width: 100%;
+      height: 100%;
+    }
+    .step h3 {
+      margin-bottom: var(--space-sm);
+    }
+    .step p {
+      color: var(--color-text-light);
+      line-height: var(--line-height-relaxed);
+      font-size: var(--font-size-sm);
+    }
+
+    /* ─── Corpus ─── */
+    .corpus-info {
+      background: var(--color-primary);
+      border-radius: var(--radius-lg);
+      padding: var(--space-3xl) var(--space-2xl);
+      margin-bottom: var(--space-2xl);
+      position: relative;
+      overflow: hidden;
+    }
+    .corpus-info-inner {
+      max-width: 40rem;
+      margin: 0 auto;
+      text-align: center;
+      position: relative;
+      z-index: 1;
+    }
+    .corpus-icon {
+      width: 56px;
+      height: 56px;
+      margin: 0 auto var(--space-lg);
+      color: var(--color-accent);
+      opacity: 0.9;
+    }
+    .corpus-info .section-title {
+      color: white;
+    }
+    .corpus-desc {
+      color: rgba(255, 255, 255, 0.85);
+      line-height: var(--line-height-relaxed);
+      margin-bottom: var(--space-xl);
+    }
+    .corpus-link {
+      display: inline-block;
+      padding: var(--space-md) var(--space-2xl);
+      background: var(--color-accent);
+      color: white;
+      border-radius: var(--radius-lg);
+      font-weight: var(--font-weight-medium);
+      text-decoration: none;
+      transition: background-color 0.15s ease;
+    }
+    .corpus-link:hover {
+      background: var(--color-accent-hover);
+      color: white;
+      text-decoration: none;
+    }
+
+    /* ─── Search results ─── */
     .intro {
       font-size: var(--font-size-lg);
       color: var(--color-text-light);
