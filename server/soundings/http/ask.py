@@ -12,11 +12,20 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from soundings.ask.dispatcher import ToolDispatcher
-from soundings.ask.orchestrator import AskOrchestrator
+from soundings.ask.orchestrator import REQUEST_TIMEOUT_SECONDS, AskOrchestrator
 from soundings.ask.prompts import SystemPromptBuilder
 from soundings.core.config import get_settings
 
 router = APIRouter(prefix="/v1")
+
+# Per-event SSE wait: a backstop for a genuinely wedged background task (e.g.
+# a stuck upstream), not a total-request budget. Derived from the
+# orchestrator's own REQUEST_TIMEOUT_SECONDS (rather than a separate literal)
+# so the two can't silently drift apart again — that happened when adaptive
+# thinking pushed REQUEST_TIMEOUT_SECONDS from 120 to 180 without this value
+# following, which killed the slowest (and richest) answers with a spurious
+# "Stream timeout" before the orchestrator's own timeout/completion could fire.
+SSE_WATCHDOG_SECONDS = REQUEST_TIMEOUT_SECONDS + 10.0
 
 
 class AskInput(BaseModel):
@@ -80,7 +89,7 @@ async def ask(input: AskInput, request: Request) -> StreamingResponse:
         # background task is genuinely wedged (e.g. a stuck upstream).
         while True:
             try:
-                data = await asyncio.wait_for(queue.get(), timeout=130.0)
+                data = await asyncio.wait_for(queue.get(), timeout=SSE_WATCHDOG_SECONDS)
                 yield f"data: {data}\n\n"
                 event_obj = json.loads(data)
                 if event_obj.get("type") in ("done", "error"):

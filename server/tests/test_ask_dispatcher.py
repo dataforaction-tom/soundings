@@ -58,7 +58,11 @@ class _FakeConn:
 
     async def execute(self, *args: object, **kwargs: object) -> list[tuple[str]]:
         # Stand in for `SELECT key FROM catalogue.indicator`.
-        return [("population.total",), ("deprivation.imd.average_score",)]
+        return [
+            ("population.total",),
+            ("deprivation.imd.average_score",),
+            ("infrastructure.parks_count",),
+        ]
 
 
 class FakeEngine:
@@ -223,6 +227,33 @@ async def test_dispatch_drops_blocks_with_unknown_indicator() -> None:
     assert types == ["text", "indicator-card", "map"]
     assert blocks[1]["indicator_key"] == "population.total"
     assert blocks[2]["indicator_key"] is None  # map downgraded to boundary
+
+
+@pytest.mark.asyncio
+async def test_dispatch_downgrades_choropleth_of_ineligible_indicator() -> None:
+    """A choropleth map naming a real but choropleth-ineligible indicator
+    (infrastructure.* counts have no bulk peer coverage — they're fetched
+    live per place, not backfilled — so a peers/sub_areas choropleth of one
+    renders mostly-null and broken) is downgraded to a boundary map, the
+    same way an unknown indicator key is. The system prompt already tells
+    the model not to do this; this is the code-level backstop for when it
+    does anyway."""
+    dispatcher = _make_dispatcher()
+    tool_input = {
+        "blocks": [
+            {
+                "type": "map",
+                "place_id": "ltla24:E06000047",
+                "indicator_key": "infrastructure.parks_count",
+                "granularity": "peers",
+            },
+        ]
+    }
+    result = await dispatcher.dispatch("compose_answer", tool_input)
+    blocks = result["blocks"]
+    assert len(blocks) == 1
+    assert blocks[0]["type"] == "map"
+    assert blocks[0]["indicator_key"] is None
 
 
 def test_dispatcher_has_get_peer_distribution_handler() -> None:
