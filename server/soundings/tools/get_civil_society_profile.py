@@ -31,6 +31,21 @@ class GetCivilSocietyProfileInput(BaseModel):
             " 'hunger', 'foodbank', 'poverty']. Leave empty for the whole sector."
         ),
     )
+    year_from: int | None = Field(
+        default=None,
+        description=(
+            "Optional lower bound for the registration cohort series"
+            " (e.g. 2015 for 'since 2015'). When set, only cohort years >="
+            " year_from are returned. Does not affect totals or income."
+        ),
+    )
+    year_to: int | None = Field(
+        default=None,
+        description=(
+            "Optional upper bound for the registration cohort series."
+            " When set, only cohort years <= year_to are returned."
+        ),
+    )
 
 
 TOOL_NAME = "get_civil_society_profile"
@@ -57,6 +72,9 @@ async def get_civil_society_profile(
 ) -> CivilSocietyProfile:
     """Tool handler — delegates to the orchestrator method."""
     result: CivilSocietyProfile = await orchestrator.compute_civil_society_profile(
-        place_id=input.place_id, keywords=input.keywords
+        place_id=input.place_id,
+        keywords=input.keywords,
+        year_from=input.year_from,
+        year_to=input.year_to,
     )
     return result

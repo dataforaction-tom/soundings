@@ -25,6 +25,7 @@ _VISUAL_TYPES = frozenset(
         "map",
         "distribution-chart",
         "composition-chart",
+        "bar-chart",
         "scatter-plot",
     }
 )
@@ -108,6 +109,20 @@ class CompositionChartBlock(BaseModel):
     caption: str | None = None
 
 
+class BarChartBar(BaseModel):
+    label: str
+    value: float
+    colour: str | None = None
+
+
+class BarChartBlock(BaseModel):
+    type: Literal["bar-chart"]
+    title: str
+    bars: list[BarChartBar] = Field(min_length=1, max_length=30)
+    y_label: str | None = None
+    caption: str | None = None
+
+
 class ScatterPlotBlock(BaseModel):
     type: Literal["scatter-plot"]
     x_indicator_key: str
@@ -143,6 +158,7 @@ AnswerBlock = Annotated[
     | MapBlock
     | DistributionChartBlock
     | CompositionChartBlock
+    | BarChartBlock
     | ScatterPlotBlock
     | SubAreaTableBlock,
     Field(discriminator="type"),

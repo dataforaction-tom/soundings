@@ -42,6 +42,12 @@ class FunderSummary(BaseModel):
     total_gbp: float = Field(ge=0, description="Sum of GBP grants from this funder.")
 
 
+class GrantYearSummary(BaseModel):
+    year: int = Field(description="Calendar year of the grant award date.")
+    grant_count: int = Field(ge=0)
+    total_gbp: float = Field(ge=0, description="Sum of GBP grants awarded in this year.")
+
+
 class CivilSocietyProfile(BaseModel):
     place_id: str
     total_organisations: int = Field(ge=0)
@@ -61,13 +67,21 @@ class CivilSocietyProfile(BaseModel):
     income_buckets: list[IncomeBucket] = Field(default_factory=list)
     registration_cohort: list[RegistrationCohort] = Field(
         default_factory=list,
-        description="One row per year, oldest first; window controlled by the orchestrator.",
+        description="One row per year, oldest first. Filtered to year_from/year_to when set.",
     )
     top_funders: list[FunderSummary] = Field(
         default_factory=list,
         description=(
             "Top funders by total GBP awarded to charities in this place in the"
             " last 12 months (360Giving). Empty when no grant data is available."
+        ),
+    )
+    grants_by_year: list[GrantYearSummary] = Field(
+        default_factory=list,
+        description=(
+            "Total GBP grants and grant count per calendar year, from 360Giving."
+            " Covers the full available history (not just 12 months). Empty when"
+            " no grant data is available or the 360G lookup timed out."
         ),
     )
     filter_keywords: list[str] = Field(

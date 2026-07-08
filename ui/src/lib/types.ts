@@ -190,6 +190,12 @@ export interface FunderSummary {
   total_gbp: number;
 }
 
+export interface GrantYearSummary {
+  year: number;
+  grant_count: number;
+  total_gbp: number;
+}
+
 export interface CivilSocietyProfile {
   place_id: string;
   total_organisations: number;
@@ -199,6 +205,7 @@ export interface CivilSocietyProfile {
   income_buckets: IncomeBucket[];
   registration_cohort: RegistrationCohort[];
   top_funders: FunderSummary[];
+  grants_by_year: GrantYearSummary[];
   sources: SourceRef[];
   caveats: string[];
   partial: boolean;

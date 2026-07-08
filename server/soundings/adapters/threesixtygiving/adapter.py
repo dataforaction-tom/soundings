@@ -151,6 +151,45 @@ class ThreeSixtyGivingAdapter(PassthroughAdapter):
 
     # ----- Core fan-out ---------------------------------------------------
 
+    async def _fetch_all_grants_for_place(self, place_id: str) -> list[dict[str, Any]]:
+        """Returns ALL grants (full history) for charities registered in place_id.
+
+        Unlike _fetch_grants_for_place which filters to the last 12 months,
+        this returns every grant in the per-org caches. Used for temporal
+        aggregation (grants by year). Per-org caches are already populated
+        by the pre-warmer; a cold place will fan out (slow).
+        """
+        place_cache_key = f"360g:place_all_grants:{place_id}"
+        cached = await self._cache.get(self.source_id, place_cache_key)
+        if cached is not None and isinstance(cached, list):
+            for g in cached:
+                g["date_obj"] = _parse_iso_date(g["date"])
+            return cached
+
+        org_ids = await self._cc_org_ids_for_place(place_id)
+        if not org_ids:
+            empty: list[dict[str, Any]] = []
+            await self._cache.put(self.source_id, place_cache_key, empty, ttl=self._ttl)
+            return empty
+
+        all_grants: list[dict[str, Any]] = []
+        for org_id in org_ids:
+            tsg_org_id = _cc_to_tsg_org_id(org_id)
+            aggregate = await self._cached_org_aggregate(tsg_org_id)
+            if aggregate is None:
+                continue
+            # Skip orgs with no grants at all
+            if not aggregate.latest_grant_date and not aggregate.earliest_grant_date:
+                continue
+            org_grants = await self._cached_org_grants(tsg_org_id)
+            all_grants.extend(org_grants)
+
+        compact = [{k: v for k, v in g.items() if k != "date_obj"} for g in all_grants]
+        await self._cache.put(self.source_id, place_cache_key, compact, ttl=self._ttl)
+        for g in compact:
+            g["date_obj"] = _parse_iso_date(g["date"])
+        return compact
+
     async def _fetch_grants_for_place(self, place_id: str) -> list[dict[str, Any]]:
         """Returns a list of {date, amount, funder, purpose} for every
         grant in the last 12 months received by a charity registered in

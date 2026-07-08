@@ -831,6 +831,80 @@
           host.appendChild(figure);
         }
 
+        // bar-chart ----------------------------------------------------------
+
+        interface BarChartBarBlock {
+          label: string;
+          value: number;
+          colour?: string | null;
+        }
+
+        async function renderBarChartBlock(
+          host: HTMLElement,
+          block: { type: string; [k: string]: unknown },
+        ) {
+          const title = asString(block.title) || "Bar chart";
+          const caption = asStringOrUndef(block.caption);
+          const barsRaw = block.bars;
+          if (!Array.isArray(barsRaw)) {
+            showBlockError(host, "Bar chart missing bars.");
+            return;
+          }
+          const bars: BarChartBarBlock[] = barsRaw
+            .map((b: unknown): BarChartBarBlock | null => {
+              if (typeof b !== "object" || b === null) return null;
+              const r = b as Record<string, unknown>;
+              const label = typeof r.label === "string" ? r.label : String(r.label ?? "");
+              const value = asNumber(r.value);
+              const colourRaw = r.colour;
+              const colour = typeof colourRaw === "string" && colourRaw.length > 0 ? colourRaw : undefined;
+              return { label, value, colour };
+            })
+            .filter((b): b is BarChartBarBlock => b !== null);
+          if (bars.length === 0) {
+            showBlockError(host, "Bar chart has no bars.");
+            return;
+          }
+          const maxVal = Math.max(...bars.map((b) => b.value), 0.001);
+          const figure = document.createElement("figure");
+          figure.className = "bar-chart-block";
+          const h4 = document.createElement("h4");
+          h4.className = "bar-chart-title";
+          h4.textContent = title;
+          figure.appendChild(h4);
+          const chartDiv = document.createElement("div");
+          chartDiv.className = "bar-chart";
+          for (const bar of bars) {
+            const row = document.createElement("div");
+            row.className = "bar-row";
+            const labelEl = document.createElement("span");
+            labelEl.className = "bar-label";
+            labelEl.textContent = bar.label;
+            const barWrap = document.createElement("div");
+            barWrap.className = "bar-track";
+            const fill = document.createElement("div");
+            fill.className = "bar-fill";
+            const pct = Math.max((bar.value / maxVal) * 100, 1);
+            fill.style.width = pct + "%";
+            if (bar.colour) fill.style.background = bar.colour;
+            const valEl = document.createElement("span");
+            valEl.className = "bar-value";
+            valEl.textContent = bar.value.toLocaleString("en-GB", { maximumFractionDigits: 0 });
+            barWrap.appendChild(fill);
+            barWrap.appendChild(valEl);
+            row.appendChild(labelEl);
+            row.appendChild(barWrap);
+            chartDiv.appendChild(row);
+          }
+          figure.appendChild(chartDiv);
+          if (caption) {
+            const figcaption = document.createElement("figcaption");
+            figcaption.textContent = caption;
+            figure.appendChild(figcaption);
+          }
+          host.appendChild(figure);
+        }
+
         // scatter-plot -------------------------------------------------------
 
         interface ScatterPeerDistributionResponse {
@@ -1145,6 +1219,10 @@
             }
             case "composition-chart": {
               renderCompositionChartBlock(host, block);
+              break;
+            }
+            case "bar-chart": {
+              renderBarChartBlock(host, block);
               break;
             }
             case "scatter-plot": {

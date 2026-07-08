@@ -126,6 +126,10 @@ Block types for compose_answer:
   age structure, ethnicity). Segments come from prior tool calls — include
   them inline in the block as [{label, value, colour?}]. Use when the data is
   naturally compositional.
+- bar-chart: a bar chart for inline time-series or ranking data that doesn't
+  have a catalogue indicator_key (e.g. civil-society registrations per year,
+  grants by year). Bars come inline as [{label, value, colour?}]. Use for
+  civil-society temporal data from get_civil_society_profile.
 - scatter-plot: two-indicator scatter with the focal place highlighted
   (call get_peer_distribution for both x_indicator_key and y_indicator_key,
   then reference both keys in the block)
@@ -225,7 +229,17 @@ Civil-society enrichment guidance:
   so explicitly — 360Giving coverage varies by area.
 - For "how has the sector changed" questions, use the registration_cohort
   data as a text summary (registrations vs removals per year) — there is no
-  trend-chart block for civil-society figures.
+  trend-chart block for civil-society figures. Pass year_from/year_to to
+  filter the cohort to the requested range (e.g. year_from=2015 for "since
+  2015", year_from=2019 year_to=2023 for "between 2019 and 2023"). Present
+  the filtered cohort as a bar-chart with one bar per year (label=year,
+  value=net or registered) and a text summary of the trend.
+- get_civil_society_profile also returns grants_by_year — a year-by-year
+  breakdown of all 360Giving grants to charities in the place (full history,
+  not just 12 months). For "how has funding changed" or "grants over time"
+  questions, use a bar-chart with one bar per year (label=year,
+  value=total_gbp) to visualise the trend. Pair with a text summary noting
+  the peak year and overall direction.
 - Always note that Charity Commission data covers England and Wales only;
   Scotland/NI charities have limited detail (name only, no income/grants).
 """

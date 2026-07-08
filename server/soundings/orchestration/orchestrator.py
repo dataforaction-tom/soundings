@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from soundings.contracts.civil_society import (
     CivilSocietyProfile,
     FunderSummary,
+    GrantYearSummary,
     IncomeBucket,
     RegistrationCohort,
 )
@@ -906,14 +907,23 @@ class IndicatorOrchestrator:
         return sql, {"kw": patterns}
 
     async def compute_civil_society_profile(
-        self, place_id: str, keywords: list[str] | None = None
+        self,
+        place_id: str,
+        keywords: list[str] | None = None,
+        *,
+        year_from: int | None = None,
+        year_to: int | None = None,
     ) -> CivilSocietyProfile:
         """Aggregate `data.organisation` rows operating in `place_id`
-        into a civil society profile. Pure SQL — no upstream calls.
+        into a civil society profile. Pure SQL — no upstream calls
+        (except the best-effort 360G fan-out for funders + grants_by_year).
 
         When `keywords` is given, the profile is restricted to charities whose
         name or charitable objects match one of the terms (case-insensitive
         substring) — e.g. ["food", "poverty"] for a food-poverty question.
+
+        When `year_from`/`year_to` are given, the registration cohort series
+        is filtered to that inclusive range. Totals and income are unaffected.
         """
         kw_sql, kw_params = self._keyword_filter_sql(keywords)
         retrieved = datetime.now(tz=UTC)
@@ -1031,6 +1041,8 @@ class IndicatorOrchestrator:
                     net=int(r.registered) - int(r.removed),
                 )
                 for r in cohort_rows
+                if (year_from is None or int(r.year) >= year_from)
+                and (year_to is None or int(r.year) <= year_to)
             ]
 
         normalised_keywords = [k.strip() for k in (keywords or []) if k and k.strip()]
@@ -1049,11 +1061,12 @@ class IndicatorOrchestrator:
                 f"{missing} of {total} charities have no income on the latest CC return."
             )
 
-        # Top funders: aggregate 360G grants by funder name for this place.
+        # Top funders + grants by year: aggregate 360G grants for this place.
         # Best-effort with a 5s timeout — 360G fan-out can take 30s+ on a cold
         # cache, and funder data is supplementary, not worth blocking the
         # profile on.
         top_funders: list[FunderSummary] = []
+        grants_by_year: list[GrantYearSummary] = []
         try:
             tsg_adapter = self._registry.adapter_for_source("threesixtygiving")
             grants = await asyncio.wait_for(
@@ -1083,6 +1096,37 @@ class IndicatorOrchestrator:
             if top_funders:
                 caveats.append(
                     "Funder data from 360Giving covers the last 12 months only and"
+                    " is limited to grants received by charities registered in this"
+                    " place (England/Wales)."
+                )
+
+            # Grants by year — uses all_grants (full history), separate fan-out.
+            # Reuses per-org caches already warmed above, so this is fast when
+            # the 12m fan-out succeeded.
+            all_grants = await asyncio.wait_for(
+                tsg_adapter._fetch_all_grants_for_place(place_id),
+                timeout=5.0,
+            )
+            year_totals: dict[int, dict[str, float | int]] = {}
+            for g in all_grants:
+                year = int(g["date"][:4])  # extract year from ISO date string
+                entry = year_totals.setdefault(year, {"total": 0.0, "count": 0})
+                entry["total"] += g.get("amount", 0.0)
+                entry["count"] += 1
+            grants_by_year = sorted(
+                (
+                    GrantYearSummary(
+                        year=year,
+                        grant_count=int(data["count"]),
+                        total_gbp=float(data["total"]),
+                    )
+                    for year, data in year_totals.items()
+                ),
+                key=lambda y: y.year,
+            )
+            if grants_by_year:
+                caveats.append(
+                    "Grant history from 360Giving covers all available years and"
                     " is limited to grants received by charities registered in this"
                     " place (England/Wales)."
                 )
@@ -1120,6 +1164,7 @@ class IndicatorOrchestrator:
             income_buckets=income_buckets,
             registration_cohort=cohort,
             top_funders=top_funders,
+            grants_by_year=grants_by_year,
             filter_keywords=normalised_keywords,
             sources=sources_list,
             caveats=caveats,
