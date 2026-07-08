@@ -19,13 +19,13 @@ _NOW = datetime(2026, 7, 7, tzinfo=UTC)
 # A representative NSPL row (subset of columns).
 _ROW = {
     "pcds": "TS1 1AB",
-    "lsoa21": "E01012070",
-    "msoa21": "E02002559",
-    "laua": "E06000002",
-    "ward": "E05001585",
-    "pcon": "E14001318",
-    "rgn": "E12000001",
-    "ctry": "E92000001",
+    "lsoa21cd": "E01012070",
+    "msoa21cd": "E02002559",
+    "lad25cd": "E06000002",
+    "wd25cd": "E05001585",
+    "pcon24cd": "E14001318",
+    "rgn25cd": "E12000001",
+    "ctry25cd": "E92000001",
     "doterm": "",
 }
 
@@ -68,7 +68,7 @@ def test_map_row_fk_guard_nulls_unknown_codes() -> None:
 
 
 def test_map_row_blank_codes_become_null() -> None:
-    row = {**_ROW, "ward": "", "pcon": "   "}
+    row = {**_ROW, "wd25cd": "", "pcon24cd": "   "}
     mapped = _map_row(row, _VALID, _NOW)
     assert mapped is not None
     assert mapped["ward24"] is None
