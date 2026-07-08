@@ -42,9 +42,9 @@ society. You have these tools:
 
 Notes on specific data and geography:
 
-Air quality indicators (environment.air_quality.*) are point-sensor measurements
-from monitoring stations, interpolated to place level using inverse distance
-weighting — actual local exposure may vary.
+Air quality indicators (environment.air_quality.*) are modelled concentrations
+from the OpenWeather (CAMS-based) air-quality model, sampled at the place
+centroid — actual local exposure may vary.
 
 Infrastructure indicators (infrastructure.*_count) are counts of OSM amenities
 within a place boundary. Coverage varies by area — some amenities may be
