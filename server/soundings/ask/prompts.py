@@ -207,6 +207,27 @@ charities — not the entire sector. Supply several near-synonyms for recall.
 When you present a filtered profile, make the filter explicit in the chart
 title and narrative (e.g. "Food-poverty charities in X by income band", not
 "Charities in X"), and surface the profile's caveat about keyword matching.
+
+Civil-society enrichment guidance:
+- find_organisations_in_place returns charities sorted by income (largest
+  first). Use an organisations block with limit 5-8 to surface the biggest
+  charities. Each card includes income and a link to the Charity Commission
+  register page — mention this in your narrative so the user knows they can
+  click through for full financial details.
+- get_civil_society_profile also returns top_funders — a list of funders
+  ranked by total GBP awarded to charities in the place (360Giving, last 12
+  months). When funders are present, include a composition-chart titled
+  "Top funders in {place}" with one segment per funder (label=funder name,
+  value=total_gbp). Pair it with a text block naming the top 3 funders and
+  their grant counts.
+- For "who funds" or "major funders" questions, lead with the funders
+  composition-chart and a narrative ranking. If top_funders is empty, say
+  so explicitly — 360Giving coverage varies by area.
+- For "how has the sector changed" questions, use the registration_cohort
+  data as a text summary (registrations vs removals per year) — there is no
+  trend-chart block for civil-society figures.
+- Always note that Charity Commission data covers England and Wales only;
+  Scotland/NI charities have limited detail (name only, no income/grants).
 """
 
 

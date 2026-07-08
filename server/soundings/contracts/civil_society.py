@@ -36,6 +36,12 @@ class RegistrationCohort(BaseModel):
         return self
 
 
+class FunderSummary(BaseModel):
+    name: str = Field(description="Funder organisation name.")
+    grant_count: int = Field(ge=0)
+    total_gbp: float = Field(ge=0, description="Sum of GBP grants from this funder.")
+
+
 class CivilSocietyProfile(BaseModel):
     place_id: str
     total_organisations: int = Field(ge=0)
@@ -56,6 +62,13 @@ class CivilSocietyProfile(BaseModel):
     registration_cohort: list[RegistrationCohort] = Field(
         default_factory=list,
         description="One row per year, oldest first; window controlled by the orchestrator.",
+    )
+    top_funders: list[FunderSummary] = Field(
+        default_factory=list,
+        description=(
+            "Top funders by total GBP awarded to charities in this place in the"
+            " last 12 months (360Giving). Empty when no grant data is available."
+        ),
     )
     filter_keywords: list[str] = Field(
         default_factory=list,
