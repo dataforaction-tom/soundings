@@ -55,11 +55,14 @@ async def ask(input: AskInput, request: Request) -> StreamingResponse:
 
     dispatcher = ToolDispatcher(request.app.state)
 
+    answer_cache = getattr(request.app.state, "answer_cache", None)
+
     orchestrator = AskOrchestrator(
         dispatcher=dispatcher,
         prompt_builder=prompt_builder,
         api_key=settings.anthropic_api_key,
         model=settings.ask_model,
+        answer_cache=answer_cache,
     )
 
     async def event_stream() -> Any:

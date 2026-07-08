@@ -1,0 +1,350 @@
+---
+import Base from "../layouts/Base.astro";
+import { getCorpusQuestions, getCorpusManifest } from "../lib/api";
+
+const cookieHeader = Astro.request.headers.get("cookie") ?? undefined;
+
+let questions: { count: number; questions: any[] } = { count: 0, questions: [] };
+let manifest: any = { available: false };
+let error: string | null = null;
+
+try {
+  questions = await getCorpusQuestions({ limit: 100, cookieHeader });
+} catch (e) {
+  error = e instanceof Error ? e.message : String(e);
+}
+
+try {
+  manifest = await getCorpusManifest({ cookieHeader });
+} catch {
+  // manifest is optional
+}
+
+function formatDate(ts: string): string {
+  const d = new Date(ts);
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function geographyLabel(geo: any[]): string {
+  if (!geo || geo.length === 0) return "—";
+  return geo.map((g) => g.name || g.type).filter(Boolean).join(", ");
+}
+---
+
+<Base title="Corpus — Soundings">
+  <header class="corpus-header">
+    <h1>The public corpus</h1>
+    <p class="lead">
+      Every question asked through Soundings is logged — with consent — to a
+      public, open corpus. Questions are sanitised before publication:
+      postcodes truncated to sector, personal names redacted, small charity
+      names stripped. Published monthly under CC BY 4.0.
+    </p>
+  </header>
+
+  {error && (
+    <p class="error">Couldn't load the corpus: {error}</p>
+  )}
+
+  {!error && questions.count === 0 && (
+    <div class="empty-state">
+      <p class="empty-title">No questions have been published yet</p>
+      <p class="empty-desc">
+        When questions are asked and cleared through the sanitisation pipeline,
+        they'll appear here. The first monthly snapshot will include all cleared
+        records.
+      </p>
+    </div>
+  )}
+
+  {manifest.available && (
+    <section class="manifest">
+      <h2>Latest publication: {manifest.period}</h2>
+      <div class="manifest-grid">
+        {manifest.files.map((f: any) => (
+          <div class="manifest-file">
+            <span class="file-name">{f.name}</span>
+            <span class="file-size">{(f.size_bytes / 1024).toFixed(1)} KB</span>
+            <code class="file-hash">{f.sha256.slice(0, 12)}…</code>
+          </div>
+        ))}
+      </div>
+      <div class="manifest-meta">
+        <span>Sanitisation rules: {manifest.sanitisation_rules_version}</span>
+        <span>Generator: <code>{manifest.generator_git_sha?.slice(0, 12) ?? "unknown"}</code></span>
+      </div>
+    </section>
+  )}
+
+  {!error && questions.count > 0 && (
+    <section class="questions">
+      <div class="questions-header">
+        <h2>Recent questions <span class="count-badge">{questions.count}</span></h2>
+        <p class="text-muted text-small">
+          Most recent {questions.count} cleared records, newest first.
+        </p>
+      </div>
+
+      <ul class="question-list">
+        {questions.questions.map((q) => (
+          <li class="question-card">
+            <div class="question-main">
+              <p class="question-text">
+                {q.question || <em class="text-muted">Question text not captured (minimal consent)</em>}
+              </p>
+              <div class="question-meta">
+                <span class="meta-time">{formatDate(q.timestamp)}</span>
+                {q.asker_sector && <span class="meta-sector">{q.asker_sector}</span>}
+                <span class={`meta-status meta-status-${q.result_status}`}>
+                  {q.result_status}
+                </span>
+                <span class="meta-level">{q.capture_level}</span>
+              </div>
+            </div>
+            {q.geography.length > 0 && (
+              <p class="question-geo">📍 {geographyLabel(q.geography)}</p>
+            )}
+            {q.indicators.length > 0 && (
+              <div class="question-tags">
+                {q.indicators.map((ind: string) => (
+                  <span class="tag tag-indicator">{ind}</span>
+                ))}
+              </div>
+            )}
+            {q.sources.length > 0 && (
+              <div class="question-tags">
+                {q.sources.map((src: string) => (
+                  <span class="tag tag-source">{src}</span>
+                ))}
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
+
+  <section class="corpus-footer">
+    <h2>Download the corpus</h2>
+    <p>
+      Monthly snapshots are published as gzipped CSV and JSON Lines. Each
+      release includes a manifest with SHA-256 hashes, catalogue version, and
+      the git commit that produced it — so you can audit exactly what went in.
+    </p>
+    <p>
+      <a href="https://github.com/dataforaction-tom/soundings/blob/main/docs/adr/0004-corpus-publication.md">
+        Read ADR-0004: corpus publication →
+      </a>
+    </p>
+  </section>
+
+  <style>
+    .corpus-header {
+      padding-bottom: var(--space-lg);
+      margin-bottom: var(--space-xl);
+      border-bottom: 1px solid var(--color-border);
+    }
+    .corpus-header h1 {
+      margin: 0 0 var(--space-md);
+    }
+    .lead {
+      margin: 0;
+      font-size: var(--font-size-lg);
+      color: var(--color-text-light);
+      line-height: var(--line-height-relaxed);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: var(--space-3xl) var(--space-xl);
+    }
+    .empty-title {
+      font-size: var(--font-size-xl);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-primary);
+      margin-bottom: var(--space-sm);
+    }
+    .empty-desc {
+      color: var(--color-text-light);
+      max-width: 30rem;
+      margin: 0 auto;
+      line-height: var(--line-height-relaxed);
+    }
+
+    .manifest {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      margin-bottom: var(--space-xl);
+    }
+    .manifest h2 {
+      font-size: var(--font-size-lg);
+      margin-bottom: var(--space-md);
+    }
+    .manifest-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-md);
+      margin-bottom: var(--space-md);
+    }
+    .manifest-file {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+      padding: var(--space-md);
+      background: var(--color-bg);
+      border-radius: var(--radius);
+      min-width: 12rem;
+    }
+    .file-name {
+      font-weight: var(--font-weight-medium);
+      font-size: var(--font-size-sm);
+    }
+    .file-size {
+      font-size: var(--font-size-xs);
+      color: var(--color-muted);
+    }
+    .file-hash {
+      font-size: var(--font-size-xs);
+      color: var(--color-muted);
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    .manifest-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-lg);
+      font-size: var(--font-size-sm);
+      color: var(--color-muted);
+    }
+    .manifest-meta code {
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 0.85em;
+    }
+
+    .questions-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: var(--space-lg);
+    }
+    .questions-header h2 {
+      margin: 0;
+    }
+    .count-badge {
+      display: inline-block;
+      padding: 0.1em 0.5em;
+      background: var(--color-accent);
+      color: white;
+      border-radius: var(--radius-sm);
+      font-size: 0.7em;
+      font-weight: var(--font-weight-medium);
+      vertical-align: middle;
+    }
+
+    .question-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .question-card {
+      padding: var(--space-lg);
+      background: var(--color-surface);
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius);
+      margin-bottom: var(--space-sm);
+      transition: box-shadow 0.15s ease;
+    }
+    .question-card:hover {
+      box-shadow: var(--shadow-sm);
+    }
+    .question-main {
+      margin-bottom: var(--space-sm);
+    }
+    .question-text {
+      font-size: var(--font-size-base);
+      color: var(--color-text);
+      margin-bottom: var(--space-sm);
+    }
+    .question-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-md);
+      font-size: var(--font-size-xs);
+      color: var(--color-muted);
+    }
+    .meta-sector {
+      text-transform: capitalize;
+    }
+    .meta-status {
+      padding: 0.1em 0.5em;
+      border-radius: var(--radius-sm);
+      font-weight: var(--font-weight-medium);
+    }
+    .meta-status-ok {
+      background: rgba(34, 197, 94, 0.1);
+      color: #16a34a;
+    }
+    .meta-status-error {
+      background: rgba(239, 68, 68, 0.1);
+      color: #dc2626;
+    }
+    .meta-level {
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .question-geo {
+      font-size: var(--font-size-sm);
+      color: var(--color-text-light);
+      margin-bottom: var(--space-sm);
+    }
+    .question-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-xs);
+      margin-bottom: var(--space-xs);
+    }
+    .tag {
+      display: inline-block;
+      padding: 0.15em 0.5em;
+      border-radius: var(--radius-sm);
+      font-size: var(--font-size-xs);
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    .tag-indicator {
+      background: rgba(26, 47, 78, 0.08);
+      color: var(--color-primary);
+    }
+    .tag-source {
+      background: rgba(74, 124, 89, 0.08);
+      color: var(--color-accent);
+    }
+
+    .corpus-footer {
+      margin-top: var(--space-3xl);
+      padding-top: var(--space-xl);
+      border-top: 1px solid var(--color-border);
+    }
+    .corpus-footer h2 {
+      margin-bottom: var(--space-md);
+    }
+    .corpus-footer p {
+      line-height: var(--line-height-relaxed);
+      color: var(--color-text-light);
+    }
+
+    .error {
+      padding: var(--space-lg);
+      background: #fee2e2;
+      color: #991b1b;
+      border-radius: var(--radius);
+      margin-bottom: var(--space-lg);
+    }
+  </style>
+</Base>

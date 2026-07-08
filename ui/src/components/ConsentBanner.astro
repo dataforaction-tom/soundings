@@ -1,126 +1,31 @@
 ---
-import {
-  ASKER_SECTORS,
-  CONSENT_LEVELS,
-  readConsentFromCookieString,
-} from "../lib/consent";
+import { readConsentFromCookieString } from "../lib/consent";
 
 const cookieHeader = Astro.request.headers.get("cookie");
-const { consentLevel, askerSector } = readConsentFromCookieString(cookieHeader);
+const { consentLevel } = readConsentFromCookieString(cookieHeader);
 ---
 
-<aside class="consent-banner" data-current-level={consentLevel}>
-  <form id="consent-form" method="post" action="/v1/capture/consent">
-    <p class="banner-text">
-      Soundings logs every question to a public corpus. Choose what to share —
-      this preference applies for the rest of your session.
+{consentLevel !== "full" && (
+  <aside class="consent-banner">
+    <p>
+      Soundings logs every question to a public, open corpus.
+      <a href="/about">Learn how capture works</a> or
+      <a href="/corpus">browse the corpus</a>.
     </p>
-    <fieldset class="consent-levels">
-      <legend>Capture level</legend>
-      {CONSENT_LEVELS.map((level) => (
-        <label>
-          <input
-            type="radio"
-            name="consent_level"
-            value={level}
-            checked={level === consentLevel}
-          />
-          {level}
-        </label>
-      ))}
-    </fieldset>
-    <label class="sector-picker">
-      Self-declared sector (optional)
-      <select name="asker_sector">
-        <option value="">—</option>
-        {ASKER_SECTORS.map((sector) => (
-          <option value={sector} selected={sector === askerSector}>{sector}</option>
-        ))}
-      </select>
-    </label>
-    <button type="submit" class="apply">Apply</button>
-  </form>
-</aside>
-
-<script>
-  // Plain inline script — no framework. POSTs to /v1/capture/consent
-  // and reloads so the SSR pass picks up the new cookies.
-  const form = document.getElementById("consent-form") as HTMLFormElement | null;
-  if (form) {
-    form.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const data = new FormData(form);
-      const consent = data.get("consent_level") as string;
-      const sectorRaw = data.get("asker_sector") as string;
-      const body: Record<string, unknown> = { consent_level: consent };
-      if (sectorRaw) body.asker_sector = sectorRaw;
-      const response = await fetch("/v1/capture/consent", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (response.ok) {
-        location.reload();
-      }
-    });
-  }
-</script>
+  </aside>
+)}
 
 <style>
   .consent-banner {
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    padding: var(--space-lg);
-    margin-bottom: var(--space-xl);
-    background: var(--color-surface);
-  }
-  .consent-banner[data-current-level="full"] {
-    display: none;
-  }
-  .banner-text {
-    margin: 0 0 var(--space-md) 0;
+    padding: var(--space-sm) var(--space-lg);
+    margin-bottom: var(--space-lg);
+    background: rgba(74, 124, 89, 0.08);
+    border-left: 3px solid var(--color-accent);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
     font-size: var(--font-size-sm);
     color: var(--color-text-light);
   }
-  .consent-banner fieldset {
-    border: none;
-    padding: 0;
-    margin: 0;
-  }
-  .consent-banner legend {
-    font-size: var(--font-size-sm);
+  .consent-banner a {
     font-weight: var(--font-weight-medium);
-    color: var(--color-muted);
-    margin-bottom: var(--space-xs);
-  }
-  .consent-levels {
-    display: flex;
-    gap: var(--space-lg);
-    margin-bottom: var(--space-md);
-  }
-  .consent-levels label {
-    display: flex;
-    align-items: center;
-    gap: var(--space-xs);
-    font-size: var(--font-size-sm);
-    cursor: pointer;
-  }
-  .consent-levels input[type="radio"] {
-    accent-color: var(--color-accent);
-  }
-  .sector-picker {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xs);
-    font-size: var(--font-size-sm);
-    color: var(--color-muted);
-    margin-bottom: var(--space-md);
-  }
-  .sector-picker select {
-    max-width: 200px;
-  }
-  .consent-banner button {
-    font-size: var(--font-size-sm);
   }
 </style>

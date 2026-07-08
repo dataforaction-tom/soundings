@@ -25,6 +25,7 @@ from anthropic.types import ThinkingConfigAdaptiveParam
 
 from soundings.ask.dispatcher import ToolDispatcher
 from soundings.ask.prompts import SystemPromptBuilder
+from soundings.cache.answer_cache import AnswerCacheStore
 
 logger = logging.getLogger(__name__)
 
@@ -64,28 +65,81 @@ class AskOrchestrator:
         api_key: str,
         model: str,
         max_iterations: int = MAX_ITERATIONS,
+        answer_cache: AnswerCacheStore | None = None,
     ) -> None:
         self._dispatcher = dispatcher
         self._prompt_builder = prompt_builder
         self._api_key = api_key
         self._model = model
         self._max_iterations = max_iterations
+        self._answer_cache = answer_cache
 
     async def run(
         self,
         query: str,
         callback: SSECallback,
     ) -> None:
-        """Run the tool-use loop, streaming events via callback."""
+        """Run the tool-use loop, streaming events via callback.
+
+        If an answer cache is configured and a fresh entry exists for
+        this query, replay the cached events without calling Claude.
+        Otherwise, run the loop, collect events, and store them.
+        """
+        # ── Cache check ──────────────────────────────────────────────
+        if self._answer_cache is not None:
+            place_id = self._prompt_builder.place_id
+            cached = await self._answer_cache.get(query, place_id)
+            if cached is not None:
+                logger.info("Answer cache HIT for query: %s", query[:80])
+                for event in cached:
+                    await _emit(callback, event)
+                return
+
+        # ── Cache miss — run the Claude loop ─────────────────────────
         client = get_anthropic_client(self._api_key)
         system_prompt = self._prompt_builder.build()
         tool_specs = self._dispatcher.tool_specs()
 
         messages: list[dict[str, Any]] = [{"role": "user", "content": query}]
 
+        # Collect events for caching if the run succeeds
+        collected_events: list[dict[str, Any]] | None = [] if self._answer_cache else None
+
+        # Wrap the callback so we can collect events for caching without
+        # changing every _emit call inside _loop.
+        collecting_callback: SSECallback = callback
+        if collected_events is not None:
+
+            async def collecting_callback(event: dict[str, Any]) -> None:
+                collected_events.append(event)
+                result = callback(event)
+                if asyncio.iscoroutine(result):
+                    await result
+
         try:
             async with asyncio.timeout(REQUEST_TIMEOUT_SECONDS):
-                await self._loop(client, system_prompt, tool_specs, messages, callback)
+                await self._loop(
+                    client,
+                    system_prompt,
+                    tool_specs,
+                    messages,
+                    collecting_callback,
+                )
+            # Run succeeded — store the collected events in the answer cache.
+            # Only cache if we got a "done" event (not an error/timeout).
+            if collected_events is not None and any(
+                e.get("type") == "done" for e in collected_events
+            ):
+                try:
+                    await self._answer_cache.put(
+                        query,
+                        self._prompt_builder.place_id,
+                        collected_events,
+                    )
+                    logger.info("Answer cache STORED for query: %s", query[:80])
+                except Exception:
+                    # Cache write failure shouldn't fail the response
+                    logger.warning("Answer cache store failed", exc_info=True)
         except TimeoutError:
             await _emit(callback, {"type": "error", "message": "Request timed out"})
         except Exception as e:

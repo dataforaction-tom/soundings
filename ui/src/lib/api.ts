@@ -211,3 +211,60 @@ export async function getCivilSocietyProfile(
     { cookieHeader: opts.cookieHeader },
   );
 }
+
+export interface CorpusQuestion {
+  id: string;
+  timestamp: string;
+  capture_level: string;
+  question: string | null;
+  tool_called: string;
+  geography: { type: string; name: string }[];
+  indicators: string[];
+  sources: string[];
+  result_status: string;
+  asker_sector: string | null;
+  marked_useful: boolean | null;
+}
+
+export interface CorpusManifest {
+  available: boolean;
+  period?: string;
+  catalogue_version?: string;
+  sanitisation_rules_version?: string;
+  generator_git_sha?: string;
+  files: { name: string; sha256: string; size_bytes: number; exists: boolean }[];
+}
+
+export async function getCorpusQuestions(
+  opts: { limit?: number; cookieHeader?: string } = {},
+): Promise<{ count: number; questions: CorpusQuestion[] }> {
+  const params = new URLSearchParams();
+  if (opts.limit) params.set("limit", String(opts.limit));
+  const qs = params.toString();
+  const url = `${apiBase()}/v1/corpus/recent${qs ? `?${qs}` : ""}`;
+  const headers: Record<string, string> = {};
+  if (opts.cookieHeader) headers["Cookie"] = opts.cookieHeader;
+  const response = await fetch(url, {
+    headers,
+    credentials: "include",
+  });
+  if (!response.ok) {
+    throw new Error(`/v1/corpus/recent ${response.status} ${response.statusText}`);
+  }
+  return (await response.json()) as { count: number; questions: CorpusQuestion[] };
+}
+
+export async function getCorpusManifest(
+  opts: { cookieHeader?: string } = {},
+): Promise<CorpusManifest> {
+  const headers: Record<string, string> = {};
+  if (opts.cookieHeader) headers["Cookie"] = opts.cookieHeader;
+  const response = await fetch(`${apiBase()}/v1/corpus/manifest`, {
+    headers,
+    credentials: "include",
+  });
+  if (!response.ok) {
+    throw new Error(`/v1/corpus/manifest ${response.status} ${response.statusText}`);
+  }
+  return (await response.json()) as CorpusManifest;
+}
