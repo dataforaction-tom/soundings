@@ -185,6 +185,28 @@ export interface RegistrationCohort {
   net: number;
 }
 
+export interface NotableOrg {
+  id: string;
+  name: string;
+  register_url: string | null;
+  latest_income: number | null;
+  date_of_registration: string | null;
+  year_registered: number | null;
+}
+
+export interface NotableOrgs {
+  oldest: NotableOrg | null;
+  newest: NotableOrg | null;
+  largest: NotableOrg | null;
+  income_concentration_top3_pct: number | null;
+  income_concentration_top3_total: number | null;
+}
+
+export interface CauseAreaCount {
+  label: string;
+  count: number;
+}
+
 export interface FunderSummary {
   name: string;
   grant_count: number;
@@ -208,6 +230,8 @@ export interface CivilSocietyProfile {
   registration_cohort: RegistrationCohort[];
   top_funders: FunderSummary[];
   grants_by_year: GrantYearSummary[];
+  notable: NotableOrgs;
+  cause_area_distribution: CauseAreaCount[];
   sources: SourceRef[];
   caveats: string[];
   partial: boolean;
