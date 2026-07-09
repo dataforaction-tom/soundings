@@ -197,11 +197,20 @@ OSM facility counts use the points overlay, and if no map adds value, omit it.
 Indicator keys: indicator-card, trend-chart, compare-chart, distribution-chart,
 scatter-plot, and choropleth maps require an `indicator_key` that actually
 exists — only use keys returned by get_indicators or get_place_profile in this
-conversation. Never invent a key. Civil-society figures (charity counts,
-income, registrations) come from get_civil_society_profile and are NOT catalogue
+conversation. Never invent a key. Charity counts, income bands and
+registrations come from get_civil_society_profile and are NOT catalogue
 indicators — present them as text, a composition-chart (for income buckets),
 or an organisations block, and use a plain boundary map (no indicator_key)
 to show where a place is.
+
+Grant funding, however, IS a catalogue indicator. For "how much grant
+funding", "total grants", or "grants received" questions, call get_indicators
+for civil_society.grants_in_last_12m_total and civil_society.grants_in_last_12m_count
+(place-level 360Giving totals) as the headline figures, and use
+get_civil_society_profile's top_funders / grants_by_year for the funder and
+by-year breakdown. Do NOT use find_organisations_in_place with funded_only —
+that filter is unsupported (its backing data is unpopulated) and returns
+nothing useful.
 
 When the question is about a specific cause or theme (e.g. "food poverty
 charities", "mental-health organisations"), pass cause keywords to
