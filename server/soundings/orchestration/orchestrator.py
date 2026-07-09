@@ -15,10 +15,13 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from soundings.contracts.civil_society import (
+    CauseAreaCount,
     CivilSocietyProfile,
     FunderSummary,
     GrantYearSummary,
     IncomeBucket,
+    NotableOrg,
+    NotableOrgs,
     RegistrationCohort,
 )
 from soundings.contracts.comparison import Comparison, ComparisonValue
@@ -737,24 +740,35 @@ class IndicatorOrchestrator:
         # with the whole place predicate, not just the trailing OR branch.
         kw_sql, kw_params = self._keyword_filter_sql(activity_filter)
         async with self._engine.connect() as conn:
-            rows = await conn.execute(
-                text(
-                    """
-                    SELECT o.id, o.name, o.classification,
-                           o.registered_address_place_id, o.source_id, o.retrieved_at,
-                           (o.raw->>'latest_income')::numeric AS latest_income
-                    FROM data.organisation o
-                    LEFT JOIN data.organisation_operates_in oi
-                        ON oi.organisation_id = o.id
-                    WHERE (o.registered_address_place_id = :pid
-                        OR oi.place_id = :pid)
-                    """  # noqa: S608
-                    f"{kw_sql}"
-                    " ORDER BY latest_income DESC NULLS LAST"
-                    " LIMIT :limit"
-                ),
-                {"pid": place_id, "limit": limit, **kw_params},
-            )
+            rows = (
+                await conn.execute(
+                    text(
+                        """
+                        SELECT o.id, o.name, o.classification,
+                               o.registered_address_place_id, o.source_id, o.retrieved_at,
+                               (o.raw->>'latest_income')::numeric AS latest_income,
+                               o.raw->>'date_of_registration' AS date_of_registration,
+                               o.raw->>'postcode' AS postcode,
+                               array_agg(DISTINCT oi.place_id) FILTER (
+                                   WHERE oi.place_id IS NOT NULL
+                               ) AS operates_in
+                        FROM data.organisation o
+                        LEFT JOIN data.organisation_operates_in oi
+                            ON oi.organisation_id = o.id
+                        WHERE (o.registered_address_place_id = :pid
+                            OR oi.place_id = :pid)
+                        """  # noqa: S608
+                        f"{kw_sql}"
+                        " GROUP BY o.id, o.name, o.classification,"
+                        "          o.registered_address_place_id, o.source_id, o.retrieved_at,"
+                        "          (o.raw->>'latest_income')::numeric,"
+                        "          o.raw->>'date_of_registration', o.raw->>'postcode'"
+                        " ORDER BY MAX((o.raw->>'latest_income')::numeric) DESC NULLS LAST"
+                        " LIMIT :limit"
+                    ),
+                    {"pid": place_id, "limit": limit, **kw_params},
+                )
+            ).all()
 
         now = datetime.now(TZ_UTC)
         orgs = []
@@ -779,10 +793,12 @@ class IndicatorOrchestrator:
                     name=row.name,
                     classification=list(row.classification or []),
                     registered_address_place_id=row.registered_address_place_id,
-                    operates_in_place_ids=[],
+                    operates_in_place_ids=list(row.operates_in or []),
                     recent_grants=[],
                     latest_income=income,
                     register_url=register_url,
+                    date_of_registration=row.date_of_registration,
+                    postcode=row.postcode,
                     source=SourceRef(
                         source_id=source_id,
                         source_label=source_id,
@@ -1061,7 +1077,136 @@ class IndicatorOrchestrator:
                 and (year_to is None or int(r.year) <= year_to)
             ]
 
+            # --- Task 4: notable orgs (oldest / newest / largest) + income
+            # concentration. A single CTE-based query picks the three extremes
+            # plus the aggregates needed for the top-3 share.
+            notable_row = (
+                await conn.execute(
+                    text(
+                        "WITH base AS ( "  # noqa: S608
+                        "  SELECT o.id, o.name,"
+                        "         (o.raw->>'latest_income')::numeric AS income,"
+                        "         (o.raw->>'date_of_registration')::date AS reg_date"
+                        "  FROM data.organisation_operates_in oi"
+                        "  JOIN data.organisation o ON o.id = oi.organisation_id"
+                        "  WHERE oi.place_id = :pid"
+                        f"{kw_sql}"
+                        "), ranked AS ("
+                        "  SELECT *, ROW_NUMBER() OVER ("
+                        "    ORDER BY reg_date ASC NULLS LAST) AS rn_oldest,"
+                        "         ROW_NUMBER() OVER ("
+                        "    ORDER BY reg_date DESC NULLS LAST) AS rn_newest,"
+                        "         ROW_NUMBER() OVER ("
+                        "    ORDER BY income DESC NULLS LAST) AS rn_largest"
+                        "  FROM base"
+                        "), agg AS ("
+                        "  SELECT SUM(income) AS total_income,"
+                        "         (SELECT SUM(income) FROM ("
+                        "            SELECT income FROM base"
+                        "            WHERE income IS NOT NULL"
+                        "            ORDER BY income DESC LIMIT 3"
+                        "         ) s) AS top3_income,"
+                        "         COUNT(income) AS income_count"
+                        "  FROM base"
+                        ")"
+                        " SELECT o.id, o.name, o.income, o.reg_date,"
+                        "        n.id AS newest_id, n.name AS newest_name,"
+                        "        n.income AS newest_income, n.reg_date AS newest_reg_date,"
+                        "        l.id AS largest_id, l.name AS largest_name,"
+                        "        l.income AS largest_income, l.reg_date AS largest_reg_date,"
+                        "        a.total_income, a.top3_income, a.income_count"
+                        " FROM ranked o"
+                        " CROSS JOIN agg a"
+                        " LEFT JOIN ranked n ON n.rn_newest = 1"
+                        " LEFT JOIN ranked l ON l.rn_largest = 1"
+                        " WHERE o.rn_oldest = 1"
+                    ),
+                    {"pid": place_id, **kw_params},
+                )
+            ).first()
+
+            # --- Task 5: cause-area distribution (top 10).
+            cause_rows = (
+                await conn.execute(
+                    text(
+                        "SELECT unnest(o.classification) AS cause, COUNT(*) AS n "  # noqa: S608
+                        "FROM data.organisation_operates_in oi "
+                        "JOIN data.organisation o ON o.id = oi.organisation_id "
+                        "WHERE oi.place_id = :pid AND o.classification != '{}'"
+                        f"{kw_sql} "
+                        "GROUP BY cause ORDER BY n DESC LIMIT 10"
+                    ),
+                    {"pid": place_id, **kw_params},
+                )
+            ).all()
+            cause_area_distribution = [
+                CauseAreaCount(
+                    label=str(r.cause)[:120],
+                    count=int(r.n),
+                )
+                for r in cause_rows
+                if r.cause
+            ]
+
         normalised_keywords = [k.strip() for k in (keywords or []) if k and k.strip()]
+
+        # --- Task 4: build the NotableOrgs object from the single notable_row.
+        def _notable(org_id, name, income, reg_date) -> NotableOrg | None:
+            if org_id is None:
+                return None
+            register_url = None
+            if org_id.startswith("charity_commission:"):
+                reg_no = org_id.split(":", 1)[1]
+                register_url = (
+                    "https://register-of-charities.charitycommission.gov.uk/"
+                    f"charity-search-/charity-details/{reg_no}"
+                )
+            year_registered = None
+            if reg_date is not None:
+                try:
+                    year_registered = int(str(reg_date)[:4])
+                except (ValueError, TypeError):
+                    year_registered = None
+            return NotableOrg(
+                id=org_id,
+                name=name,
+                register_url=register_url,
+                latest_income=float(income) if income is not None else None,
+                date_of_registration=str(reg_date) if reg_date is not None else None,
+                year_registered=year_registered,
+            )
+
+        notable = NotableOrgs()
+        if notable_row is not None:
+            notable = NotableOrgs(
+                oldest=_notable(
+                    notable_row.id, notable_row.name, notable_row.income, notable_row.reg_date
+                ),
+                newest=_notable(
+                    notable_row.newest_id,
+                    notable_row.newest_name,
+                    notable_row.newest_income,
+                    notable_row.newest_reg_date,
+                ),
+                largest=_notable(
+                    notable_row.largest_id,
+                    notable_row.largest_name,
+                    notable_row.largest_income,
+                    notable_row.largest_reg_date,
+                ),
+            )
+            income_count = int(notable_row.income_count or 0)
+            if income_count >= 3 and notable_row.total_income:
+                top3 = float(notable_row.top3_income or 0)
+                total_inc = float(notable_row.total_income)
+                if total_inc > 0:
+                    notable = notable.model_copy(
+                        update={
+                            "income_concentration_top3_pct": round(top3 / total_inc * 100, 1),
+                            "income_concentration_top3_total": top3,
+                        }
+                    )
+
         caveats: list[str] = []
         if normalised_keywords:
             caveats.append(
@@ -1195,6 +1340,8 @@ class IndicatorOrchestrator:
             sources=sources_list,
             caveats=caveats,
             partial=False,
+            notable=notable,
+            cause_area_distribution=cause_area_distribution,
         )
 
 
