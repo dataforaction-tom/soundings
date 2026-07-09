@@ -10,9 +10,11 @@ import zipfile
 from datetime import UTC, datetime
 
 import pytest
+from sqlalchemy import text
 
 from soundings.adapters.ons_nspl.client import NsplBulkClient, _find_data_csv
-from soundings.adapters.ons_nspl.loader import _map_row
+from soundings.adapters.ons_nspl.loader import NsplLoader, _map_row
+from soundings.db.engine import get_engine
 
 _NOW = datetime(2026, 7, 7, tzinfo=UTC)
 
@@ -125,3 +127,55 @@ async def test_client_iter_rows_over_in_memory_zip() -> None:
 
     assert [r["pcds"] for r in rows] == ["TS1 1AB", "TS1 2CD"]
     assert rows[0]["laua"] == "E06000002"
+
+
+@pytest.mark.integration
+async def test_derive_utla_covers_hierarchy_and_unitary() -> None:
+    """utla24 is derived two ways: two-tier districts via a county parent in
+    place_hierarchy, and unitary authorities (LTLA == UTLA) via the same-code
+    UTLA place, which has no hierarchy edge."""
+    engine = get_engine()
+    async with engine.begin() as conn:
+        await conn.execute(text("DELETE FROM data.trend_point"))
+        await conn.execute(text("DELETE FROM data.indicator_value"))
+        await conn.execute(text("DELETE FROM geography.postcode"))
+        await conn.execute(text("DELETE FROM geography.place_hierarchy"))
+        await conn.execute(text("DELETE FROM geography.place"))
+        # A unitary (E06 — its own UTLA) and a two-tier district (E07) + county (E10).
+        for pid, typ, code in [
+            ("ltla24:E06000002", "ltla24", "E06000002"),
+            ("utla24:E06000002", "utla24", "E06000002"),
+            ("ltla24:E07000001", "ltla24", "E07000001"),
+            ("utla24:E10000001", "utla24", "E10000001"),
+        ]:
+            await conn.execute(
+                text("INSERT INTO geography.place (id, type, code, name) VALUES (:id, :t, :c, :n)"),
+                {"id": pid, "t": typ, "c": code, "n": code},
+            )
+        await conn.execute(
+            text(
+                "INSERT INTO geography.place_hierarchy (parent_id, child_id) "
+                "VALUES ('utla24:E10000001', 'ltla24:E07000001')"
+            )
+        )
+        now = datetime.now(tz=UTC)
+        for pc, ltla in [("UNIT1AA", "ltla24:E06000002"), ("TWO1AA", "ltla24:E07000001")]:
+            await conn.execute(
+                text(
+                    "INSERT INTO geography.postcode (postcode, ltla24, retrieved_at) "
+                    "VALUES (:pc, :ltla, :now)"
+                ),
+                {"pc": pc, "ltla": ltla, "now": now},
+            )
+
+    await NsplLoader(engine)._derive_utla()
+
+    async with engine.connect() as conn:
+        rows = dict(
+            (r.postcode, r.utla24)
+            for r in (
+                await conn.execute(text("SELECT postcode, utla24 FROM geography.postcode"))
+            ).all()
+        )
+    assert rows["TWO1AA"] == "utla24:E10000001"  # two-tier via hierarchy
+    assert rows["UNIT1AA"] == "utla24:E06000002"  # unitary via same-code fallback
