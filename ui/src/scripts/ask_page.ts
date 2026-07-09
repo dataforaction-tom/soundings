@@ -454,6 +454,7 @@
             }[];
             latest_income: number | null;
             register_url: string | null;
+            date_of_registration: string | null;
           }[];
         }
 
@@ -519,6 +520,13 @@
                 maximumFractionDigits: 0,
               }) + "/yr";
               card.appendChild(incomeP);
+            }
+            if (org.date_of_registration) {
+              const year = org.date_of_registration.substring(0, 4);
+              const foundedP = document.createElement("p");
+              foundedP.className = "text-muted text-small";
+              foundedP.textContent = `Founded ${year}`;
+              card.appendChild(foundedP);
             }
             if (org.classification.length > 0) {
               const cls = document.createElement("p");
@@ -588,7 +596,7 @@
           host.appendChild(container);
 
           try {
-            const { renderPlaceMap, renderChoroplethMap, renderAmenityMap } =
+            const { renderPlaceMap, renderChoroplethMap, renderAmenityMap, renderOrganisationMap } =
               await import("../lib/map-renderer");
 
             const amenityKeys =
@@ -646,6 +654,21 @@
                 fetchAmenityPoints(),
               ]);
               renderAmenityMap(container, boundary, points, {
+                tilesUrl: mapTilesUrl || undefined,
+              });
+            } else if (overlay?.source === "organisations") {
+              // 5) organisation (charity) points only.
+              const [boundary, points] = await Promise.all([
+                getJSON<GeoJSON.Feature>(
+                  `/v1/place/${encodeURIComponent(mapPlaceId)}/geometry`,
+                  apiBase,
+                ),
+                getJSON<GeoJSON.FeatureCollection>(
+                  `/v1/place/${encodeURIComponent(mapPlaceId)}/organisations/geometry?limit=200`,
+                  apiBase,
+                ),
+              ]);
+              renderOrganisationMap(container, boundary, points, {
                 tilesUrl: mapTilesUrl || undefined,
               });
             } else if (indicatorKey) {

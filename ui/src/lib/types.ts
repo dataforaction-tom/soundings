@@ -157,6 +157,7 @@ export interface OrganisationRef {
   recent_grants: GrantRef[];
   latest_income: number | null;
   register_url: string | null;
+  date_of_registration: string | null;
   source: SourceRef;
   methodology_note: string | null;
 }

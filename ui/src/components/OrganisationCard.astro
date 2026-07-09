@@ -27,6 +27,10 @@ function formatDate(dateStr: string): string {
 }
 
 const topGrants = organisation.recent_grants.slice(0, 3);
+
+const foundedYear = organisation.date_of_registration
+  ? organisation.date_of_registration.substring(0, 4)
+  : null;
 ---
 
 <article class="organisation-card">
@@ -51,6 +55,10 @@ const topGrants = organisation.recent_grants.slice(0, 3);
         maximumFractionDigits: 0,
       }).format(organisation.latest_income)}/yr
     </p>
+  )}
+
+  {foundedYear && (
+    <p class="founded text-muted text-small">Founded {foundedYear}</p>
   )}
 
   {organisation.classification.length > 0 && (
@@ -111,6 +119,10 @@ const topGrants = organisation.recent_grants.slice(0, 3);
     font-weight: var(--font-weight-medium);
     color: var(--color-text);
     font-variant-numeric: tabular-nums;
+  }
+  .founded {
+    margin: var(--space-xs) 0 0;
+    font-size: var(--font-size-xs);
   }
   .organisation-card h4 a {
     color: var(--color-primary);
