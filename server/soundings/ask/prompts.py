@@ -160,6 +160,12 @@ Block types for compose_answer:
     indicator_key="deprivation.imd.score", granularity="sub_areas",
     overlay={source:"amenities", indicator_keys:["infrastructure.food_banks_count"]}.
     The point layers are toggleable in the legend.
+  * org-points — set overlay {source:"organisations"} to plot charity
+    registered-address locations on the map, sized by income. Use for
+    "where are the charities" or "show me charity locations" questions.
+    No indicator_keys needed. Pair with a text block noting how many
+    charities are mapped vs total (some charities registered elsewhere
+    won't appear).
 - sub-area-table: a table of sub-area (neighbourhood) values within a parent
   place. Use after calling get_sub_areas — the block carries the sub_areas
   data inline. Pair with a sub_areas choropleth map for the geographic view.
@@ -231,11 +237,38 @@ Civil-society enrichment guidance:
   registered here. The difference ({X-Y}) are charities registered elsewhere
   but operating in this area." This matches how the Charity Commission
   reports counts. Lead with total_organisations as the headline figure.
+- get_civil_society_profile also returns `notable` — standout charities that
+  make the answer interesting:
+  * notable.oldest — the oldest registered charity still active. Lead with
+    this as an insight-callout (severity: "notable") with headline like
+    "Oldest charity in {place}: {name}, founded {year}". Include the
+    register link in the evidence text.
+  * notable.largest — the highest-income charity. Use an insight-callout or
+    weave into the narrative: "The largest charity is {name} with £X/yr".
+  * notable.newest — the most recently registered charity. Mention in the
+    narrative if interesting (e.g. "The newest charity was registered in
+    {year}").
+  * notable.income_concentration_top3_pct — if >= 3 charities report income,
+    this is the top-3's share of total income. When it's high (e.g. >60%),
+    call it out: "The top 3 charities hold {pct}% of the sector's reported
+    income — significant concentration". Use an insight-callout when
+    striking.
+  Use at most 1-2 insight-callouts for notable orgs — don't over-callout.
+- get_civil_society_profile also returns cause_area_distribution — a top-10
+  breakdown of charities by their free-text activities field. When present
+  (non-empty), include a composition-chart titled "Charity causes in
+  {place}" with one segment per cause area (label=cause text truncated,
+  value=count). Pair with text noting the top 3 cause areas. Caveat: labels
+  are free-text, not structured codes, so some may be noisy or overlapping.
 - find_organisations_in_place returns charities sorted by income (largest
   first). Use an organisations block with limit 5-8 to surface the biggest
-  charities. Each card includes income and a link to the Charity Commission
-  register page — mention this in your narrative so the user knows they can
-  click through for full financial details.
+  charities. Each card includes income, founding year, and a link to the
+  Charity Commission register page — mention this in your narrative.
+- For "where are they" or "show me charity locations" questions, use a map
+  block with overlay {source:"organisations"} to plot charity registered-
+  address locations. Note that only charities with a registered address in
+  the place are mapped — charities operating here but registered elsewhere
+  won't appear on the map.
 - get_civil_society_profile also returns top_funders — a list of funders
   ranked by total GBP awarded to charities in the place (360Giving, last 12
   months). When funders are present, include a composition-chart titled
@@ -246,12 +279,9 @@ Civil-society enrichment guidance:
   composition-chart and a narrative ranking. If top_funders is empty, say
   so explicitly — 360Giving coverage varies by area.
 - For "how has the sector changed" questions, use the registration_cohort
-  data as a text summary (registrations vs removals per year) — there is no
-  trend-chart block for civil-society figures. Pass year_from/year_to to
-  filter the cohort to the requested range (e.g. year_from=2015 for "since
-  2015", year_from=2019 year_to=2023 for "between 2019 and 2023"). Present
-  the filtered cohort as a bar-chart with one bar per year (label=year,
-  value=net or registered) and a text summary of the trend.
+  data. Pass year_from/year_to to filter the cohort to the requested range.
+  Present the filtered cohort as a bar-chart with one bar per year
+  (label=year, value=net or registered) and a text summary of the trend.
 - get_civil_society_profile also returns grants_by_year — a year-by-year
   breakdown of all 360Giving grants to charities in the place (full history,
   not just 12 months). For "how has funding changed" or "grants over time"
