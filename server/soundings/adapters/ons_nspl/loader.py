@@ -52,14 +52,25 @@ _UPSERT_SQL = text(
     "  retrieved_at = EXCLUDED.retrieved_at"
 )
 
-# Derive utla24 from each postcode's ltla24 via the place hierarchy.
-_DERIVE_UTLA_SQL = text(
+# Derive utla24 in two passes:
+# 1. Two-tier districts (E07) sit under a county UTLA (E10) in the hierarchy.
+_DERIVE_UTLA_HIERARCHY_SQL = text(
     "UPDATE geography.postcode p "
     "SET utla24 = h.parent_id "
     "FROM geography.place_hierarchy h "
     "WHERE h.child_id = p.ltla24 "
     "  AND h.parent_id LIKE 'utla24:%' "
     "  AND p.ltla24 IS NOT NULL"
+)
+# 2. Unitary authorities (E06/E08/E09) are their own UTLA — the LTLA code also
+# exists as a utla24 place, but there is no ltla->utla hierarchy edge. Fall
+# back to the same-code UTLA where one exists.
+_DERIVE_UTLA_UNITARY_SQL = text(
+    "UPDATE geography.postcode p "
+    "SET utla24 = 'utla24:' || split_part(p.ltla24, ':', 2) "
+    "WHERE p.utla24 IS NULL AND p.ltla24 IS NOT NULL "
+    "  AND EXISTS (SELECT 1 FROM geography.place pl "
+    "             WHERE pl.id = 'utla24:' || split_part(p.ltla24, ':', 2))"
 )
 
 
@@ -115,8 +126,9 @@ class NsplLoader(LoaderAdapter):
 
     async def _derive_utla(self) -> int:
         async with self._engine.begin() as conn:
-            result = await conn.execute(_DERIVE_UTLA_SQL)
-        return result.rowcount or 0
+            hierarchy = await conn.execute(_DERIVE_UTLA_HIERARCHY_SQL)
+            unitary = await conn.execute(_DERIVE_UTLA_UNITARY_SQL)
+        return (hierarchy.rowcount or 0) + (unitary.rowcount or 0)
 
 
 def _map_row(
