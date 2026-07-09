@@ -36,5 +36,13 @@ class OrganisationRef(BaseModel):
         default=None,
         description="Direct link to the regulator's public register page, if constructible.",
     )
+    date_of_registration: str | None = Field(
+        default=None,
+        description="ISO date string of first registration, if known.",
+    )
+    postcode: str | None = Field(
+        default=None,
+        description="Registered-address postcode, if available.",
+    )
     source: SourceRef
     methodology_note: str | None = None
