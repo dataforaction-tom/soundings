@@ -93,6 +93,21 @@ logger = logging.getLogger(__name__)
 # without failing the whole answer (see _parse_compose_answer).
 _ANSWER_BLOCK_ADAPTER: TypeAdapter[Any] = TypeAdapter(AnswerBlock)
 
+# Indicator prefixes with per-area choropleth data (see the "Do NOT
+# choropleth infrastructure.* ..." guidance in prompts.py). Keep this in sync
+# with that prompt text — it's the code-level backstop for when the model
+# ignores the instruction. Everything else (notably infrastructure.* OSM
+# counts, which are fetched live per place rather than bulk-backfilled across
+# peers, and environment.air_quality.*/crime.*, which have no stored per-area
+# series) renders as a mostly-null, visually broken map.
+_CHOROPLETH_ELIGIBLE_PREFIXES = (
+    "deprivation.",
+    "environment.greenspace.",
+    "economy.active_companies_",
+    "economy.new_incorporations_12m",
+    "population.",
+)
+
 TERMINAL_TOOL = "compose_answer"
 
 COMPOSE_ANSWER_DESCRIPTION = (
@@ -178,25 +193,37 @@ class ToolDispatcher:
         return self._known_indicator_keys
 
     async def _sanitise_blocks(self, parsed: ComposeAnswerArgs) -> None:
-        """Drop blocks that reference an indicator the catalogue doesn't have.
+        """Drop blocks that reference an indicator the catalogue doesn't have,
+        and downgrade choropleth maps that name a real but choropleth-
+        ineligible indicator.
 
         The model occasionally invents plausible-but-nonexistent keys (e.g.
         ``civil_society.total_organisations``), which would otherwise surface in
-        the UI as a "No data" card or a blank choropleth. A map that names a
-        bad indicator is downgraded to a plain boundary map rather than dropped,
-        since the boundary is still useful.
+        the UI as a "No data" card or a blank choropleth. It also sometimes
+        ignores the prompt's guidance and choropleths an indicator with no
+        bulk per-area coverage (e.g. infrastructure.* OSM counts, fetched live
+        per place rather than backfilled across peers) — that renders a
+        mostly-null, visually broken map. Both cases: a map downgrades to a
+        plain boundary map rather than being dropped, since the boundary is
+        still useful; other block types with a bad key are dropped.
         """
         known = await self._known_keys()
         kept: list[Any] = []
         for block in parsed.blocks:
             key = getattr(block, "indicator_key", None)
-            if key is None or key in known:
+            if key is None:
                 kept.append(block)
                 continue
-            if block.type == "map":
-                block.indicator_key = None  # fall back to a boundary map
-                kept.append(block)
-            # indicator-card / trend-chart / compare-chart with a bad key: drop.
+            choropleth_ineligible = block.type == "map" and not key.startswith(
+                _CHOROPLETH_ELIGIBLE_PREFIXES
+            )
+            if key not in known or choropleth_ineligible:
+                if block.type == "map":
+                    block.indicator_key = None  # fall back to a boundary map
+                    kept.append(block)
+                # indicator-card / trend-chart / compare-chart with a bad key: drop.
+                continue
+            kept.append(block)
         parsed.blocks = kept
 
     async def dispatch(self, tool_name: str, tool_input: dict[str, Any]) -> dict[str, Any]:
