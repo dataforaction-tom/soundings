@@ -336,3 +336,71 @@ async def get_amenities_geometry(
     if errors:
         result["errors"] = errors
     return result
+
+
+@router.get("/place/{place_id}/organisations/geometry")
+async def get_organisations_geometry(
+    request: Request,
+    place_id: str,
+    limit: int = Query(default=200, ge=1, le=500),
+) -> dict[str, object]:
+    """GeoJSON FeatureCollection of charity registered-address locations
+    within a place. Each feature is a Point with properties: id, name,
+    income, cause, register_url.
+
+    Only charities with a postcode that resolves to a lat/lon are included.
+    Charities that operate here but are registered elsewhere are NOT
+    included (no coordinates for them).
+    """
+    engine = request.app.state.engine
+    async with engine.connect() as conn:
+        rows = (
+            await conn.execute(
+                text(
+                    """
+                    SELECT o.id, o.name,
+                           (o.raw->>'latest_income')::numeric AS income,
+                           o.raw->>'postcode' AS postcode,
+                           o.classification,
+                           p.latitude, p.longitude
+                    FROM data.organisation o
+                    JOIN geography.postcode p
+                        ON p.postcode = REPLACE(o.raw->>'postcode', ' ', '')
+                    WHERE o.registered_address_place_id = :pid
+                      AND p.latitude IS NOT NULL
+                      AND p.longitude IS NOT NULL
+                    ORDER BY (o.raw->>'latest_income')::numeric DESC NULLS LAST
+                    LIMIT :limit
+                    """
+                ),
+                {"pid": place_id, "limit": limit},
+            )
+        ).all()
+
+    features: list[dict[str, object]] = []
+    for r in rows:
+        reg_no = r.id.split(":", 1)[1] if ":" in r.id else None
+        register_url: str | None = None
+        if reg_no:
+            register_url = (
+                "https://register-of-charities.charitycommission.gov.uk/"
+                f"charity-search-/charity-details/{reg_no}"
+            )
+        classification = list(r.classification or [])
+        features.append(
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [float(r.longitude), float(r.latitude)],
+                },
+                "properties": {
+                    "id": r.id,
+                    "name": r.name,
+                    "income": float(r.income) if r.income is not None else None,
+                    "cause": classification[0] if classification else None,
+                    "register_url": register_url,
+                },
+            }
+        )
+    return {"type": "FeatureCollection", "features": features}

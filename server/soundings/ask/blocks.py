@@ -73,10 +73,14 @@ class InsightCalloutBlock(BaseModel):
 
 
 class MapOverlay(BaseModel):
-    # v1: amenity point locations only. air_quality/organisations had no point
-    # data and were never implemented.
-    source: Literal["amenities"]
-    indicator_keys: list[str] = Field(min_length=1, max_length=6)
+    # amenity point locations (OSM/Give Food) or organisation point locations
+    # (charity registered addresses from Charity Commission).
+    source: Literal["amenities", "organisations"]
+    indicator_keys: list[str] = Field(
+        default_factory=list,
+        max_length=6,
+        description="Required for amenities overlay; ignored for organisations overlay.",
+    )
 
 
 class MapBlock(BaseModel):
