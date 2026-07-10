@@ -41,14 +41,16 @@ _COLUMN_MAP: list[tuple[str, str, str]] = [
 _UPSERT_SQL = text(
     "INSERT INTO geography.postcode "
     "(postcode, lsoa21, msoa21, ltla24, ward24, "
-    " westminster_constituency_24, region, country, retrieved_at) "
+    " westminster_constituency_24, region, country, latitude, longitude, retrieved_at) "
     "VALUES (:postcode, :lsoa21, :msoa21, :ltla24, :ward24, "
-    "        :westminster_constituency_24, :region, :country, :retrieved_at) "
+    "        :westminster_constituency_24, :region, :country, "
+    "        :latitude, :longitude, :retrieved_at) "
     "ON CONFLICT (postcode) DO UPDATE SET "
     "  lsoa21 = EXCLUDED.lsoa21, msoa21 = EXCLUDED.msoa21, "
     "  ltla24 = EXCLUDED.ltla24, ward24 = EXCLUDED.ward24, "
     "  westminster_constituency_24 = EXCLUDED.westminster_constituency_24, "
     "  region = EXCLUDED.region, country = EXCLUDED.country, "
+    "  latitude = EXCLUDED.latitude, longitude = EXCLUDED.longitude, "
     "  retrieved_at = EXCLUDED.retrieved_at"
 )
 
@@ -151,4 +153,15 @@ def _map_row(
         code = (raw.get(nspl_col) or "").strip()
         place_id = f"{prefix}:{code}" if code else None
         mapped[our_col] = place_id if (place_id and place_id in valid_ids) else None
+    mapped["latitude"] = _coerce_float(raw.get("lat"))
+    mapped["longitude"] = _coerce_float(raw.get("long"))
     return mapped
+
+
+def _coerce_float(raw: str | None) -> float | None:
+    if raw is None or not raw.strip():
+        return None
+    try:
+        return float(raw)
+    except ValueError:
+        return None

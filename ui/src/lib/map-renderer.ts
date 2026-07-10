@@ -658,6 +658,128 @@ export function renderAmenityMap(
   };
 }
 
+/**
+ * Render a place boundary plus a single circle layer of organisation (charity)
+ * registered-address points, sized by income. Click popups show name, income,
+ * cause, and a link to the Charity Commission register page. Returns a
+ * cleanup function.
+ */
+export function renderOrganisationMap(
+  container: HTMLElement,
+  boundary: GeoJSON.Feature,
+  points: GeoJSON.FeatureCollection,
+  options: { tilesUrl?: string } = {},
+): () => void {
+  const map = new maplibregl.Map(baseMapOptions(container, options.tilesUrl));
+  let legend: HTMLElement | null = null;
+
+  map.on("load", () => {
+    map.addSource("boundary", { type: "geojson", data: boundary });
+    map.addLayer({
+      id: "boundary-fill",
+      type: "fill",
+      source: "boundary",
+      paint: { "fill-color": ACCENT_GREEN, "fill-opacity": 0.08 },
+    });
+    map.addLayer({
+      id: "boundary-outline",
+      type: "line",
+      source: "boundary",
+      paint: { "line-color": ACCENT_GREEN, "line-width": 1 },
+    });
+
+    if (points.features.length > 0) {
+      map.addSource("org-points", { type: "geojson", data: points });
+      map.addLayer({
+        id: "org-points",
+        type: "circle",
+        source: "org-points",
+        paint: {
+          "circle-radius": [
+            "interpolate",
+            ["linear"],
+            ["get", "income"],
+            0, 4,
+            100000, 5,
+            1000000, 7,
+            10000000, 9,
+          ],
+          "circle-color": NAVY,
+          "circle-stroke-color": CREAM,
+          "circle-stroke-width": 1,
+          "circle-opacity": 0.8,
+        },
+      });
+
+      const clickPopup = new maplibregl.Popup({
+        closeButton: true,
+        closeOnClick: false,
+        maxWidth: "260px",
+      });
+
+      map.on("click", "org-points", (e) => {
+        const f = e.features?.[0];
+        if (!f) return;
+        const props = (f.properties ?? {}) as Record<string, unknown>;
+        const name = (props.name as string | undefined) ?? "—";
+        const incomeRaw = props.income;
+        const income =
+          typeof incomeRaw === "number" && Number.isFinite(incomeRaw)
+            ? incomeRaw.toLocaleString("en-GB", {
+                style: "currency",
+                currency: "GBP",
+                maximumFractionDigits: 0,
+              }) + "/yr"
+            : "Income not reported";
+        const cause = (props.cause as string | undefined) ?? "";
+        const registerUrl = (props.register_url as string | undefined) ?? "";
+        const html =
+          `<div style="font-family:system-ui,sans-serif;font-size:13px;line-height:1.5">` +
+          `<strong>${escapeHtml(name)}</strong><br/>${escapeHtml(income)}` +
+          (cause
+            ? `<br/><span class="text-muted">${escapeHtml(cause)}</span>`
+            : "") +
+          (registerUrl
+            ? `<br/><a href="${escapeHtml(registerUrl)}" target="_blank">Register page →</a>`
+            : "") +
+          `</div>`;
+        const coords = (f.geometry as GeoJSON.Point | undefined)?.coordinates;
+        if (coords) {
+          clickPopup
+            .setLngLat(coords as [number, number])
+            .setHTML(html)
+            .addTo(map);
+        }
+      });
+
+      map.on("mouseenter", "org-points", () => {
+        map.getCanvas().style.cursor = "pointer";
+      });
+      map.on("mouseleave", "org-points", () => {
+        map.getCanvas().style.cursor = "";
+      });
+
+      // Legend entry for charities.
+      legend = document.createElement("div");
+      legend.className = "map-legend org-legend";
+      legend.innerHTML =
+        '<div class="legend-item">' +
+        '<span class="legend-swatch" style="background:#1a2f4e;border-radius:50%"></span>' +
+        " Charities</div>";
+      container.appendChild(legend);
+    }
+
+    map.fitBounds(featureBounds(boundary), { padding: 20 });
+  });
+
+  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
+
+  return () => {
+    legend?.remove();
+    map.remove();
+  };
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")

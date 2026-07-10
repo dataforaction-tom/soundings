@@ -1,7 +1,7 @@
 from datetime import date, datetime
 
 from geoalchemy2 import Geometry
-from sqlalchemy import Date, DateTime, ForeignKey, Index, String, Text, UniqueConstraint
+from sqlalchemy import Date, DateTime, ForeignKey, Index, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from soundings.db.models import Base
@@ -49,6 +49,8 @@ class Postcode(Base):
     )
     region: Mapped[str | None] = mapped_column(ForeignKey("geography.place.id"), nullable=True)
     country: Mapped[str | None] = mapped_column(ForeignKey("geography.place.id"), nullable=True)
+    latitude: Mapped[float | None] = mapped_column(Numeric(9, 6), nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Numeric(9, 6), nullable=True)
     retrieved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 

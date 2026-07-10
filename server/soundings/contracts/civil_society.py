@@ -48,6 +48,41 @@ class GrantYearSummary(BaseModel):
     total_gbp: float = Field(ge=0, description="Sum of GBP grants awarded in this year.")
 
 
+class NotableOrg(BaseModel):
+    id: str = Field(description="`{regulator}:{registration_number}` namespaced id.")
+    name: str
+    register_url: str | None = Field(default=None)
+    latest_income: float | None = Field(
+        default=None, description="Latest reported annual income in GBP, if available."
+    )
+    date_of_registration: str | None = Field(
+        default=None, description="ISO date string of first registration, if known."
+    )
+    year_registered: int | None = Field(
+        default=None, description="Calendar year of first registration, if known."
+    )
+
+
+class NotableOrgs(BaseModel):
+    oldest: NotableOrg | None = Field(default=None)
+    newest: NotableOrg | None = Field(default=None)
+    largest: NotableOrg | None = Field(
+        default=None, description="Charity with the highest `latest_income`."
+    )
+    income_concentration_top3_pct: float | None = Field(
+        default=None,
+        description="Combined income share (0-100) of the top three charities by income.",
+    )
+    income_concentration_top3_total: float | None = Field(
+        default=None, description="Combined GBP income of the top three charities."
+    )
+
+
+class CauseAreaCount(BaseModel):
+    label: str = Field(description="Cause-area label, e.g. 'Education', 'Health'.")
+    count: int = Field(ge=0)
+
+
 class CivilSocietyProfile(BaseModel):
     place_id: str
     total_organisations: int = Field(
@@ -112,3 +147,11 @@ class CivilSocietyProfile(BaseModel):
     sources: list[SourceRef] = Field(default_factory=list)
     caveats: list[str] = Field(default_factory=list)
     partial: bool = Field(default=False)
+    notable: NotableOrgs = Field(default_factory=NotableOrgs)
+    cause_area_distribution: list[CauseAreaCount] = Field(
+        default_factory=list,
+        description=(
+            "Count of charities per cause-area label. Empty when no cause-area"
+            " classification is available."
+        ),
+    )

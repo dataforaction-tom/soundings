@@ -29,6 +29,8 @@ class PostcodeLookup:
     westminster_constituency_24: str | None
     region: str | None
     country: str | None
+    latitude: float | None
+    longitude: float | None
 
     def place_id_references(self) -> list[str]:
         return [
@@ -66,6 +68,8 @@ class PostcodeLookup:
             westminster_constituency_24=keep(self.westminster_constituency_24),
             region=keep(self.region),
             country=keep(self.country),
+            latitude=self.latitude,
+            longitude=self.longitude,
         )
 
 
@@ -81,6 +85,15 @@ def _chunked(seq: list[str], n: int) -> list[list[str]]:
     return [seq[i : i + n] for i in range(0, len(seq), n)]
 
 
+def _coerce_optional_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return None
+
+
 def _upsert_postcode_stmt(normalised_postcode: str, lookup: PostcodeLookup) -> Any:
     stmt = insert(Postcode).values(
         postcode=normalised_postcode,
@@ -92,6 +105,8 @@ def _upsert_postcode_stmt(normalised_postcode: str, lookup: PostcodeLookup) -> A
         westminster_constituency_24=lookup.westminster_constituency_24,
         region=lookup.region,
         country=lookup.country,
+        latitude=lookup.latitude,
+        longitude=lookup.longitude,
         retrieved_at=datetime.now(tz=UTC),
     )
     return stmt.on_conflict_do_update(
@@ -105,6 +120,8 @@ def _upsert_postcode_stmt(normalised_postcode: str, lookup: PostcodeLookup) -> A
             "westminster_constituency_24": stmt.excluded.westminster_constituency_24,
             "region": stmt.excluded.region,
             "country": stmt.excluded.country,
+            "latitude": stmt.excluded.latitude,
+            "longitude": stmt.excluded.longitude,
             "retrieved_at": stmt.excluded.retrieved_at,
         },
     )
@@ -252,4 +269,6 @@ class PostcodesIoAdapter(PassthroughAdapter):
             ),
             region=_qualified("region", codes.get("region")),
             country=_qualified("country", codes.get("country")),
+            latitude=_coerce_optional_float(result.get("latitude")),
+            longitude=_coerce_optional_float(result.get("longitude")),
         )
